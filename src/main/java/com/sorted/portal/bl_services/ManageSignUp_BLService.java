@@ -107,7 +107,7 @@ public class ManageSignUp_BLService {
 			Users user = users_Service.repoFindOne(filterM);
 			if (user == null) {
 				user = new Users();
-			} else if (user.getIs_verified()) {
+			} else if (Boolean.TRUE.equals(user.getIs_verified())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.ALREADY_SIGNED_UP);
 			}
 
