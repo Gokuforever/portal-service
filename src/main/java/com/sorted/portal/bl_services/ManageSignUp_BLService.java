@@ -1,4 +1,4 @@
-package com.sorted.portal.signup;
+package com.sorted.portal.bl_services;
 
 import java.util.List;
 
@@ -23,7 +23,6 @@ import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.ProcessType;
 import com.sorted.commons.enums.ResponseCode;
-import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
@@ -60,7 +59,7 @@ public class ManageSignUp_BLService {
 
 	@Value("${se.portal.customer.signup.role}")
 	private String customer_signup_role;
-	
+
 //	private String getShortIdentified() {
 //		return this.getClass().getSimpleName();
 //	}
@@ -84,6 +83,18 @@ public class ManageSignUp_BLService {
 			}
 			if (!StringUtils.hasText(req.getPassword())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PASS);
+			}
+			if (!SERegExpUtils.isString(req.getFirst_name())) {
+				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_FN);
+			}
+			if (!SERegExpUtils.isString(req.getLast_name())) {
+				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_LN);
+			}
+			if (!SERegExpUtils.isMobileNo(req.getMobile_no())) {
+				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_MN);
+			}
+			if (!SERegExpUtils.isEmail(req.getEmail_id())) {
+				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_EI);
 			}
 			String password = req.getPassword().trim();
 			PasswordValidatorUtils.validatePassword(password);
@@ -117,7 +128,6 @@ public class ManageSignUp_BLService {
 			user.setMobile_no(req.getMobile_no());
 			user.setEmail_id(req.getEmail_id());
 			user.setPassword(encode);
-			user.setUser_type(UserType.CUSTOMER);
 
 			user = users_Service.upsert(user.getId(), user, Defaults.SIGN_UP);
 
@@ -149,7 +159,7 @@ public class ManageSignUp_BLService {
 	}
 
 	@PostMapping("/signup/verify")
-	public SEResponse verify(@RequestBody SERequest request) {
+	public SEResponse verify(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
 			log.info("/signup/verify:: API started");
 			VerifySignUp req = request.getGenericRequestDataObject(VerifySignUp.class);
@@ -195,8 +205,17 @@ public class ManageSignUp_BLService {
 			users.setRole_id(customer_signup_role);
 			users_Service.create(users, Defaults.SIGN_UP);
 
-			UsersBean usersBean = users_Service.validateUserForLogin(users.getId(), users.getRole_id());
-
+			UsersBean usersBean = users_Service.validateAndGetUserInfo(users.getId(), users.getRole_id());
+			
+			
+			String req_user_id = httpServletRequest.getHeader("req_user_id");
+			String req_role_id = httpServletRequest.getHeader("req_role_id");
+			if(StringUtils.hasText(req_user_id) && StringUtils.hasText(req_role_id)) {
+				SEFilter filterGuest = new SEFilter(SEFilterType.AND);
+				filterGuest.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req_user_id));
+				filterGuest.addClause(WhereClause.eq(Users.Fields.role_id, req_role_id));
+			}
+			
 			return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
