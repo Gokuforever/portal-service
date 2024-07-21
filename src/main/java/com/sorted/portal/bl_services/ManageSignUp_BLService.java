@@ -156,7 +156,7 @@ public class ManageSignUp_BLService {
 				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_OTP);
 			}
 			if (!StringUtils.hasText(reference_id)) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_OTP_REF);
+				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_REF_ID);
 			}
 			if (!StringUtils.hasText(entity_id)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
