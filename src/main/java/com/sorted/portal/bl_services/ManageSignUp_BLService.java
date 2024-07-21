@@ -1,26 +1,23 @@
 package com.sorted.portal.bl_services;
 
-import java.util.List;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sorted.commons.beans.OTPResponse;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
-import com.sorted.commons.entity.mongo.Otp;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Users;
-import com.sorted.commons.entity.service.Otp_Service;
 import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Users_Service;
+import com.sorted.commons.enums.EntityDetails;
 import com.sorted.commons.enums.ProcessType;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
@@ -33,8 +30,7 @@ import com.sorted.commons.manage.otp.ManageOtp;
 import com.sorted.commons.utils.PasswordValidatorUtils;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.request.beans.SignUpRequest;
-import com.sorted.portal.request.beans.VerifySignUp;
-import com.sorted.portal.response.beans.OTPResponse;
+import com.sorted.portal.request.beans.VerifyOtpBean;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -42,9 +38,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RestController
 public class ManageSignUp_BLService {
-
-	@Autowired
-	private Otp_Service otp_Service;
 
 	@Autowired
 	private ManageOtp manageOtp;
@@ -131,22 +124,12 @@ public class ManageSignUp_BLService {
 
 			user = users_Service.upsert(user.getId(), user, Defaults.SIGN_UP);
 
-			SEFilter filterO = new SEFilter(SEFilterType.AND);
-			filterO.addClause(WhereClause.eq(Otp.Fields.mobile_no, req.getMobile_no()));
-			filterO.addClause(WhereClause.eq(Otp.Fields.status, true));
-			filterO.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-			List<Otp> listOtp = otp_Service.repoFind(filterO);
-			if (!CollectionUtils.isEmpty(listOtp)) {
-				for (Otp otp : listOtp) {
-					otp.setStatus(false);
-					otp_Service.update(otp.getId(), otp, Defaults.SIGN_UP);
-				}
-			}
-			String uuid = manageOtp.send(req.getMobile_no(), user.getId(), ProcessType.SIGN_UP);
+			String uuid = manageOtp.send(req.getMobile_no(), user.getId(), ProcessType.SIGN_UP, EntityDetails.USERS,
+					Defaults.SIGN_UP);
 			OTPResponse response = new OTPResponse();
-			response.setEntity_id(user.getId());
 			response.setReference_id(uuid);
+			response.setEntity_id(user.getId());
+			response.setProcess_type(ProcessType.SIGN_UP.name());
 			log.info("signUp:: API ended");
 			return SEResponse.getBasicSuccessResponseObject(response, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
@@ -162,25 +145,24 @@ public class ManageSignUp_BLService {
 	public SEResponse verify(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
 			log.info("/signup/verify:: API started");
-			VerifySignUp req = request.getGenericRequestDataObject(VerifySignUp.class);
+			VerifyOtpBean req = request.getGenericRequestDataObject(VerifyOtpBean.class);
 			String otp = req.getOtp();
-			String entity_id = req.getEntity_id();
 			String reference_id = req.getReference_id();
+			String entity_id = req.getEntity_id();
 			if (!StringUtils.hasText(otp)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_OTP);
 			}
 			if (!SERegExpUtils.isOtp(otp)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_OTP);
 			}
-			if (!StringUtils.hasText(entity_id)) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
-			}
-			if (!StringUtils.hasText(entity_id)) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
-			}
 			if (!StringUtils.hasText(reference_id)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_OTP_REF);
 			}
+			if (!StringUtils.hasText(entity_id)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
+			}
+
+			manageOtp.verify(EntityDetails.USERS, reference_id, otp, entity_id, ProcessType.SIGN_UP, Defaults.SIGN_UP);
 
 			SEFilter filterCL = new SEFilter(SEFilterType.AND);
 			filterCL.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, entity_id));
@@ -199,23 +181,20 @@ public class ManageSignUp_BLService {
 			if (role == null) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MSSING_CUST_DEF_ROLE);
 			}
-
-			manageOtp.verify(users.getMobile_no(), entity_id, reference_id, otp, ProcessType.SIGN_UP, Defaults.SIGN_UP);
 			users.setIs_verified(true);
 			users.setRole_id(customer_signup_role);
-			users_Service.create(users, Defaults.SIGN_UP);
+			users_Service.update(users.getId(), users, Defaults.SIGN_UP);
 
 			UsersBean usersBean = users_Service.validateAndGetUserInfo(users.getId(), users.getRole_id());
-			
-			
+
 			String req_user_id = httpServletRequest.getHeader("req_user_id");
 			String req_role_id = httpServletRequest.getHeader("req_role_id");
-			if(StringUtils.hasText(req_user_id) && StringUtils.hasText(req_role_id)) {
+			if (StringUtils.hasText(req_user_id) && StringUtils.hasText(req_role_id)) {
 				SEFilter filterGuest = new SEFilter(SEFilterType.AND);
 				filterGuest.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req_user_id));
 				filterGuest.addClause(WhereClause.eq(Users.Fields.role_id, req_role_id));
 			}
-			
+
 			return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
