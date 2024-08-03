@@ -6,6 +6,6 @@ import lombok.Data;
 public class CartItemsBean {
 
 	private String product_id;
-	private Integer quantity;
-	private boolean add;
+	private Long quantity;
+	private boolean add_req;
 }
