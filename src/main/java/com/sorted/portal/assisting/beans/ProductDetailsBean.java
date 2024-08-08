@@ -16,4 +16,5 @@ public class ProductDetailsBean {
 	private String img_url;
 	private String description;
 	private List<ProductDetailsBean> varients = new ArrayList<>();
+	private List<ProductDetailsBean> related_products = new ArrayList<>();
 }
