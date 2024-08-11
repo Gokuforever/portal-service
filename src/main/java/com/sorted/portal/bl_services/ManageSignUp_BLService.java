@@ -185,7 +185,7 @@ public class ManageSignUp_BLService {
 			users.setRole_id(customer_signup_role);
 			users_Service.update(users.getId(), users, Defaults.SIGN_UP);
 
-			UsersBean usersBean = users_Service.validateAndGetUserInfo(users.getId(), users.getRole_id());
+			UsersBean usersBean = users_Service.validateAndGetUserInfo(users.getId());
 
 			String req_user_id = httpServletRequest.getHeader("req_user_id");
 			String req_role_id = httpServletRequest.getHeader("req_role_id");

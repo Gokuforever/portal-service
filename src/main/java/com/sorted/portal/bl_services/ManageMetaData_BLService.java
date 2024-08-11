@@ -51,8 +51,7 @@ public class ManageMetaData_BLService {
 	public SEResponse getUserInfo(HttpServletRequest httpServletRequest) {
 		try {
 			String req_user_id = httpServletRequest.getHeader("req_user_id");
-			String req_role_id = httpServletRequest.getHeader("req_role_id");
-			UsersBean usersBean = users_Service.validateAndGetUserInfo(req_user_id, req_role_id);
+			UsersBean usersBean = users_Service.validateAndGetUserInfo(req_user_id);
 			return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;

@@ -113,7 +113,7 @@ public class ManageCart_BLService {
 			if (!StringUtils.hasText(itemBean.getProduct_id())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_ID);
 			}
-			if (itemBean.getQuantity() == null || itemBean.getQuantity() <= 0) {
+			if (itemBean.getQuantity() == null || itemBean.getQuantity() < 0) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_QUANTITY);
 			}
 
@@ -126,7 +126,7 @@ public class ManageCart_BLService {
 				throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
 			}
 			List<Item> listItems = new ArrayList<>();
-			if (!itemBean.isAdd_req()) {
+			if (itemBean.getQuantity() == 0) {
 				List<Item> cart_items = cart.getCart_items().stream()
 						.filter(e -> !e.getProduct_id().equals(itemBean.getProduct_id())).collect(Collectors.toList());
 				if (!CollectionUtils.isEmpty(cart_items)) {
@@ -142,6 +142,10 @@ public class ManageCart_BLService {
 					throw new CustomIllegalArgumentsException(ResponseCode.ITEM_NOT_FOUND);
 				}
 
+				if (product.getQuantity().compareTo(itemBean.getQuantity()) < 0) {
+					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_QUANTITY);
+				}
+
 				Item item = new Item();
 				item.setProduct_id(product.getId());
 				item.setQuantity(itemBean.getQuantity());
@@ -155,7 +159,7 @@ public class ManageCart_BLService {
 			}
 
 			cart.setCart_items(listItems);
-			
+
 			cart_Service.update(cart.getId(), cart, req_user_id);
 
 			// TODO:: add items
@@ -182,8 +186,7 @@ public class ManageCart_BLService {
 
 			List<Products> listP = productService.repoFind(filterC);
 			if (!CollectionUtils.isEmpty(listP)) {
-				Map<String, Products> mapP = listP.stream()
-						.collect(Collectors.toMap(p -> p.getId(), p -> p));
+				Map<String, Products> mapP = listP.stream().collect(Collectors.toMap(p -> p.getId(), p -> p));
 				cart_items.stream().forEach(e -> {
 					if (mapP.containsKey(e.getProduct_id())) {
 						CartItems items = new CartItems();
@@ -192,6 +195,7 @@ public class ManageCart_BLService {
 						items.setProduct_code(e.getProduct_code());
 						items.setQuantity(e.getQuantity());
 						items.setSelling_price(products.getSelling_price());
+						items.setIn_stock(products.getQuantity().compareTo(e.getQuantity()) >= 0);
 						cartItems.add(items);
 					}
 				});

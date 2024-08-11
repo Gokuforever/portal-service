@@ -44,7 +44,7 @@ public class ManageGuest_BLService {
 
 			Users guest = users_Service.create(user, Defaults.AUTO);
 
-			UsersBean usersBean = users_Service.validateAndGetUserInfo(guest.getId(), guest_role_id);
+			UsersBean usersBean = users_Service.validateAndGetUserInfo(guest.getId());
 			return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
