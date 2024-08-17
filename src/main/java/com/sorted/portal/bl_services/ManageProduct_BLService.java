@@ -37,6 +37,7 @@ import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
+import com.sorted.commons.helper.AggregationFilter.SEFilterNode;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
@@ -126,7 +127,7 @@ public class ManageProduct_BLService {
 				}
 				SelectedSubCatagories subCatagories = new SelectedSubCatagories();
 				subCatagories.setSub_category(key);
-				subCatagories.setSelected_attributes(attributes);
+				subCatagories.setSelected_attributes(val);
 				listSC.add(subCatagories);
 			});
 
@@ -152,6 +153,14 @@ public class ManageProduct_BLService {
 			}
 			if (!SERegExpUtils.isPriceInDecimal(req.getMrp())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SELLING_PRICE);
+			}
+			String description = null;
+			if (StringUtils.hasText(req.getDescription())) {
+				if (!SERegExpUtils.standardTextValidation(req.getDescription())) {
+					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
+				}
+
+				description = req.getDescription().trim();
 			}
 			String varient_mapping_id = null;
 			if (StringUtils.hasText(req.getVarient_mapping_id())) {
@@ -205,6 +214,7 @@ public class ManageProduct_BLService {
 			product.setSeller_code(usersBean.getSeller().getCode());
 			product.setQuantity(Long.valueOf(req.getQuantity()));
 			product.setVarient_mapping_id(varient_mapping_id);
+			product.setDescription(description);
 			if (!CollectionUtils.isEmpty(req.getMedia())) {
 				product.setMedia(req.getMedia());
 			}
@@ -297,15 +307,19 @@ public class ManageProduct_BLService {
 				throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
 			}
 			SEFilter filterRI = new SEFilter(SEFilterType.AND);
+			List<SEFilterNode> nodes = new ArrayList<>();
 			for (Entry<String, List<String>> entry : relatedFilters.entrySet()) {
+				SEFilterNode node = new SEFilterNode(SEFilterType.OR);
 				if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
 					Map<String, String> keymap = new HashMap<>();
 					keymap.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
 					Map<String, List<?>> valmap = new HashMap<>();
 					valmap.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
-					filterRI.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, keymap, valmap));
+					node.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, keymap, valmap));
+					nodes.add(node);
 				}
 			}
+			filterRI.addNodes(nodes);
 			filterRI.addClause(WhereClause.notEq(BaseMongoEntity.Fields.id, product.getId()));
 			filterRI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
@@ -359,6 +373,9 @@ public class ManageProduct_BLService {
 				for (Products variant : variants) {
 					if (!variant.getId().equals(product.getId())) {
 						ProductDetailsBean variantBean = this.convertProductToBean(variant);
+						if(CollectionUtils.isEmpty(productDetailsBean.getVarients())) {
+							productDetailsBean.setVarients(new ArrayList<>());
+						}
 						productDetailsBean.getVarients().add(variantBean);
 					}
 				}

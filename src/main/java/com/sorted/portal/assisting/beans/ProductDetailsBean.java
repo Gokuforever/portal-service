@@ -15,6 +15,6 @@ public class ProductDetailsBean {
 	private BigDecimal selling_price;
 	private String img_url;
 	private String description;
-	private List<ProductDetailsBean> varients = new ArrayList<>();
-	private List<ProductDetailsBean> related_products = new ArrayList<>();
+	private List<ProductDetailsBean> varients;
+	private List<ProductDetailsBean> related_products;
 }
