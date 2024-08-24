@@ -1,5 +1,6 @@
 package com.sorted.portal.request.beans;
 
+import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.helper.ReqBaseBean;
 
 import lombok.Data;
@@ -7,9 +8,8 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = false)
-public class VerifyOtpBean extends ReqBaseBean {
+public class AddressBean extends ReqBaseBean {
 
-	private String otp;
-	private String entity_id;
-	private String reference_id;
+	private String cus_user_id;
+	private AddressDTO address;
 }

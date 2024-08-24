@@ -77,10 +77,10 @@ public class ManageSignUp_BLService {
 			if (!StringUtils.hasText(req.getPassword())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PASS);
 			}
-			if (!SERegExpUtils.isString(req.getFirst_name())) {
+			if (!SERegExpUtils.isAlphabeticString(req.getFirst_name())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_FN);
 			}
-			if (!SERegExpUtils.isString(req.getLast_name())) {
+			if (!SERegExpUtils.isAlphabeticString(req.getLast_name())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_LN);
 			}
 			if (!SERegExpUtils.isMobileNo(req.getMobile_no())) {

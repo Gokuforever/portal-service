@@ -21,18 +21,20 @@ public class RazorpayUtility {
 	private String rzr_secret;
 
 	@PostMapping("/create")
-	public void create(String order_id) throws RazorpayException {
-		
-		
+	public void create(Long amount, String order_id, String note) throws RazorpayException {
+
+		if (amount == null) {
+
+		}
 
 		RazorpayClient razorpay = new RazorpayClient(rzr_key, rzr_secret);
 
 		JSONObject orderRequest = new JSONObject();
-		orderRequest.put("amount", 500);
+		orderRequest.put("amount", amount);
 		orderRequest.put("currency", "INR");
-		orderRequest.put("receipt", "receipt#1");
+		orderRequest.put("receipt", order_id);
 		JSONObject notes = new JSONObject();
-		notes.put("notes_key_1", "Tea, Earl Grey, Hot");
+		notes.put("notes_key_1", note);
 		orderRequest.put("notes", notes);
 
 		Order order = razorpay.orders.create(orderRequest);

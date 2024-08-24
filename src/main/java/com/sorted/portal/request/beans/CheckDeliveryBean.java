@@ -7,9 +7,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = false)
-public class VerifyOtpBean extends ReqBaseBean {
+public class CheckDeliveryBean extends ReqBaseBean {
 
-	private String otp;
-	private String entity_id;
-	private String reference_id;
+	private String pincode;
 }

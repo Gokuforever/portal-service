@@ -1,7 +1,6 @@
 package com.sorted.portal.assisting.beans;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 
 import lombok.Data;
@@ -17,4 +16,5 @@ public class ProductDetailsBean {
 	private String description;
 	private List<ProductDetailsBean> varients;
 	private List<ProductDetailsBean> related_products;
+	private boolean is_deliverable;
 }

@@ -26,9 +26,11 @@ import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Category_Master;
 import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.mongo.Role;
+import com.sorted.commons.entity.mongo.Seller;
 import com.sorted.commons.entity.mongo.Varient_Mapping;
 import com.sorted.commons.entity.service.Category_MasterService;
 import com.sorted.commons.entity.service.ProductService;
+import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.entity.service.Varient_Mapping_Service;
 import com.sorted.commons.enums.Activity;
@@ -67,6 +69,9 @@ public class ManageProduct_BLService {
 	@Autowired
 	private Users_Service users_Service;
 
+	@Autowired
+	private Seller_Service seller_Service;
+
 	@PostMapping("/create")
 	public SEResponse create(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
@@ -74,6 +79,7 @@ public class ManageProduct_BLService {
 			CommonUtils.extractHeaders(httpServletRequest, req);
 			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
 					Activity.INVENTORY_MANAGEMENT);
+
 			Role role = usersBean.getRole();
 			switch (role.getUser_type()) {
 			case SELLER:
@@ -82,126 +88,18 @@ public class ManageProduct_BLService {
 			default:
 				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
 			}
-			if (!StringUtils.hasText(req.getCategory_id())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_CATEGORY);
-			}
-			if (!StringUtils.hasText(req.getName())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_NAME);
-			}
-			if (!SERegExpUtils.standardTextValidation(req.getName())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_NAME);
-			}
-			if (CollectionUtils.isEmpty(req.getSub_categories())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SUB_CATEGORY);
-			}
-			SEFilter filterC = new SEFilter(SEFilterType.AND);
-			filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getCategory_id()));
-			filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
-			Category_Master category_Master = category_MasterService.repoFindOne(filterC);
-			if (category_Master == null) {
-				throw new CustomIllegalArgumentsException(ResponseCode.CATEGORY_NOT_FOUND);
-			}
-			if (CollectionUtils.isEmpty(category_Master.getSub_categories())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-			}
-			Map<String, List<String>> mapSC = category_Master.getSub_categories().stream()
-					.collect(Collectors.toMap(e -> e.getName(),
-							e -> CollectionUtils.isEmpty(e.getAttributes()) ? new ArrayList<>() : e.getAttributes()));
-			List<SelectedSubCatagories> listSC = new ArrayList<>();
-			req.getSub_categories().forEach((key, val) -> {
-				if (!StringUtils.hasText(key)) {
-					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SUB_CATEGORY);
-				}
-				if (CollectionUtils.isEmpty(val)) {
-					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY_VAL);
-				}
-				if (!mapSC.containsKey(key)) {
-					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY);
-				}
-				List<String> attributes = mapSC.get(key);
-				if (!CollectionUtils.isEmpty(attributes)) {
-					if (!attributes.containsAll(val)) {
-						throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY);
-					}
-				}
-				SelectedSubCatagories subCatagories = new SelectedSubCatagories();
-				subCatagories.setSub_category(key);
-				subCatagories.setSelected_attributes(val);
-				listSC.add(subCatagories);
-			});
+			this.validateRequest(req);
 
-			category_Master.getSub_categories().stream().forEach(e -> {
-				if (e.isMandate() && !req.getSub_categories().containsKey(e.getName())) {
-					throw new CustomIllegalArgumentsException(e.getName() + " is mandatory.");
-				}
-			});
-			if (!StringUtils.hasText(req.getQuantity())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_QUANTITY);
-			}
-			if (!SERegExpUtils.isQuantity(req.getQuantity())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.INVAALID_PRODUCT_QUANTITY);
-			}
-			if (!StringUtils.hasText(req.getMrp())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_MRP);
-			}
-			if (!SERegExpUtils.isPriceInDecimal(req.getMrp())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_MRP);
-			}
-			if (!StringUtils.hasText(req.getSelling_price())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SP);
-			}
-			if (!SERegExpUtils.isPriceInDecimal(req.getMrp())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SELLING_PRICE);
-			}
-			String description = null;
-			if (StringUtils.hasText(req.getDescription())) {
-				if (!SERegExpUtils.standardTextValidation(req.getDescription())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
-				}
+			Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
 
-				description = req.getDescription().trim();
-			}
-			String varient_mapping_id = null;
-			if (StringUtils.hasText(req.getVarient_mapping_id())) {
-				SEFilter filterV = new SEFilter(SEFilterType.AND);
-				filterV.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-				filterV.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getVarient_mapping_id()));
+			Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master);
 
-				Varient_Mapping varient_Mapping = varient_Mapping_Service.repoFindOne(filterV);
-				if (varient_Mapping == null) {
-					throw new CustomIllegalArgumentsException(ResponseCode.VARIENT_NOT_FOUND);
-				}
-				varient_mapping_id = varient_Mapping.getId();
-			} else if (StringUtils.hasText(req.getVarient_name())) {
-				if (!SERegExpUtils.standardTextValidation(req.getVarient_name())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_VARIENT_NAME);
-				}
+			List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(req, mapSC);
 
-				String varient_name = CommonUtils.toTitleCase(req.getVarient_name());
+			this.validateMandatorySubCategories(category_Master, mapSC);
 
-				SEFilter filterV = new SEFilter(SEFilterType.AND);
-				filterV.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-				filterV.addClause(WhereClause.eq(Varient_Mapping.Fields.name, varient_name));
-				if (role.getUser_type() == UserType.SELLER) {
-					filterV.addClause(
-							WhereClause.eq(Varient_Mapping.Fields.seller_id, usersBean.getRole().getSeller_id()));
-				}
-				long count = varient_Mapping_Service.countByFilter(filterV);
-				if (count > 0) {
-					throw new CustomIllegalArgumentsException(ResponseCode.DUPLICATE_VARIENT);
-				}
-
-				Varient_Mapping varient = new Varient_Mapping();
-				varient.setName(varient_name);
-				if (role.getUser_type() == UserType.SELLER) {
-					varient.setSeller_id(role.getSeller_id());
-					varient.setSeller_code(role.getSeller_code());
-				}
-
-				varient = varient_Mapping_Service.create(varient, usersBean.getId());
-				varient_mapping_id = varient.getId();
-			}
+			String varient_mapping_id = this.upsertAndGetVarientMappingId(req, usersBean, role);
 
 			BigDecimal mrp = new BigDecimal(req.getMrp());
 			BigDecimal sp = new BigDecimal(req.getSelling_price());
@@ -214,7 +112,7 @@ public class ManageProduct_BLService {
 			product.setSeller_code(usersBean.getSeller().getCode());
 			product.setQuantity(Long.valueOf(req.getQuantity()));
 			product.setVarient_mapping_id(varient_mapping_id);
-			product.setDescription(description);
+			product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
 			if (!CollectionUtils.isEmpty(req.getMedia())) {
 				product.setMedia(req.getMedia());
 			}
@@ -236,36 +134,16 @@ public class ManageProduct_BLService {
 			CommonUtils.extractHeaders(httpServletRequest, req);
 			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.PRODUCTS,
 					Activity.INVENTORY_MANAGEMENT);
-			SEFilter filterSE = new SEFilter(SEFilterType.AND);
-			switch (usersBean.getRole().getUser_type()) {
-			case SELLER:
-				filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, usersBean.getRole().getSeller_id()));
-				filterSE.addClause(WhereClause.eq(Products.Fields.seller_code, usersBean.getRole().getSeller_code()));
-			default:
-				break;
-			}
-			if (!CollectionUtils.isEmpty(req.getFilters())) {
-				for (Entry<String, List<String>> entry : req.getFilters().entrySet()) {
-					if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
-						Map<String, String> keymap = new HashMap<>();
-						keymap.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
-						Map<String, List<?>> valmap = new HashMap<>();
-						valmap.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
-						filterSE.addClause(
-								WhereClause.elem_match(Products.Fields.selected_sub_catagories, keymap, valmap));
-					}
-				}
-			}
-			filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+			SEFilter filterSE = this.createFilterForProductList(req, usersBean);
 
 			List<Products> listP = productService.repoFind(filterSE);
 			if (CollectionUtils.isEmpty(listP)) {
 				return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
 			}
 
-			Map<String, List<Products>> mapV = this.getVarients(listP);
+			Set<String> seller_ids = this.getSellerByPincode(req.getPincode());
 
-			List<ProductDetailsBean> resList = this.productToBean(mapV, listP);
+			List<ProductDetailsBean> resList = this.convertToBean(null, listP, seller_ids);
 
 			return SEResponse.getBasicSuccessResponseList(resList, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
@@ -274,6 +152,50 @@ public class ManageProduct_BLService {
 			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
 			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
 		}
+	}
+
+	private SEFilter createFilterForProductList(FindProductBean req, UsersBean usersBean) {
+		SEFilter filterSE = new SEFilter(SEFilterType.AND);
+		switch (usersBean.getRole().getUser_type()) {
+		case SELLER:
+			filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, usersBean.getRole().getSeller_id()));
+			filterSE.addClause(WhereClause.eq(Products.Fields.seller_code, usersBean.getRole().getSeller_code()));
+		default:
+			break;
+		}
+		if (StringUtils.hasText(req.getName())) {
+			filterSE.addClause(WhereClause.like(Products.Fields.name, req.getName()));
+		}
+		if (!CollectionUtils.isEmpty(req.getFilters())) {
+			for (Entry<String, List<String>> entry : req.getFilters().entrySet()) {
+				if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
+					Map<String, Object> map = new HashMap<>();
+					map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
+					map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
+					filterSE.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+				}
+			}
+		}
+		filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+		return filterSE;
+	}
+
+	private Set<String> getSellerByPincode(String pincode) {
+		Set<String> seller_ids = new HashSet<>();
+		if (StringUtils.hasText(pincode)) {
+			if (!SERegExpUtils.isPincode(pincode)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PINCODE);
+			}
+			SEFilter filterS = new SEFilter(SEFilterType.AND);
+			filterS.addClause(WhereClause.eq(Seller.Fields.serviceable_pincodes, pincode));
+			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			List<Seller> sellers = seller_Service.repoFind(filterS);
+			if (!CollectionUtils.isEmpty(sellers)) {
+				seller_ids = sellers.stream().map(e -> e.getId()).collect(Collectors.toSet());
+			}
+		}
+		return seller_ids;
 	}
 
 	@PostMapping("/findOne")
@@ -311,11 +233,10 @@ public class ManageProduct_BLService {
 			for (Entry<String, List<String>> entry : relatedFilters.entrySet()) {
 				SEFilterNode node = new SEFilterNode(SEFilterType.OR);
 				if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
-					Map<String, String> keymap = new HashMap<>();
-					keymap.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
-					Map<String, List<?>> valmap = new HashMap<>();
-					valmap.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
-					node.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, keymap, valmap));
+					Map<String, Object> map = new HashMap<>();
+					map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
+					map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
+					node.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
 					nodes.add(node);
 				}
 			}
@@ -326,7 +247,8 @@ public class ManageProduct_BLService {
 			List<Products> listRI = productService.repoFind(filterRI);
 
 			Map<String, List<Products>> mapV = this.getVarients(product);
-			ProductDetailsBean resBean = this.productToBean(listRI, mapV, product);
+			Set<String> seller_ids = this.getSellerByPincode(req.getPincode());
+			ProductDetailsBean resBean = this.productToBean(listRI, mapV, product, seller_ids);
 
 			return SEResponse.getBasicSuccessResponseObject(resBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
@@ -344,18 +266,14 @@ public class ManageProduct_BLService {
 		}
 	}
 
-	private List<ProductDetailsBean> productToBean(Map<String, List<Products>> variantMap, List<Products> listP) {
-		return this.convertToBean(variantMap, listP);
-	}
-
 	private ProductDetailsBean productToBean(List<Products> relatedProducts, Map<String, List<Products>> variantMap,
-			Products product) {
-		ProductDetailsBean mainProductDetails = this.convertToBean(variantMap, Arrays.asList(product)).get(0);
+			Products product, Set<String> seller_ids) {
+		ProductDetailsBean mainProductDetails = this.convertToBean(variantMap, Arrays.asList(product), null).get(0);
 
 		if (!CollectionUtils.isEmpty(relatedProducts)) {
 			List<ProductDetailsBean> relatedProductDetailsList = new ArrayList<>();
 			for (Products temp : relatedProducts) {
-				relatedProductDetailsList.add(this.convertProductToBean(temp));
+				relatedProductDetailsList.add(this.convertProductToBean(temp, seller_ids));
 			}
 			mainProductDetails.setRelated_products(relatedProductDetailsList);
 		}
@@ -363,17 +281,18 @@ public class ManageProduct_BLService {
 		return mainProductDetails;
 	}
 
-	private List<ProductDetailsBean> convertToBean(Map<String, List<Products>> variantMap, List<Products> products) {
+	private List<ProductDetailsBean> convertToBean(Map<String, List<Products>> variantMap, List<Products> products,
+			Set<String> seller_ids) {
 		List<ProductDetailsBean> productDetailsList = new ArrayList<>();
 		for (Products product : products) {
-			ProductDetailsBean productDetailsBean = this.convertProductToBean(product);
+			ProductDetailsBean productDetailsBean = this.convertProductToBean(product, seller_ids);
 			if (StringUtils.hasText(product.getVarient_mapping_id()) && !CollectionUtils.isEmpty(variantMap)
 					&& variantMap.containsKey(product.getVarient_mapping_id())) {
 				List<Products> variants = variantMap.get(product.getVarient_mapping_id());
 				for (Products variant : variants) {
 					if (!variant.getId().equals(product.getId())) {
-						ProductDetailsBean variantBean = this.convertProductToBean(variant);
-						if(CollectionUtils.isEmpty(productDetailsBean.getVarients())) {
+						ProductDetailsBean variantBean = this.convertProductToBean(variant, seller_ids);
+						if (CollectionUtils.isEmpty(productDetailsBean.getVarients())) {
 							productDetailsBean.setVarients(new ArrayList<>());
 						}
 						productDetailsBean.getVarients().add(variantBean);
@@ -385,13 +304,16 @@ public class ManageProduct_BLService {
 		return productDetailsList;
 	}
 
-	private ProductDetailsBean convertProductToBean(Products product) {
+	private ProductDetailsBean convertProductToBean(Products product, Set<String> seller_ids) {
 		ProductDetailsBean bean = new ProductDetailsBean();
 		bean.setName(product.getName());
 		bean.setId(product.getId());
 		bean.setProduct_code(product.getProduct_code());
 		bean.setSelling_price(CommonUtils.paiseToRupee(product.getSelling_price()));
 		bean.setDescription(product.getDescription());
+		if (!CollectionUtils.isEmpty(seller_ids)) {
+			bean.set_deliverable(seller_ids.contains(product.getSeller_id()));
+		}
 		return bean;
 	}
 
@@ -433,6 +355,141 @@ public class ManageProduct_BLService {
 			mapV.get(e.getVarient_mapping_id()).add(e);
 		});
 		return mapV;
+	}
+
+	private void validateRequest(ProductReqBean req) {
+		if (!StringUtils.hasText(req.getCategory_id())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_CATEGORY);
+		}
+		if (!StringUtils.hasText(req.getName())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_NAME);
+		}
+		if (!SERegExpUtils.standardTextValidation(req.getName())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_NAME);
+		}
+		if (CollectionUtils.isEmpty(req.getSub_categories())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SUB_CATEGORY);
+		}
+		if (!StringUtils.hasText(req.getQuantity())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_QUANTITY);
+		}
+		if (!SERegExpUtils.isQuantity(req.getQuantity())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.INVAALID_PRODUCT_QUANTITY);
+		}
+		if (!StringUtils.hasText(req.getMrp())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_MRP);
+		}
+		if (!SERegExpUtils.isPriceInDecimal(req.getMrp())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_MRP);
+		}
+		if (!StringUtils.hasText(req.getSelling_price())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SP);
+		}
+		if (!SERegExpUtils.isPriceInDecimal(req.getMrp())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SELLING_PRICE);
+		}
+		if (StringUtils.hasText(req.getDescription()) && !SERegExpUtils.standardTextValidation(req.getDescription())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
+		}
+	}
+
+	private Category_Master getCategoryMaster(String categoryId) {
+		SEFilter filterC = new SEFilter(SEFilterType.AND);
+		filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, categoryId));
+		filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+		Category_Master categoryMaster = category_MasterService.repoFindOne(filterC);
+		if (categoryMaster == null) {
+			throw new CustomIllegalArgumentsException(ResponseCode.CATEGORY_NOT_FOUND);
+		}
+		return categoryMaster;
+	}
+
+	private Map<String, List<String>> getSubCategoriesMap(Category_Master categoryMaster) {
+		if (CollectionUtils.isEmpty(categoryMaster.getSub_categories())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+
+		return categoryMaster.getSub_categories().stream().collect(Collectors.toMap(e -> e.getName(),
+				e -> CollectionUtils.isEmpty(e.getAttributes()) ? new ArrayList<>() : e.getAttributes()));
+	}
+
+	private List<SelectedSubCatagories> buildSelectedSubCategories(ProductReqBean req,
+			Map<String, List<String>> mapSC) {
+		List<SelectedSubCatagories> listSC = new ArrayList<>();
+		req.getSub_categories().forEach((key, val) -> {
+			if (!StringUtils.hasText(key)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SUB_CATEGORY);
+			}
+			if (CollectionUtils.isEmpty(val)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY_VAL);
+			}
+			if (!mapSC.containsKey(key)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY);
+			}
+
+			List<String> attributes = mapSC.get(key);
+			if (!CollectionUtils.isEmpty(attributes) && !attributes.containsAll(val)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY);
+			}
+
+			SelectedSubCatagories subCatagories = new SelectedSubCatagories();
+			subCatagories.setSub_category(key);
+			subCatagories.setSelected_attributes(val);
+			listSC.add(subCatagories);
+		});
+		return listSC;
+	}
+
+	private void validateMandatorySubCategories(Category_Master categoryMaster,
+			Map<String, List<String>> subCategories) {
+		categoryMaster.getSub_categories().forEach(e -> {
+			if (e.isMandate() && !subCategories.containsKey(e.getName())) {
+				throw new CustomIllegalArgumentsException(e.getName() + " is mandatory.");
+			}
+		});
+	}
+
+	private String upsertAndGetVarientMappingId(ProductReqBean req, UsersBean usersBean, Role role) {
+		if (StringUtils.hasText(req.getVarient_mapping_id())) {
+			SEFilter filterV = new SEFilter(SEFilterType.AND);
+			filterV.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+			filterV.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getVarient_mapping_id()));
+
+			Varient_Mapping varient_Mapping = varient_Mapping_Service.repoFindOne(filterV);
+			if (varient_Mapping == null) {
+				throw new CustomIllegalArgumentsException(ResponseCode.VARIENT_NOT_FOUND);
+			}
+			return varient_Mapping.getId();
+		} else if (StringUtils.hasText(req.getVarient_name())) {
+			if (!SERegExpUtils.standardTextValidation(req.getVarient_name())) {
+				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_VARIENT_NAME);
+			}
+
+			String varient_name = CommonUtils.toTitleCase(req.getVarient_name());
+
+			SEFilter filterV = new SEFilter(SEFilterType.AND);
+			filterV.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+			filterV.addClause(WhereClause.eq(Varient_Mapping.Fields.name, varient_name));
+			if (role.getUser_type() == UserType.SELLER) {
+				filterV.addClause(WhereClause.eq(Varient_Mapping.Fields.seller_id, usersBean.getRole().getSeller_id()));
+			}
+			long count = varient_Mapping_Service.countByFilter(filterV);
+			if (count > 0) {
+				throw new CustomIllegalArgumentsException(ResponseCode.DUPLICATE_VARIENT);
+			}
+
+			Varient_Mapping varient = new Varient_Mapping();
+			varient.setName(varient_name);
+			if (role.getUser_type() == UserType.SELLER) {
+				varient.setSeller_id(role.getSeller_id());
+				varient.setSeller_code(role.getSeller_code());
+			}
+
+			varient = varient_Mapping_Service.create(varient, usersBean.getId());
+			return varient.getId();
+		}
+		return null;
 	}
 
 }
