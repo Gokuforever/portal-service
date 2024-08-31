@@ -10,7 +10,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Category_Master;
+import com.sorted.commons.entity.mongo.Product_Master;
 import com.sorted.commons.entity.service.Category_MasterService;
+import com.sorted.commons.entity.service.Product_Master_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
@@ -18,6 +20,7 @@ import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SEResponse;
+import com.sorted.portal.response.beans.MetaData;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -32,19 +35,28 @@ public class ManageMetaData_BLService {
 	@Autowired
 	private Users_Service users_Service;
 
+	@Autowired
+	private Product_Master_Service product_Master_Service;
+
 	@PostMapping("/getMetaData")
 	public SEResponse getMetaData() {
 		log.info("getMetaData:: API started");
+		MetaData data = new MetaData();
 		SEFilter filterCM = new SEFilter(SEFilterType.AND);
 		filterCM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 		filterCM.addProjection(Category_Master.Fields.name, Category_Master.Fields.sub_categories,
 				Category_Master.Fields.category_code);
 		List<Category_Master> listCM = category_MasterService.repoFind(filterCM);
-		if (CollectionUtils.isEmpty(listCM)) {
-			return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+		if (!CollectionUtils.isEmpty(listCM)) {
+			data.setCatagories(listCM);
+		}
+
+		List<Product_Master> listPM = product_Master_Service.repoFindAll();
+		if (!CollectionUtils.isEmpty(listPM)) {
+			data.setProducts(listPM);
 		}
 		log.info("getMetaData:: API ended");
-		return SEResponse.getBasicSuccessResponseList(listCM, ResponseCode.SUCCESSFUL);
+		return SEResponse.getBasicSuccessResponseObject(data, ResponseCode.SUCCESSFUL);
 	}
 
 	@PostMapping("/getUserInfo")
