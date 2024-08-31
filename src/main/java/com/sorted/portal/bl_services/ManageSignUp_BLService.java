@@ -57,6 +57,9 @@ public class ManageSignUp_BLService {
 //		return this.getClass().getSimpleName();
 //	}
 
+//	@Autowired
+//	private EmailSenderImpl emailSenderImpl;
+
 	@PostMapping("/signup")
 	public SEResponse signUp(@RequestBody SERequest request, HttpServletRequest servletRequest) {
 		try {
@@ -186,14 +189,6 @@ public class ManageSignUp_BLService {
 			users_Service.update(users.getId(), users, Defaults.SIGN_UP);
 
 			UsersBean usersBean = users_Service.validateAndGetUserInfo(users.getId());
-
-			String req_user_id = httpServletRequest.getHeader("req_user_id");
-			String req_role_id = httpServletRequest.getHeader("req_role_id");
-			if (StringUtils.hasText(req_user_id) && StringUtils.hasText(req_role_id)) {
-				SEFilter filterGuest = new SEFilter(SEFilterType.AND);
-				filterGuest.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req_user_id));
-				filterGuest.addClause(WhereClause.eq(Users.Fields.role_id, req_role_id));
-			}
 
 			return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
