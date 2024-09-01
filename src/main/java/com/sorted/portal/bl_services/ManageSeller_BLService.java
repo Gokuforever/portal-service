@@ -76,12 +76,6 @@ public class ManageSeller_BLService {
 
 	private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-	@Value("${se.portal.default.page}")
-	private int default_page;
-
-	@Value("${se.portal.default.size}")
-	private int default_size;
-
 	@PostMapping("/create")
 	public SEResponse create(@RequestBody SERequest request, HttpServletRequest servletRequest) {
 		try {
