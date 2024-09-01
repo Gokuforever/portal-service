@@ -104,7 +104,6 @@ public class ManageSeller_BLService {
 			if (addressDTO == null) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ADDRESS);
 			}
-			// TODO: create new record for address
 			Address address = ValidationUtil.validateAddress(addressDTO);
 			List<Spoc_Details> spoc_details = req.getSpoc_details();
 			if (CollectionUtils.isEmpty(spoc_details)) {
