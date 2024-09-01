@@ -10,4 +10,5 @@ public class CartItems {
 	private Long selling_price;
 	private Long quantity;
 	private boolean in_stock;
+	private boolean secure_item;
 }

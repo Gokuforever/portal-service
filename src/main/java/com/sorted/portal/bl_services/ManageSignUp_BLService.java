@@ -13,8 +13,10 @@ import com.sorted.commons.beans.OTPResponse;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
+import com.sorted.commons.entity.mongo.Cart;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Users;
+import com.sorted.commons.entity.service.Cart_Service;
 import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.EntityDetails;
@@ -52,6 +54,9 @@ public class ManageSignUp_BLService {
 
 	@Value("${se.portal.customer.signup.role}")
 	private String customer_signup_role;
+
+	@Autowired
+	private Cart_Service cart_Service;
 
 //	private String getShortIdentified() {
 //		return this.getClass().getSimpleName();
@@ -187,6 +192,22 @@ public class ManageSignUp_BLService {
 			users.setIs_verified(true);
 			users.setRole_id(customer_signup_role);
 			users_Service.update(users.getId(), users, Defaults.SIGN_UP);
+
+			Cart new_cart = new Cart();
+			new_cart.setUser_id(users.getId());
+			String req_user_id = httpServletRequest.getHeader("req_user_id");
+			if (StringUtils.hasText(req_user_id)) {
+				SEFilter filterC = new SEFilter(SEFilterType.AND);
+				filterC.addClause(WhereClause.eq(Cart.Fields.user_id, req_user_id));
+				filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+				Cart cart = cart_Service.repoFindOne(filterC);
+				if (cart != null) {
+					new_cart.setCart_items(cart.getCart_items());
+				}
+			}
+
+			cart_Service.create(new_cart, Defaults.SIGN_UP);
 
 			UsersBean usersBean = users_Service.validateAndGetUserInfo(users.getId());
 

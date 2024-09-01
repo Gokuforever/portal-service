@@ -7,5 +7,5 @@ public class CartItemsBean {
 
 	private String product_id;
 	private Long quantity;
-	private boolean add_req;
+	private boolean secure_item;
 }

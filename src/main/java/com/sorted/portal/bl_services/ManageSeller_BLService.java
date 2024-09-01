@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.CollectionUtils;
@@ -19,10 +20,12 @@ import com.sorted.commons.beans.Bank_Details;
 import com.sorted.commons.beans.OTPResponse;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.beans.UsersBean;
+import com.sorted.commons.entity.mongo.Address;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Seller;
 import com.sorted.commons.entity.mongo.Users;
+import com.sorted.commons.entity.service.Address_Service;
 import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
@@ -33,9 +36,12 @@ import com.sorted.commons.enums.ProcessType;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.helper.AggregationFilter.OrderBy;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
+import com.sorted.commons.helper.AggregationFilter.SortOrder;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
+import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.manage.otp.ManageOtp;
@@ -44,7 +50,9 @@ import com.sorted.commons.utils.PasswordValidatorUtils;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.commons.utils.ValidationUtil;
 import com.sorted.portal.request.beans.CUDSellerBean;
+import com.sorted.portal.request.beans.FidnSellerBean;
 import com.sorted.portal.request.beans.VerifyOtpBean;
+import com.sorted.portal.response.beans.FindResBean;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -63,7 +71,16 @@ public class ManageSeller_BLService {
 	@Autowired
 	private ManageOtp manageOtp;
 
+	@Autowired
+	private Address_Service address_Service;
+
 	private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
+	@Value("${se.portal.default.page}")
+	private int default_page;
+
+	@Value("${se.portal.default.size}")
+	private int default_size;
 
 	@PostMapping("/create")
 	public SEResponse create(@RequestBody SERequest request, HttpServletRequest servletRequest) {
@@ -95,7 +112,7 @@ public class ManageSeller_BLService {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ADDRESS);
 			}
 			// TODO: create new record for address
-//			Address address = ValidationUtil.validateAddress(addressDTO);
+			Address address = ValidationUtil.validateAddress(addressDTO);
 			List<Spoc_Details> spoc_details = req.getSpoc_details();
 			if (CollectionUtils.isEmpty(spoc_details)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC);
@@ -191,7 +208,6 @@ public class ManageSeller_BLService {
 			String name = CommonUtils.toTitleCase(req.getName());
 			String pan_no = req.getPan_no();
 			seller.setBusiness_name(name);
-//			seller.setBusiness_address(address);
 			seller.setSpoc_details(spoc_details);
 			seller.setServiceable_pincodes(serviceable_pincodes);
 			seller.setCompany_pan(pan_no);
@@ -200,6 +216,11 @@ public class ManageSeller_BLService {
 			seller = seller_Service.upsert(seller.getId(), seller, usersBean.getId());
 			String uuid = manageOtp.send(primary_spoc.getMobile_no(), seller.getId(), ProcessType.SELLER_ONBOARDING,
 					EntityDetails.SELLER, usersBean.getId());
+
+			address.setUser_type(UserType.SELLER);
+			address.setEntity_id(seller.getId());
+			address_Service.create(address, req.getReq_user_id());
+
 			OTPResponse response = new OTPResponse();
 			response.setReference_id(uuid);
 			response.setEntity_id(seller.getId());
@@ -272,8 +293,88 @@ public class ManageSeller_BLService {
 			String generatePassword = PasswordValidatorUtils.generatePassword();
 			String encode = passwordEncoder.encode(generatePassword);
 			user.setPassword(encode);
-			
+
+			SEFilter filterU = new SEFilter(SEFilterType.AND);
+			filterU.addClause(WhereClause.eq(Users.Fields.mobile_no, spoc_Details.getMobile_no()));
+			filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			long duplicate = users_Service.countByFilter(filterU);
+			if (duplicate > 0) {
+				throw new CustomIllegalArgumentsException(ResponseCode.DUPLICATE_USER_MOBILE);
+			}
+			filterU = new SEFilter(SEFilterType.AND);
+			filterU.addClause(WhereClause.eq(Users.Fields.email_id, spoc_Details.getEmail_id()));
+			filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			duplicate = users_Service.countByFilter(filterU);
+			if (duplicate > 0) {
+				throw new CustomIllegalArgumentsException(ResponseCode.DUPLICATE_USER_EMAIL);
+			}
+
 			// TODO: send email notification
+
+		} catch (CustomIllegalArgumentsException ex) {
+			throw ex;
+		} catch (Exception e) {
+			log.error("/seller/create:: exception occurred");
+			log.error("/seller/create:: {}", e.getMessage());
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
+	@PostMapping("/find")
+	public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+		try {
+			log.info("find seller API started.");
+			FidnSellerBean req = request.getGenericRequestDataObject(FidnSellerBean.class);
+			CommonUtils.extractHeaders(httpServletRequest, req);
+			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(),
+					Activity.SELLER_MANAGEMENT);
+
+			Role role = usersBean.getRole();
+			switch (role.getUser_type()) {
+			case SUPER_ADMIN:
+				break;
+			default:
+				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+			}
+
+			FindResBean bean = new FindResBean();
+
+			SEFilter filterS = new SEFilter(SEFilterType.AND);
+			if (StringUtils.hasText(req.getName())) {
+				filterS.addClause(WhereClause.like(Seller.Fields.business_name, req.getName().trim()));
+			}
+
+			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			OrderBy orderBy = new OrderBy();
+			orderBy.setKey(BaseMongoEntity.Fields.modification_date);
+			orderBy.setType(SortOrder.DESC);
+			filterS.setOrderBy(orderBy);
+
+			long total_count = seller_Service.countByFilter(filterS);
+			if (total_count == 0) {
+				return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
+			}
+
+			int page = req.getPage();
+			int size = req.getSize();
+			Pagination pagination = new Pagination(page, size);
+
+			filterS.setPagination(pagination);
+
+			List<Seller> listS = seller_Service.repoFind(filterS);
+			if (CollectionUtils.isEmpty(listS)) {
+				return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
+			}
+
+			if (pagination.getPage() == 0) {
+				bean.setTotal_count(total_count);
+			}
+
+			bean.setList(listS);
+			return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
 
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
