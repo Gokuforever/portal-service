@@ -79,20 +79,6 @@ public class ManageAddress_BLService {
 			address.setEntity_id(usersBean.getId());
 			address_Service.create(address, req.getReq_user_id());
 
-//			List<Address> addresses = usersBean.getAddresses();
-//			if (CollectionUtils.isEmpty(addresses)) {
-//				addresses = new ArrayList<>();
-//			}
-//			addresses.add(address);
-
-//			SEFilter filterU = new SEFilter(SEFilterType.AND);
-//			filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, usersBean.getId()));
-//			filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-//
-//			Users users = users_Service.repoFindOne(filterU);
-//			users.setAddresses(addresses);
-//
-//			users_Service.update(users.getId(), users, users.getId());
 			return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;

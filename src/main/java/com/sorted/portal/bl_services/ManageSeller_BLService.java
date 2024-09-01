@@ -19,12 +19,16 @@ import com.sorted.commons.beans.Bank_Details;
 import com.sorted.commons.beans.OTPResponse;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.beans.UsersBean;
+import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.Address;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
+import com.sorted.commons.entity.mongo.Plans;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Seller;
 import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.Address_Service;
+import com.sorted.commons.entity.service.Plans_Service;
+import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
@@ -72,6 +76,12 @@ public class ManageSeller_BLService {
 
 	@Autowired
 	private Address_Service address_Service;
+
+	@Autowired
+	private Plans_Service plans_Service;
+
+	@Autowired
+	private RoleService roleService;
 
 	private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -276,15 +286,8 @@ public class ManageSeller_BLService {
 			if (findFirst.isEmpty()) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRIMARY_SPOC);
 			}
+
 			Spoc_Details spoc_Details = findFirst.get();
-			Users user = new Users();
-			user.setFirst_name(spoc_Details.getFirst_name());
-			user.setLast_name(spoc_Details.getLast_name());
-			user.setMobile_no(spoc_Details.getMobile_no());
-			user.setEmail_id(spoc_Details.getEmail_id());
-			String generatePassword = PasswordValidatorUtils.generatePassword();
-			String encode = passwordEncoder.encode(generatePassword);
-			user.setPassword(encode);
 
 			SEFilter filterU = new SEFilter(SEFilterType.AND);
 			filterU.addClause(WhereClause.eq(Users.Fields.mobile_no, spoc_Details.getMobile_no()));
@@ -302,6 +305,38 @@ public class ManageSeller_BLService {
 			if (duplicate > 0) {
 				throw new CustomIllegalArgumentsException(ResponseCode.DUPLICATE_USER_EMAIL);
 			}
+
+			SEFilter filterP = new SEFilter(SEFilterType.AND);
+			filterP.addClause(WhereClause.eq(Plans.Fields.name, Defaults.DEFAULT_SELLER_PLAN));
+			filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			Plans plan = plans_Service.repoFindOne(filterP);
+			if (plan == null) {
+				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_DEF_SELLER_PLAN);
+			}
+
+			Users user = new Users();
+			user.setFirst_name(spoc_Details.getFirst_name());
+			user.setLast_name(spoc_Details.getLast_name());
+			user.setMobile_no(spoc_Details.getMobile_no());
+			user.setEmail_id(spoc_Details.getEmail_id());
+			String generatePassword = PasswordValidatorUtils.generatePassword();
+			String encode = passwordEncoder.encode(generatePassword);
+			user.setPassword(encode);
+
+			List<Role> roles = plan.getRoles();
+			roles.stream().forEach(e -> {
+				e.setSeller_code(seller.getCode());
+				e.setSeller_id(seller.getId());
+				e.setUser_type(UserType.SELLER);
+				e.setUser_type_id(UserType.SELLER.getId());
+				Role temp = roleService.create(e, usersBean.getId());
+				if (e.getName().equals("ADMIN")) {
+					user.setRole_id(temp.getId());
+				}
+			});
+
+			users_Service.create(user, usersBean.getId());
 
 			// TODO: send email notification
 
