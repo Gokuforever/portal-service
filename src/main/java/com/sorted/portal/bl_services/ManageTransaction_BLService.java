@@ -8,21 +8,25 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sorted.commons.beans.Item;
 import com.sorted.commons.beans.UsersBean;
+import com.sorted.commons.entity.mongo.Address;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Cart;
 import com.sorted.commons.entity.mongo.Order_Item;
 import com.sorted.commons.entity.mongo.Products;
+import com.sorted.commons.entity.service.Address_Service;
 import com.sorted.commons.entity.service.Cart_Service;
 import com.sorted.commons.entity.service.ProductService;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
@@ -48,6 +52,9 @@ public class ManageTransaction_BLService {
 	@Autowired
 	private ProductService productService;
 
+	@Autowired
+	private Address_Service address_Service;
+
 	@PostMapping("/pay")
 	public SEResponse pay(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
@@ -63,6 +70,20 @@ public class ManageTransaction_BLService {
 			default:
 				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
 			}
+			if (!StringUtils.hasText(req.getDelivery_address_id())) {
+				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_DELIVERY_ADD);
+			}
+
+			SEFilter filterA = new SEFilter(SEFilterType.AND);
+			filterA.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getDelivery_address_id()));
+			filterA.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+			filterA.addClause(WhereClause.eq(Address.Fields.entity_id, usersBean.getId()));
+			filterA.addClause(WhereClause.eq(Address.Fields.user_type, UserType.CUSTOMER.name()));
+
+			Address address = address_Service.repoFindOne(filterA);
+			if (address == null) {
+				throw new CustomIllegalArgumentsException(ResponseCode.ADDRESS_NOT_FOUND);
+			}
 
 			SEFilter filterC = new SEFilter(SEFilterType.AND);
 			filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
@@ -72,11 +93,12 @@ public class ManageTransaction_BLService {
 			if (cart == null) {
 				throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
 			}
+
 			List<Item> cart_items = cart.getCart_items();
 			if (CollectionUtils.isEmpty(cart_items)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.CART_EMPTY);
 			}
-			Set<String> product_ids = cart_items.stream().map(e -> e.getProduct_id()).collect(Collectors.toSet());
+			Set<String> product_ids = cart_items.stream().map(Item::getProduct_id).collect(Collectors.toSet());
 			SEFilter filterP = new SEFilter(SEFilterType.AND);
 			filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(product_ids)));
 			filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -99,15 +121,15 @@ public class ManageTransaction_BLService {
 				}
 
 				Order_Item order_Item = new Order_Item();
-				order_Item.setQuantity(item.getQuantity());
 				order_Item.setProduct_id(product.getId());
 				order_Item.setProduct_code(product.getProduct_code());
+				order_Item.setQuantity(item.getQuantity());
 				order_Item.setSelling_price(product.getSelling_price());
 				order_Item.setTotal_cost(product.getSelling_price() * item.getQuantity());
 				listOI.add(order_Item);
 
 			}
-			
+
 //			Order_Details order_Details = new Order_Details();
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
