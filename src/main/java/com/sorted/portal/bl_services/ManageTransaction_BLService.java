@@ -1,5 +1,8 @@
 package com.sorted.portal.bl_services;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +28,7 @@ import com.sorted.commons.entity.service.Cart_Service;
 import com.sorted.commons.entity.service.ProductService;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
+import com.sorted.commons.enums.PurchaseType;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
@@ -98,7 +102,21 @@ public class ManageTransaction_BLService {
 			if (CollectionUtils.isEmpty(cart_items)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.CART_EMPTY);
 			}
+			LocalDateTime return_date = null;
+			boolean has_secure = cart_items.stream().anyMatch(Item::is_secure);
+			if (has_secure) {
+				if (!StringUtils.hasText(req.getReturn_date())) {
+					throw new CustomIllegalArgumentsException(ResponseCode.MISSING_RETURN_DATE);
+				}
+				try {
+					return_date = LocalDate.parse(req.getReturn_date()).atTime(LocalTime.MAX);
+				} catch (Exception e) {
+					log.error("pay:: Exception occurred:: {}", e.getMessage());
+					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_RETURN_DATE);
+				}
+			}
 			Set<String> product_ids = cart_items.stream().map(Item::getProduct_id).collect(Collectors.toSet());
+
 			SEFilter filterP = new SEFilter(SEFilterType.AND);
 			filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(product_ids)));
 			filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -126,6 +144,12 @@ public class ManageTransaction_BLService {
 				order_Item.setQuantity(item.getQuantity());
 				order_Item.setSelling_price(product.getSelling_price());
 				order_Item.setTotal_cost(product.getSelling_price() * item.getQuantity());
+				if (item.is_secure()) {
+					order_Item.setType(PurchaseType.SECURE);
+					order_Item.setReturn_date(return_date);
+				} else {
+					order_Item.setType(PurchaseType.BUY);
+				}
 				listOI.add(order_Item);
 
 			}

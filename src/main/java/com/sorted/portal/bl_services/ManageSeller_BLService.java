@@ -402,7 +402,6 @@ public class ManageSeller_BLService {
 
 			bean.setList(listS);
 			return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
-
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
 		} catch (Exception e) {

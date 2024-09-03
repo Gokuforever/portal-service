@@ -63,8 +63,7 @@ public class ManageCart_BLService {
 			UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Permission.VIEW,
 					Activity.CART_MANAGEMENT);
 			switch (usersBean.getRole().getUser_type()) {
-			case CUSTOMER:
-			case GUEST:
+			case CUSTOMER, GUEST:
 				break;
 			default:
 				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);

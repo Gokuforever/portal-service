@@ -13,4 +13,5 @@ public class PayNowBean extends ReqBaseBean {
 
 	private String delivery_address_id;
 	private List<String> selected_products;
+	private String return_date;
 }
