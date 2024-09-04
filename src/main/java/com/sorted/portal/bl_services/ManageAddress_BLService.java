@@ -133,7 +133,7 @@ public class ManageAddress_BLService {
 					dto.setCity(e.getCity());
 					dto.setState(e.getState());
 					dto.setPincode(e.getPincode());
-					dto.setAddress_type(e.getAddress_type());
+					dto.setAddress_type(e.getAddress_type().getType());
 					dto.setAddress_type_desc(e.getAddress_type_desc());
 					dto.setCode(e.getCode());
 					dto.setIs_default(e.getIs_default());
