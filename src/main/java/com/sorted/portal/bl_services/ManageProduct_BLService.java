@@ -24,6 +24,7 @@ import com.sorted.commons.beans.SelectedSubCatagories;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Category_Master;
+import com.sorted.commons.entity.mongo.Category_Master.SubCategory;
 import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Seller;
@@ -415,11 +416,15 @@ public class ManageProduct_BLService {
 	}
 
 	private Map<String, List<String>> getSubCategoriesMap(Category_Master categoryMaster) {
-		if (CollectionUtils.isEmpty(categoryMaster.getSub_categories())) {
+		if (CollectionUtils.isEmpty(categoryMaster.getGroups())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+		List<SubCategory> sub_catagories = categoryMaster.getSub_categories();
+		if (CollectionUtils.isEmpty(sub_catagories)) {
 			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
 		}
 
-		return categoryMaster.getSub_categories().stream().collect(Collectors.toMap(e -> e.getName(),
+		return sub_catagories.stream().collect(Collectors.toMap(e -> e.getName(),
 				e -> CollectionUtils.isEmpty(e.getAttributes()) ? new ArrayList<>() : e.getAttributes()));
 	}
 

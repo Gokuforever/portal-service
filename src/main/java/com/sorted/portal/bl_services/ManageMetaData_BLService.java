@@ -44,7 +44,7 @@ public class ManageMetaData_BLService {
 		MetaData data = new MetaData();
 		SEFilter filterCM = new SEFilter(SEFilterType.AND);
 		filterCM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-		filterCM.addProjection(Category_Master.Fields.name, Category_Master.Fields.sub_categories,
+		filterCM.addProjection(Category_Master.Fields.name, Category_Master.Fields.groups,
 				Category_Master.Fields.category_code);
 		List<Category_Master> listCM = category_MasterService.repoFind(filterCM);
 		if (!CollectionUtils.isEmpty(listCM)) {
