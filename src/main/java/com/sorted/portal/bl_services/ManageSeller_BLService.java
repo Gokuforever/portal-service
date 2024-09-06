@@ -32,6 +32,7 @@ import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
+import com.sorted.commons.enums.All_Status.Seller_Status;
 import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
@@ -255,6 +256,59 @@ public class ManageSeller_BLService {
 		} catch (Exception e) {
 			log.error("/seller/create:: exception occurred");
 			log.error("/seller/create:: {}", e.getMessage());
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
+	@PostMapping("/changeStatus")
+	public SEResponse changeStatus(@RequestBody SERequest request, HttpServletRequest servletRequest) {
+		try {
+			log.info("/seller/changeStatus:: API started!");
+			CUDSellerBean req = request.getGenericRequestDataObject(CUDSellerBean.class);
+			CommonUtils.extractHeaders(servletRequest, req);
+			UsersBean usersBean = users_Service.validateUserForActivity(req, Permission.EDIT,
+					Activity.SELLER_ONBOARDING, Activity.STORE_MANAGEMENT);
+			Seller_Status status = Seller_Status.getById(req.getStatus_id());
+			if (status == null) {
+				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SELLER_STATUS);
+			}
+			SEFilter filterS = new SEFilter(SEFilterType.AND);
+			switch (usersBean.getRole().getUser_type()) {
+			case SUPER_ADMIN: {
+				if (!StringUtils.hasText(req.getSeller_id())) {
+					throw new CustomIllegalArgumentsException(ResponseCode.SELLER_ID_MANDATE);
+				}
+				filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getSeller_id()));
+				break;
+			}
+			case SELLER: {
+				if (!(status.equals(Seller_Status.ACTIVE) || status.equals(Seller_Status.INACTIVE))) {
+					throw new CustomIllegalArgumentsException(ResponseCode.ACTION_NOT_ALLOWED);
+				}
+				filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, usersBean.getSeller().getId()));
+				break;
+			}
+			default: {
+				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+			}
+			}
+			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+			Seller seller = seller_Service.repoFindOne(filterS);
+			if (seller == null) {
+				throw new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND);
+			}
+			if (seller.getStatus().equals(status)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.SELLER_STATUS_UNCHANGED);
+			}
+			seller.setStatus(status);
+			seller_Service.update(seller.getId(), seller, req.getReq_user_id());
+			log.info("/seller/changeStatus:: API ended");
+			return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
+		} catch (CustomIllegalArgumentsException ex) {
+			throw ex;
+		} catch (Exception e) {
+			log.error("/seller/changeStatus:: exception occurred");
+			log.error("/seller/changeStatus:: {}", e.getMessage());
 			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
 		}
 	}

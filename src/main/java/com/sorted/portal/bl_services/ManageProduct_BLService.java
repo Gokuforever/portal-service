@@ -34,6 +34,7 @@ import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.entity.service.Varient_Mapping_Service;
 import com.sorted.commons.enums.Activity;
+import com.sorted.commons.enums.All_Status.Seller_Status;
 import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
@@ -160,7 +161,15 @@ public class ManageProduct_BLService {
 		case SELLER:
 			filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, usersBean.getRole().getSeller_id()));
 			filterSE.addClause(WhereClause.eq(Products.Fields.seller_code, usersBean.getRole().getSeller_code()));
+			break;
 		default:
+			SEFilter filterS = new SEFilter(SEFilterType.AND);
+			filterS.addClause(WhereClause.notEq(Seller.Fields.status, Seller_Status.ACTIVE.name()));
+			List<Seller> sellers = seller_Service.repoFind(filterS);
+			if (!CollectionUtils.isEmpty(sellers)) {
+				List<String> ids = sellers.parallelStream().map(Seller::getId).collect(Collectors.toList());
+				filterSE.addClause(WhereClause.nin(Products.Fields.seller_id, ids));
+			}
 			break;
 		}
 		if (StringUtils.hasText(req.getName())) {

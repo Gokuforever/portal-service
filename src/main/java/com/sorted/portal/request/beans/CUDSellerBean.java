@@ -15,6 +15,8 @@ import lombok.EqualsAndHashCode;
 public class CUDSellerBean extends ReqBaseBean {
 
 	private String name;
+	private String seller_id;
+	private int status_id;
 	private AddressDTO address;
 	private String pan_no;
 	private String primary_mobile_no;
