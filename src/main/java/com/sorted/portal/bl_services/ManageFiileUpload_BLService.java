@@ -7,9 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
-import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.GoogleDriveService;
 
@@ -23,23 +22,21 @@ public class ManageFiileUpload_BLService {
 	}
 
 	@PostMapping("/upload")
-	public SEResponse uploadPhoto(@RequestParam("file") MultipartFile file) {
+	public SEResponse uploadPhoto() {
+		String fileId = null;
 		try {
-			String fileId = googleDriveService.uploadPhoto(file);
-			return SEResponse.getBasicSuccessResponseObject(fileId, null);
+			fileId = googleDriveService.uploadPhoto("E:\\kittu all photos\\22 Feb kittu\\97324e.jpg");
 		} catch (IOException | GeneralSecurityException e) {
-			throw new CustomIllegalArgumentsException("Failed to upload file: " + e.getMessage());
+			e.printStackTrace();
 		}
+		return SEResponse.getBasicSuccessResponseObject(fileId, ResponseCode.SUCCESSFUL);
 	}
 
 	@GetMapping("/download")
 	public SEResponse fetchPhoto(@RequestParam("fileId") String fileId,
 			@RequestParam("destinationPath") String destinationPath) {
-		try {
-			googleDriveService.fetchPhoto(fileId, destinationPath);
-			return SEResponse.getBasicSuccessResponseObject(fileId, null);
-		} catch (IOException | GeneralSecurityException e) {
-			throw new CustomIllegalArgumentsException("Failed to download file: " + e.getMessage());
-		}
+		googleDriveService.fetchPhoto(fileId, destinationPath);
+		return SEResponse.getBasicSuccessResponseObject(fileId, null);
+
 	}
 }
