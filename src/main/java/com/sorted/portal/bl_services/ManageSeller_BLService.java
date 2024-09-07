@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Bank_Details;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.beans.UsersBean;
@@ -94,73 +93,62 @@ public class ManageSeller_BLService {
 			if (!UserType.SUPER_ADMIN.equals(role.getUser_type())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
 			}
-			if (!StringUtils.hasText(req.getName())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SELLER_NAME);
-			}
-			if (!SERegExpUtils.standardTextValidation(req.getName())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SELLER_NAME);
-			}
-			if (!StringUtils.hasText(req.getPan_no())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_PAN_NO);
-			}
-			if (!SERegExpUtils.isPan(req.getPan_no())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PAN_NO);
-			}
-			AddressDTO addressDTO = req.getAddress();
-			if (addressDTO == null) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ADDRESS);
-			}
-			Address address = ValidationUtil.validateAddress(addressDTO);
+			validateSellerReq(req);
+
+			Address address = ValidationUtil.validateAddress(req.getAddress(), new Address());
+			// TODO: Remove commented code if create api works fine
+//			List<Spoc_Details> spoc_details = req.getSpoc_details();
+//			List<String> unique_phone = new ArrayList<>();
+//			Spoc_Details primary_spoc = null;
+//			for (Spoc_Details spoc : spoc_details) {
+//				if (!StringUtils.hasText(spoc.getFirst_name())) {
+//					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_FNAME);
+//				}
+//				if (!SERegExpUtils.standardTextValidation(spoc.getFirst_name())) {
+//					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_FNAME);
+//				}
+//				if (!StringUtils.hasText(spoc.getLast_name())) {
+//					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_LNAME);
+//				}
+//				if (!SERegExpUtils.standardTextValidation(spoc.getLast_name())) {
+//					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_LNAME);
+//				}
+//				if (!StringUtils.hasText(spoc.getEmail_id())) {
+//					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_MAIL);
+//				}
+//				if (!SERegExpUtils.isEmail(spoc.getEmail_id())) {
+//					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_MAIL);
+//				}
+//				if (!StringUtils.hasText(spoc.getMobile_no())) {
+//					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_PHONE);
+//				}
+//				if (!SERegExpUtils.isMobileNo(spoc.getMobile_no())) {
+//					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_PHONE);
+//				}
+//				if (!StringUtils.hasText(spoc.getDesignation())) {
+//					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_DESIGNATION);
+//				}
+//				if (!SERegExpUtils.standardTextValidation(spoc.getDesignation())) {
+//					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_DESIGNATION);
+//				}
+//				if (unique_phone.contains(spoc.getMobile_no())) {
+//					throw new CustomIllegalArgumentsException(ResponseCode.DUPLICATE_SPOC_PHONE);
+//				}
+//				unique_phone.add(spoc.getMobile_no());
+//				if (spoc.isPrimary() && primary_spoc == null) {
+//					primary_spoc = spoc;
+//				} else {
+//					spoc.setPrimary(false);
+//				}
+//			}
+//			if (primary_spoc == null) {
+//				throw new CustomIllegalArgumentsException(ResponseCode.MARK_PRIMARY);
+//			}
+
 			List<Spoc_Details> spoc_details = req.getSpoc_details();
-			if (CollectionUtils.isEmpty(spoc_details)) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC);
-			}
-			List<String> unique_phone = new ArrayList<>();
-			Spoc_Details primary_spoc = null;
-			for (Spoc_Details spoc : spoc_details) {
-				if (!StringUtils.hasText(spoc.getFirst_name())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_FNAME);
-				}
-				if (!SERegExpUtils.standardTextValidation(spoc.getFirst_name())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_FNAME);
-				}
-				if (!StringUtils.hasText(spoc.getLast_name())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_LNAME);
-				}
-				if (!SERegExpUtils.standardTextValidation(spoc.getLast_name())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_LNAME);
-				}
-				if (!StringUtils.hasText(spoc.getEmail_id())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_MAIL);
-				}
-				if (!SERegExpUtils.isEmail(spoc.getEmail_id())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_MAIL);
-				}
-				if (!StringUtils.hasText(spoc.getMobile_no())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_PHONE);
-				}
-				if (!SERegExpUtils.isMobileNo(spoc.getMobile_no())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_PHONE);
-				}
-				if (!StringUtils.hasText(spoc.getDesignation())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_DESIGNATION);
-				}
-				if (!SERegExpUtils.standardTextValidation(spoc.getDesignation())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_DESIGNATION);
-				}
-				if (unique_phone.contains(spoc.getMobile_no())) {
-					throw new CustomIllegalArgumentsException(ResponseCode.DUPLICATE_SPOC_PHONE);
-				}
-				unique_phone.add(spoc.getMobile_no());
-				if (spoc.isPrimary() && primary_spoc == null) {
-					primary_spoc = spoc;
-				} else {
-					spoc.setPrimary(false);
-				}
-			}
-			if (primary_spoc == null) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MARK_PRIMARY);
-			}
+			Spoc_Details primary_spoc = validateSPOC(spoc_details);
+			List<String> unique_phone = spoc_details.parallelStream().map(Spoc_Details::getMobile_no).distinct()
+					.collect(Collectors.toList());
 			Bank_Details bank_details = req.getBank_details();
 			if (bank_details == null) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_BANK_DETAILS);
@@ -278,7 +266,7 @@ public class ManageSeller_BLService {
 			if (!StringUtils.hasText(req.getSeller_id())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.SELLER_ID_MANDATE);
 			}
-			Address address = validateSellerReq(req);
+			validateSellerReq(req);
 
 			SEFilter filterDbS = new SEFilter(SEFilterType.AND);
 			filterDbS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getSeller_id()));
@@ -321,8 +309,8 @@ public class ManageSeller_BLService {
 				}
 
 				/*
-				 * fetching user details on the basis of role as there is One Role and One
-				 * User per Seller
+				 * fetching user details on the basis of role as there is One Role and One User
+				 * per Seller
 				 */
 
 				SEFilter filterU = new SEFilter(SEFilterType.AND);
@@ -393,12 +381,12 @@ public class ManageSeller_BLService {
 			}
 			int db_hash = getSellerAddresshashCode(dbAddress);
 
+			Address address = ValidationUtil.validateAddress(req.getAddress(), dbAddress);
 			address.setUser_type(UserType.SELLER);
 			address.setEntity_id(seller.getId());
 			int req_hash = getSellerAddresshashCode(address);
 			if (db_hash != req_hash) {
-				//FIXME: creating multiple entries in update
-//				address_Service.update(dbAddress.getId(), address, req.getReq_user_id());
+				address_Service.update(dbAddress.getId(), address, req.getReq_user_id());
 			}
 			log.info("/seller/edit:: API ended");
 			return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
@@ -526,7 +514,7 @@ public class ManageSeller_BLService {
 		}
 	}
 
-	private Address validateSellerReq(CUDSellerBean req) {
+	private void validateSellerReq(CUDSellerBean req) {
 		if (!StringUtils.hasText(req.getName())) {
 			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SELLER_NAME);
 		}
@@ -539,15 +527,12 @@ public class ManageSeller_BLService {
 		if (!SERegExpUtils.isPan(req.getPan_no())) {
 			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PAN_NO);
 		}
-		AddressDTO addressDTO = req.getAddress();
-		if (addressDTO == null) {
-			throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ADDRESS);
-		}
-		Address address = ValidationUtil.validateAddress(addressDTO);
 		if (CollectionUtils.isEmpty(req.getSpoc_details())) {
 			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC);
 		}
-		return address;
+		if (req.getAddress() == null) {
+			throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ADDRESS);
+		}
 	}
 
 	private Spoc_Details validateSPOC(List<Spoc_Details> spoc_details) {

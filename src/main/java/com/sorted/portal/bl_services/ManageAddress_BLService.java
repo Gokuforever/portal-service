@@ -74,7 +74,7 @@ public class ManageAddress_BLService {
 				
 			}
 			
-			Address address = ValidationUtil.validateAddress(addressDTO);
+			Address address = ValidationUtil.validateAddress(addressDTO, new Address());
 			address.setUser_type(user_type);
 			address.setEntity_id(usersBean.getId());
 			address_Service.create(address, req.getReq_user_id());
