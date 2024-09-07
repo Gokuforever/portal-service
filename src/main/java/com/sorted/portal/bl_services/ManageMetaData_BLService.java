@@ -1,5 +1,6 @@
 package com.sorted.portal.bl_services;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +56,7 @@ public class ManageMetaData_BLService {
 		if (!CollectionUtils.isEmpty(listPM)) {
 			data.setProducts(listPM);
 		}
+		data.setUpdated_at(LocalDateTime.now());
 		log.info("getMetaData:: API ended");
 		return SEResponse.getBasicSuccessResponseObject(data, ResponseCode.SUCCESSFUL);
 	}
