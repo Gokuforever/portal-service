@@ -1,6 +1,8 @@
 package com.sorted.portal.bl_services;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -17,7 +19,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.sorted.commons.beans.ProductReqBean;
 import com.sorted.commons.beans.SelectedSubCatagories;
@@ -36,6 +40,7 @@ import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.entity.service.Varient_Mapping_Service;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.All_Status.Seller_Status;
+import com.sorted.commons.enums.DocumentType;
 import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
@@ -47,6 +52,7 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.CommonUtils;
+import com.sorted.commons.utils.GoogleDriveService;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.request.beans.FindProductBean;
@@ -73,6 +79,12 @@ public class ManageProduct_BLService {
 
 	@Autowired
 	private Seller_Service seller_Service;
+
+	private final GoogleDriveService googleDriveService;
+
+	public ManageProduct_BLService(GoogleDriveService googleDriveService) {
+		this.googleDriveService = googleDriveService;
+	}
 
 	@PostMapping("/create")
 	public SEResponse create(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
@@ -266,6 +278,23 @@ public class ManageProduct_BLService {
 		} catch (Exception e) {
 			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
 			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
+	@PostMapping("/upload/image")
+	public SEResponse uploadPhoto(@RequestParam("file") MultipartFile file, HttpServletRequest httpServletRequest) {
+		try {
+			String req_user_id = httpServletRequest.getHeader("req_user_id").toString();
+			String req_role_id = httpServletRequest.getHeader("req_role_id").toString();
+			if (!StringUtils.hasText(req_user_id) || !StringUtils.hasText(req_role_id)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+			}
+			UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.INVENTORY_MANAGEMENT);
+			String fileId = googleDriveService.uploadPhoto(file, usersBean, DocumentType.PRODUCT_IMAGE);
+			return SEResponse.getBasicSuccessResponseObject(fileId, ResponseCode.SUCCESSFUL);
+		} catch (IOException | GeneralSecurityException e) {
+			e.printStackTrace();
+			return SEResponse.getBadRequestFailureResponse(ResponseCode.ERR_0001);
 		}
 	}
 
