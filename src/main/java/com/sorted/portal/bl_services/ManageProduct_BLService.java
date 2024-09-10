@@ -111,7 +111,7 @@ public class ManageProduct_BLService {
 
 			List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(req, mapSC);
 
-			this.validateMandatorySubCategories(category_Master, mapSC);
+			this.validateMandatorySubCategories(category_Master, listSC);
 
 			String varient_mapping_id = this.upsertAndGetVarientMappingId(req, usersBean, role);
 
@@ -427,6 +427,11 @@ public class ManageProduct_BLService {
 		if (!SERegExpUtils.isPriceInDecimal(req.getMrp())) {
 			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SELLING_PRICE);
 		}
+		BigDecimal mrp = new BigDecimal(req.getMrp());
+		BigDecimal sp = new BigDecimal(req.getSelling_price());
+		if (sp.compareTo(mrp) > 0) {
+			throw new CustomIllegalArgumentsException(ResponseCode.SP_MAX_MRP);
+		}
 		if (StringUtils.hasText(req.getDescription()) && !SERegExpUtils.standardTextValidation(req.getDescription())) {
 			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
 		}
@@ -465,7 +470,8 @@ public class ManageProduct_BLService {
 				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SUB_CATEGORY);
 			}
 			if (CollectionUtils.isEmpty(val)) {
-				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY_VAL);
+				return;
+//				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_SUB_CATEGORY_VAL);
 			}
 			if (!mapSC.containsKey(key)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY);
@@ -484,10 +490,13 @@ public class ManageProduct_BLService {
 		return listSC;
 	}
 
-	private void validateMandatorySubCategories(Category_Master categoryMaster,
-			Map<String, List<String>> subCategories) {
-		categoryMaster.getSub_categories().forEach(e -> {
-			if (e.isMandate() && !subCategories.containsKey(e.getName())) {
+	private void validateMandatorySubCategories(Category_Master categoryMaster, List<SelectedSubCatagories> listSC) {
+		Map<String, List<String>> mapSC = listSC.stream()
+				.collect(Collectors.toMap(e -> e.getSub_category(), e -> e.getSelected_attributes()));
+		List<SubCategory> sub_categories = categoryMaster.getSub_categories();
+		List<SubCategory> sorted = sub_categories.stream().sorted((o1, o2) -> o1.getOrder()).toList();
+		sorted.forEach(e -> {
+			if (e.isMandate() && (!mapSC.containsKey(e.getName()) || CollectionUtils.isEmpty(mapSC.get(e.getName())))) {
 				throw new CustomIllegalArgumentsException(e.getName() + " is mandatory.");
 			}
 		});
