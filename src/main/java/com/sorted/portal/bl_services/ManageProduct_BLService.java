@@ -23,17 +23,20 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.sorted.commons.beans.Media;
 import com.sorted.commons.beans.ProductReqBean;
 import com.sorted.commons.beans.SelectedSubCatagories;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Category_Master;
 import com.sorted.commons.entity.mongo.Category_Master.SubCategory;
+import com.sorted.commons.entity.mongo.File_Upload_Details;
 import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Seller;
 import com.sorted.commons.entity.mongo.Varient_Mapping;
 import com.sorted.commons.entity.service.Category_MasterService;
+import com.sorted.commons.entity.service.File_Upload_Details_Service;
 import com.sorted.commons.entity.service.ProductService;
 import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.Users_Service;
@@ -80,6 +83,9 @@ public class ManageProduct_BLService {
 	@Autowired
 	private Seller_Service seller_Service;
 
+	@Autowired
+	private File_Upload_Details_Service file_Upload_Details_Service;
+
 	private final GoogleDriveService googleDriveService;
 
 	public ManageProduct_BLService(GoogleDriveService googleDriveService) {
@@ -95,9 +101,9 @@ public class ManageProduct_BLService {
 					Activity.INVENTORY_MANAGEMENT);
 
 			Role role = usersBean.getRole();
-			switch (role.getUser_type()) {
-			case SELLER:
-			case SUPER_ADMIN:
+			UserType user_type = role.getUser_type();
+			switch (user_type) {
+			case SELLER, SUPER_ADMIN:
 				break;
 			default:
 				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
@@ -128,7 +134,33 @@ public class ManageProduct_BLService {
 			product.setVarient_mapping_id(varient_mapping_id);
 			product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
 			if (!CollectionUtils.isEmpty(req.getMedia())) {
-				product.setMedia(req.getMedia());
+				Set<String> document_ids = req.getMedia().stream().filter(e -> StringUtils.hasText(e.getDocument_id()))
+						.map(Media::getDocument_id).collect(Collectors.toSet());
+				if (CollectionUtils.isEmpty(document_ids)) {
+					throw new CustomIllegalArgumentsException(ResponseCode.DOC_IDS_MISSING);
+				}
+				document_ids.remove(null);
+				SEFilter filterFUD = new SEFilter(SEFilterType.AND);
+				filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(document_ids)));
+				filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+				filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.document_type_id,
+						DocumentType.PRODUCT_IMAGE.getId()));
+				if (user_type == UserType.SELLER) {
+					filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.user_type, user_type.name()));
+					filterFUD.addClause(
+							WhereClause.eq(File_Upload_Details.Fields.entity_id, usersBean.getSeller().getId()));
+				}
+
+				List<File_Upload_Details> repoFind = file_Upload_Details_Service.repoFind(filterFUD);
+				if (CollectionUtils.isEmpty(repoFind)) {
+					throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
+				}
+				List<String> db_document_ids = repoFind.stream().map(e -> e.getId()).toList();
+				if (!db_document_ids.containsAll(document_ids)) {
+					throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
+				}
+				List<Media> listMedia = req.getMedia().stream().filter(e -> StringUtils.hasText(e.getDocument_id())).toList();
+				product.setMedia(listMedia);
 			}
 
 			Products create = productService.create(product, usersBean.getId());
@@ -180,7 +212,7 @@ public class ManageProduct_BLService {
 			filterS.addClause(WhereClause.notEq(Seller.Fields.status, Seller_Status.ACTIVE.name()));
 			List<Seller> sellers = seller_Service.repoFind(filterS);
 			if (!CollectionUtils.isEmpty(sellers)) {
-				List<String> ids = sellers.parallelStream().map(Seller::getId).collect(Collectors.toList());
+				List<String> ids = sellers.parallelStream().map(Seller::getId).toList();
 				filterSE.addClause(WhereClause.nin(Products.Fields.seller_id, ids));
 			}
 			break;
@@ -284,14 +316,14 @@ public class ManageProduct_BLService {
 	@PostMapping("/upload/image")
 	public SEResponse uploadPhoto(@RequestParam("file") MultipartFile file, HttpServletRequest httpServletRequest) {
 		try {
-			String req_user_id = httpServletRequest.getHeader("req_user_id").toString();
-			String req_role_id = httpServletRequest.getHeader("req_role_id").toString();
+			String req_user_id = httpServletRequest.getHeader("req_user_id");
+			String req_role_id = httpServletRequest.getHeader("req_role_id");
 			if (!StringUtils.hasText(req_user_id) || !StringUtils.hasText(req_role_id)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
 			}
 			UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.INVENTORY_MANAGEMENT);
-			String fileId = googleDriveService.uploadPhoto(file, usersBean, DocumentType.PRODUCT_IMAGE);
-			return SEResponse.getBasicSuccessResponseObject(fileId, ResponseCode.SUCCESSFUL);
+			String file_id = googleDriveService.uploadPhoto(file, usersBean, DocumentType.PRODUCT_IMAGE);
+			return SEResponse.getBasicSuccessResponseObject(file_id, ResponseCode.SUCCESSFUL);
 		} catch (IOException | GeneralSecurityException e) {
 			e.printStackTrace();
 			return SEResponse.getBadRequestFailureResponse(ResponseCode.ERR_0001);
@@ -367,7 +399,7 @@ public class ManageProduct_BLService {
 		if (CollectionUtils.isEmpty(varientMappingIds)) {
 			return new HashMap<>();
 		}
-		List<String> product_ids = listP.stream().map(Products::getId).collect(Collectors.toList());
+		List<String> product_ids = listP.stream().map(Products::getId).toList();
 		SEFilter filterVM = new SEFilter(SEFilterType.AND);
 		filterVM.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(varientMappingIds)));
 		filterVM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -376,7 +408,7 @@ public class ManageProduct_BLService {
 		if (CollectionUtils.isEmpty(listVM)) {
 			return new HashMap<>();
 		}
-		List<String> varient_ids = listVM.stream().map(Varient_Mapping::getId).collect(Collectors.toList());
+		List<String> varient_ids = listVM.stream().map(Varient_Mapping::getId).toList();
 		SEFilter filterVarients = new SEFilter(SEFilterType.AND);
 		filterVarients.addClause(WhereClause.in(Products.Fields.varient_mapping_id, varient_ids));
 		filterVarients.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -471,7 +503,6 @@ public class ManageProduct_BLService {
 			}
 			if (CollectionUtils.isEmpty(val)) {
 				return;
-//				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_SUB_CATEGORY_VAL);
 			}
 			if (!mapSC.containsKey(key)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY);
