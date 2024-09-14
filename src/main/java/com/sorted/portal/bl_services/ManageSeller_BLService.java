@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.CollectionUtils;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Bank_Details;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.beans.UsersBean;
@@ -86,6 +88,12 @@ public class ManageSeller_BLService {
 
 	@Autowired
 	private EmailSenderImpl emailSenderImpl;
+
+	@Value("${se.default.page}")
+	private int default_page;
+
+	@Value("${se.default.size}")
+	private int default_size;
 
 	@PostMapping("/create")
 	public SEResponse create(@RequestBody SERequest request, HttpServletRequest servletRequest) {
@@ -500,28 +508,68 @@ public class ManageSeller_BLService {
 			orderBy.setType(SortOrder.DESC);
 			filterS.setOrderBy(orderBy);
 
-			long total_count = seller_Service.countByFilter(filterS);
-			if (total_count == 0) {
-				return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
-			}
-
 			int page = req.getPage();
 			int size = req.getSize();
+			if (size < 1) {
+				page = default_page;
+				size = default_size;
+			}
+			if (page == 0) {
+				long total_count = seller_Service.countByFilter(filterS);
+				if (total_count == 0) {
+					return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
+				}
+				bean.setTotal_count(total_count);
+			}
 			Pagination pagination = new Pagination(page, size);
 
 			filterS.setPagination(pagination);
 
 			List<Seller> listS = seller_Service.repoFind(filterS);
 			if (CollectionUtils.isEmpty(listS)) {
-				return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
+				return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
+			}
+			Map<String, Address> mapAdd = new HashMap<>();
+
+			List<String> seller_ids = listS.stream().map(Seller::getId).toList();
+			SEFilter filterSE = new SEFilter(SEFilterType.AND);
+			filterSE.addClause(WhereClause.in(Address.Fields.entity_id, seller_ids));
+			filterSE.addClause(WhereClause.eq(Address.Fields.user_type, UserType.SELLER.name()));
+			filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, false));
+
+			List<Address> listAdd = address_Service.repoFind(filterSE);
+			if (!CollectionUtils.isEmpty(listAdd)) {
+				mapAdd.putAll(listAdd.stream().collect(Collectors.toMap(e -> e.getEntity_id(), e -> e)));
+			}
+			List<CUDSellerBean> resList = new ArrayList<>();
+
+			for (Seller seller : listS) {
+				CUDSellerBean tempBean = new CUDSellerBean();
+				tempBean.setName(seller.getBusiness_name());
+				tempBean.setSeller_id(seller.getId());
+				if (mapAdd.containsKey(seller.getId())) {
+					Address address = mapAdd.get(seller.getId());
+
+					AddressDTO address2 = new AddressDTO();
+					address2.setStreet_1(address.getStreet_1());
+					address2.setStreet_2(address.getStreet_2());
+					address2.setLandmark(address.getLandmark());
+					address2.setCity(address.getCity());
+					address2.setState(address.getState());
+					address2.setPincode(address.getPincode());
+					address2.setAddress_type(address.getAddress_type().getType());
+					address2.setAddress_type_desc(address.getAddress_type_desc());
+					tempBean.setAddress(address2);
+				}
+				tempBean.setPan_no(seller.getCompany_pan());
+				tempBean.setSpoc_details(seller.getSpoc_details());
+				tempBean.setBank_details(seller.getBank_details());
+				tempBean.setServiceable_pincodes(seller.getServiceable_pincodes());
+				resList.add(tempBean);
 			}
 
-			if (pagination.getPage() == 0) {
-				bean.setTotal_count(total_count);
-			}
-
-			bean.setList(listS);
-			return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
+			bean.setList(resList);
+			return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
 		} catch (Exception e) {
