@@ -16,6 +16,7 @@ public class ProductDetailsBean {
 	private BigDecimal mrp;
 	private BigDecimal selling_price;
 	private String description;
+	private int quantity;
 	private List<ProductDetailsBean> varients;
 	private List<ProductDetailsBean> related_products;
 	private List<Media> media;
