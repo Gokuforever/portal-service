@@ -47,6 +47,7 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.CommonUtils;
+import com.sorted.portal.razorpay.CheckoutReqbean;
 import com.sorted.portal.razorpay.RazorpayUtility;
 import com.sorted.portal.request.beans.PayNowBean;
 import com.sorted.portal.response.beans.PGResponseBean;
@@ -209,7 +210,6 @@ public class ManageTransaction_BLService {
 					order_Item.setType(PurchaseType.BUY);
 				}
 				listOI.add(order_Item);
-
 			}
 			long totalSum = listOI.stream().mapToLong(Order_Item::getTotal_cost).sum();
 			if (totalSum < 1) {
@@ -251,11 +251,12 @@ public class ManageTransaction_BLService {
 				order_Item.setOrder_code(order_Details.getCode());
 				order_Item_Service.create(order_Item, usersBean.getId());
 			}
-			Order rzrp_order = razorpayUtility.create(totalSum, order_Details.getId(), "");
+			Order rzrp_order = razorpayUtility.createOrder(totalSum, order_Details.getId());
 			if (rzrp_order == null) {
 				throw new CustomIllegalArgumentsException(ResponseCode.PG_ORDER_GEN_FAILED);
 			}
-			return SEResponse.getBasicSuccessResponseObject(rzrp_order, ResponseCode.SUCCESSFUL);
+			CheckoutReqbean checkoutPayload = razorpayUtility.createCheckoutPayload(rzrp_order);
+			return SEResponse.getBasicSuccessResponseObject(checkoutPayload, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
 		} catch (Exception e) {
