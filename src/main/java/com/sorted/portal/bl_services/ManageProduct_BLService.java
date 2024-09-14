@@ -538,9 +538,9 @@ public class ManageProduct_BLService {
 		if (!StringUtils.hasText(req.getName())) {
 			throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_NAME);
 		}
-		if (!SERegExpUtils.standardTextValidation(req.getName())) {
-			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_NAME);
-		}
+//		if (!SERegExpUtils.standardTextValidation(req.getName())) {
+//			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_NAME);
+//		}
 		if (CollectionUtils.isEmpty(req.getSub_categories())) {
 			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SUB_CATEGORY);
 		}
