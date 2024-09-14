@@ -35,6 +35,7 @@ import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.All_Status.Seller_Status;
+import com.sorted.commons.enums.MailTemplate;
 import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
@@ -44,9 +45,11 @@ import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.SortOrder;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
+import com.sorted.commons.helper.MailBuilder;
 import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
+import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.PasswordValidatorUtils;
 import com.sorted.commons.utils.SERegExpUtils;
@@ -79,6 +82,9 @@ public class ManageSeller_BLService {
 	private RoleService roleService;
 
 	private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
+	@Autowired
+	private EmailSenderImpl emailSenderImpl;
 
 	@PostMapping("/create")
 	public SEResponse create(@RequestBody SERequest request, HttpServletRequest servletRequest) {
@@ -238,7 +244,15 @@ public class ManageSeller_BLService {
 			address.setEntity_id(seller_record.getId());
 			address_Service.create(address, req.getReq_user_id());
 
-			// TODO: send email notification
+			String first_name = primary_spoc.getFirst_name();
+			String mobile_no = primary_spoc.getMobile_no();
+
+			String cont = first_name + "|" + mobile_no + "|" + generatePassword;
+			MailBuilder builder = new MailBuilder();
+			builder.setTo(primary_spoc.getEmail_id());
+			builder.setContent(cont);
+			builder.setTemplate(MailTemplate.SELLER_WELCOME_MAIL);
+			emailSenderImpl.sendEmailHtmlTemplate(builder);
 
 			log.info("/seller/create:: API ended");
 			return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
