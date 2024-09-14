@@ -79,7 +79,7 @@ public class ManageCart_BLService {
 				cart = cart_Service.create(cart, req_user_id);
 			}
 
-			CartBean cartBean = this.getCartBean(filterC, cart);
+			CartBean cartBean = this.getCartBean(cart);
 			return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
@@ -95,7 +95,7 @@ public class ManageCart_BLService {
 		try {
 			CartCRUDBean req = request.getGenericRequestDataObject(CartCRUDBean.class);
 			CommonUtils.extractHeaders(httpServletRequest, req);
-			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.MANAGE_ADDRESS);
+			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.CART_MANAGEMENT);
 			if (req.getItem() == null) {
 				throw new CustomIllegalArgumentsException(ResponseCode.NO_ITEMS);
 			}
@@ -159,7 +159,9 @@ public class ManageCart_BLService {
 				item.set_secure(is_secure_item);
 
 				listItems.add(item);
-				if (!CollectionUtils.isEmpty(cart.getCart_items())) {
+				if (CollectionUtils.isEmpty(cart.getCart_items())) {
+					cart.setCart_items(new ArrayList<>());
+				} else {
 					listItems.addAll(cart.getCart_items());
 				}
 				cart.getCart_items().add(item);
@@ -169,7 +171,7 @@ public class ManageCart_BLService {
 
 			cart_Service.update(cart.getId(), cart, usersBean.getId());
 
-			CartBean cartBean = this.getCartBean(filterC, cart);
+			CartBean cartBean = this.getCartBean(cart);
 			return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
@@ -180,17 +182,17 @@ public class ManageCart_BLService {
 		}
 	}
 
-	private CartBean getCartBean(SEFilter filterC, Cart cart) {
+	private CartBean getCartBean(Cart cart) {
 		CartBean cartBean = new CartBean();
 		List<CartItems> cartItems = new ArrayList<>();
 		List<Item> cart_items = cart.getCart_items();
 		if (!CollectionUtils.isEmpty(cart_items)) {
-			List<String> product_ids = cart_items.stream().map(e -> e.getProduct_id()).collect(Collectors.toList());
+			List<String> product_ids = cart_items.stream().map(Item::getProduct_id).toList();
 			SEFilter filterP = new SEFilter(SEFilterType.AND);
 			filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, product_ids));
 			filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
-			List<Products> listP = productService.repoFind(filterC);
+			List<Products> listP = productService.repoFind(filterP);
 			if (!CollectionUtils.isEmpty(listP)) {
 				Map<String, Products> mapP = listP.stream().collect(Collectors.toMap(p -> p.getId(), p -> p));
 				cart_items.stream().forEach(e -> {
