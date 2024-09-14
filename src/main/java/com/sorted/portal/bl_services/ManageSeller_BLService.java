@@ -35,6 +35,7 @@ import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.All_Status.Seller_Status;
+import com.sorted.commons.enums.All_Status.User_Status;
 import com.sorted.commons.enums.MailTemplate;
 import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
@@ -222,6 +223,8 @@ public class ManageSeller_BLService {
 			user.setLast_name(primary_spoc.getLast_name());
 			user.setMobile_no(primary_spoc.getMobile_no());
 			user.setEmail_id(primary_spoc.getEmail_id());
+			user.setIs_verified(true);
+			user.setStatus(User_Status.ACTIVE.getId());
 			String generatePassword = PasswordValidatorUtils.generatePassword();
 			String encode = passwordEncoder.encode(generatePassword);
 			user.setPassword(encode);
