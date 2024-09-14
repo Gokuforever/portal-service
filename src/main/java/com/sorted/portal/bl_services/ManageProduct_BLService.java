@@ -605,7 +605,7 @@ public class ManageProduct_BLService {
 				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SUB_CATEGORY);
 			}
 			if (!CollectionUtils.isEmpty(val)) {
-				val = val.stream().filter(e -> !e.isEmpty()).toList();
+				val = val.stream().filter(e -> e != null && !e.isEmpty()).toList();
 			}
 			if (CollectionUtils.isEmpty(val)) {
 				return;
