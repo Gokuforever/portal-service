@@ -565,7 +565,7 @@ public class ManageSeller_BLService {
 				tempBean.setSpoc_details(seller.getSpoc_details());
 				tempBean.setBank_details(seller.getBank_details());
 				tempBean.setServiceable_pincodes(seller.getServiceable_pincodes());
-				tempBean.setStatus(seller.getStatus().getId());
+				tempBean.setStatus_id(seller.getStatus().getId());
 				resList.add(tempBean);
 			}
 
