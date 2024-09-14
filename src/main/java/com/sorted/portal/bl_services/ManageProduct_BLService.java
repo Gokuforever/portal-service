@@ -109,8 +109,23 @@ public class ManageProduct_BLService {
 
 			Role role = usersBean.getRole();
 			UserType user_type = role.getUser_type();
+			Seller seller = null;
 			switch (user_type) {
-			case SELLER, SUPER_ADMIN:
+			case SELLER:
+				seller = usersBean.getSeller();
+				break;
+			case SUPER_ADMIN:
+				if (!StringUtils.hasText(req.getSeller_id())) {
+					throw new CustomIllegalArgumentsException(ResponseCode.PLEASE_SELECT_SELLER);
+				}
+				SEFilter filterS = new SEFilter(SEFilterType.AND);
+				filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getSeller_id()));
+				filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+				seller = seller_Service.repoFindOne(filterS);
+				if (seller == null) {
+					throw new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND);
+				}
 				break;
 			default:
 				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
@@ -135,9 +150,9 @@ public class ManageProduct_BLService {
 			product.setMrp(CommonUtils.rupeeToPaise(mrp));
 			product.setSelling_price(CommonUtils.rupeeToPaise(sp));
 			product.setSelected_sub_catagories(listSC);
-			product.setSeller_id(usersBean.getSeller().getId());
+			product.setSeller_id(seller.getId());
+			product.setSeller_code(seller.getCode());
 			product.setCategory_id(category_Master.getId());
-			product.setSeller_code(usersBean.getSeller().getCode());
 			product.setQuantity(Long.valueOf(req.getQuantity()));
 			product.setVarient_mapping_id(varient_mapping_id);
 			product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
