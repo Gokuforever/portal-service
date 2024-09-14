@@ -53,7 +53,6 @@ import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterNode;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
-import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.CommonUtils;
@@ -61,7 +60,6 @@ import com.sorted.commons.utils.GoogleDriveService;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.request.beans.FindProductBean;
-import com.sorted.portal.response.beans.FindResBean;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -193,26 +191,27 @@ public class ManageProduct_BLService {
 					Activity.INVENTORY_MANAGEMENT);
 			SEFilter filterSE = this.createFilterForProductList(req, usersBean);
 
-			FindResBean bean = new FindResBean();
-			int page = req.getPage();
-			int size = req.getSize();
-			if (page == 0) {
-				long total_count = productService.countByFilter(filterSE);
-				if (total_count <= 0) {
-					return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
-				}
-				bean.setTotal_count(total_count);
-			}
-			if (size < 1) {
-				page = default_page;
-				size = default_size;
-			}
-			Pagination pagination = new Pagination(page, size);
-			filterSE.setPagination(pagination);
+//			FindResBean bean = new FindResBean();
+//			int page = req.getPage();
+//			int size = req.getSize();
+//			if (size < 1) {
+//				page = default_page;
+//				size = default_size;
+//			}
+//			if (page == 0) {
+//				long total_count = productService.countByFilter(filterSE);
+//				if (total_count <= 0) {
+//					return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
+//				}
+//				bean.setTotal_count(total_count);
+//			}
+//			
+//			Pagination pagination = new Pagination(page, size);
+//			filterSE.setPagination(pagination);
 
 			List<Products> listP = productService.repoFind(filterSE);
 			if (CollectionUtils.isEmpty(listP)) {
-				return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
+				return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
 			}
 
 			Map<String, String> mapImg = this.filterAndFetchImgMap(listP);
@@ -221,9 +220,9 @@ public class ManageProduct_BLService {
 
 			List<ProductDetailsBean> resList = this.convertToBean(null, listP, seller_ids, mapImg);
 
-			bean.setList(resList);
+//			bean.setList(resList);
 
-			return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
+			return SEResponse.getBasicSuccessResponseList(resList, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
 		} catch (Exception e) {
