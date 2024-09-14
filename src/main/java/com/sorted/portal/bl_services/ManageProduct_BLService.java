@@ -159,7 +159,8 @@ public class ManageProduct_BLService {
 				if (!db_document_ids.containsAll(document_ids)) {
 					throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
 				}
-				List<Media> listMedia = req.getMedia().stream().filter(e -> StringUtils.hasText(e.getDocument_id())).toList();
+				List<Media> listMedia = req.getMedia().stream().filter(e -> StringUtils.hasText(e.getDocument_id()))
+						.toList();
 				product.setMedia(listMedia);
 			}
 
@@ -187,9 +188,11 @@ public class ManageProduct_BLService {
 				return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
 			}
 
+			Map<String, String> mapImg = this.filterAndFetchImgMap(listP);
+
 			Set<String> seller_ids = this.getSellerByPincode(req.getPincode());
 
-			List<ProductDetailsBean> resList = this.convertToBean(null, listP, seller_ids);
+			List<ProductDetailsBean> resList = this.convertToBean(null, listP, seller_ids, mapImg);
 
 			return SEResponse.getBasicSuccessResponseList(resList, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
@@ -198,6 +201,39 @@ public class ManageProduct_BLService {
 			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
 			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
 		}
+	}
+
+	private Map<String, String> filterAndFetchImgMap(List<Products> listP) {
+		// Extract image document IDs from products
+		List<String> imageIds = listP.stream()
+				.filter(products -> products.getMedia() != null && !products.getMedia().isEmpty())
+				.flatMap(products -> products.getMedia().stream().map(Media::getDocument_id)).toList();
+
+		// Initialize maps for file upload details and images
+		Map<String, String> mapFUD = new HashMap<>();
+		Map<String, String> mapImg = new HashMap<>();
+
+		// Process only if imageIds list is not empty
+		if (!CollectionUtils.isEmpty(imageIds)) {
+			// Create a filter to retrieve file upload details based on image IDs
+			SEFilter filterFUD = new SEFilter(SEFilterType.AND);
+			filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, imageIds));
+			filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			// Retrieve file upload details
+			List<File_Upload_Details> listFUD = file_Upload_Details_Service.repoFind(filterFUD);
+
+			// Populate mapFUD if file upload details list is not empty
+			if (!CollectionUtils.isEmpty(listFUD)) {
+				mapFUD = listFUD.stream()
+						.collect(Collectors.toMap(File_Upload_Details::getId, File_Upload_Details::getDocument_id));
+			}
+
+			// Map the image IDs that have corresponding entries in mapFUD
+			mapImg.putAll(imageIds.stream().filter(mapFUD::containsKey) // Only consider IDs present in mapFUD
+					.collect(Collectors.toMap(id -> id, mapFUD::get))); // Map image ID to corresponding document ID
+		}
+		return mapImg;
 	}
 
 	private SEFilter createFilterForProductList(FindProductBean req, UsersBean usersBean) {
@@ -302,7 +338,9 @@ public class ManageProduct_BLService {
 
 			Map<String, List<Products>> mapV = this.getVarients(product);
 			Set<String> seller_ids = this.getSellerByPincode(req.getPincode());
-			ProductDetailsBean resBean = this.productToBean(listRI, mapV, product, seller_ids);
+			Map<String, String> mapImg = this.filterAndFetchImgMap(Arrays.asList(product));
+
+			ProductDetailsBean resBean = this.productToBean(listRI, mapV, product, seller_ids, mapImg);
 
 			return SEResponse.getBasicSuccessResponseObject(resBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
@@ -338,13 +376,14 @@ public class ManageProduct_BLService {
 	}
 
 	private ProductDetailsBean productToBean(List<Products> relatedProducts, Map<String, List<Products>> variantMap,
-			Products product, Set<String> seller_ids) {
-		ProductDetailsBean mainProductDetails = this.convertToBean(variantMap, Arrays.asList(product), null).get(0);
+			Products product, Set<String> seller_ids, Map<String, String> mapImg) {
+		ProductDetailsBean mainProductDetails = this.convertToBean(variantMap, Arrays.asList(product), null, mapImg)
+				.get(0);
 
 		if (!CollectionUtils.isEmpty(relatedProducts)) {
 			List<ProductDetailsBean> relatedProductDetailsList = new ArrayList<>();
 			for (Products temp : relatedProducts) {
-				relatedProductDetailsList.add(this.convertProductToBean(temp, seller_ids));
+				relatedProductDetailsList.add(this.convertProductToBean(temp, seller_ids, mapImg));
 			}
 			mainProductDetails.setRelated_products(relatedProductDetailsList);
 		}
@@ -353,16 +392,16 @@ public class ManageProduct_BLService {
 	}
 
 	private List<ProductDetailsBean> convertToBean(Map<String, List<Products>> variantMap, List<Products> products,
-			Set<String> seller_ids) {
+			Set<String> seller_ids, Map<String, String> mapImg) {
 		List<ProductDetailsBean> productDetailsList = new ArrayList<>();
 		for (Products product : products) {
-			ProductDetailsBean productDetailsBean = this.convertProductToBean(product, seller_ids);
+			ProductDetailsBean productDetailsBean = this.convertProductToBean(product, seller_ids, mapImg);
 			if (StringUtils.hasText(product.getVarient_mapping_id()) && !CollectionUtils.isEmpty(variantMap)
 					&& variantMap.containsKey(product.getVarient_mapping_id())) {
 				List<Products> variants = variantMap.get(product.getVarient_mapping_id());
 				for (Products variant : variants) {
 					if (!variant.getId().equals(product.getId())) {
-						ProductDetailsBean variantBean = this.convertProductToBean(variant, seller_ids);
+						ProductDetailsBean variantBean = this.convertProductToBean(variant, seller_ids, mapImg);
 						if (CollectionUtils.isEmpty(productDetailsBean.getVarients())) {
 							productDetailsBean.setVarients(new ArrayList<>());
 						}
@@ -375,13 +414,31 @@ public class ManageProduct_BLService {
 		return productDetailsList;
 	}
 
-	private ProductDetailsBean convertProductToBean(Products product, Set<String> seller_ids) {
+	private ProductDetailsBean convertProductToBean(Products product, Set<String> seller_ids,
+			Map<String, String> mapImg) {
 		ProductDetailsBean bean = new ProductDetailsBean();
 		bean.setName(product.getName());
 		bean.setId(product.getId());
 		bean.setProduct_code(product.getProduct_code());
 		bean.setSelling_price(CommonUtils.paiseToRupee(product.getSelling_price()));
 		bean.setDescription(product.getDescription());
+		if (!CollectionUtils.isEmpty(product.getMedia())) {
+			List<Media> listMedia = new ArrayList<>();
+			List<Media> list = product.getMedia().stream().sorted((o1, o2) -> o1.getOrder().compareTo(o2.getOrder()))
+					.toList();
+			int order = 1;
+			for (Media media : list) {
+				if (!mapImg.containsKey(media.getDocument_id())) {
+					continue;
+				}
+				String document_id = mapImg.get(media.getDocument_id());
+				media.setDocument_id(document_id);
+				media.setOrder(order);
+				listMedia.add(media);
+				order++;
+			}
+			bean.setMedia(listMedia);
+		}
 		if (!CollectionUtils.isEmpty(seller_ids)) {
 			bean.set_deliverable(seller_ids.contains(product.getSeller_id()));
 		}
