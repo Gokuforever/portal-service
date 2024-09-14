@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,6 +53,7 @@ import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterNode;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
+import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.CommonUtils;
@@ -59,6 +61,7 @@ import com.sorted.commons.utils.GoogleDriveService;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.request.beans.FindProductBean;
+import com.sorted.portal.response.beans.FindResBean;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -91,6 +94,12 @@ public class ManageProduct_BLService {
 	public ManageProduct_BLService(GoogleDriveService googleDriveService) {
 		this.googleDriveService = googleDriveService;
 	}
+
+	@Value("${se.default.page}")
+	private int default_page;
+
+	@Value("${se.default.size}")
+	private int default_size;
 
 	@PostMapping("/create")
 	public SEResponse create(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
@@ -129,6 +138,7 @@ public class ManageProduct_BLService {
 			product.setSelling_price(CommonUtils.rupeeToPaise(sp));
 			product.setSelected_sub_catagories(listSC);
 			product.setSeller_id(usersBean.getSeller().getId());
+			product.setCategory_id(category_Master.getId());
 			product.setSeller_code(usersBean.getSeller().getCode());
 			product.setQuantity(Long.valueOf(req.getQuantity()));
 			product.setVarient_mapping_id(varient_mapping_id);
@@ -183,9 +193,26 @@ public class ManageProduct_BLService {
 					Activity.INVENTORY_MANAGEMENT);
 			SEFilter filterSE = this.createFilterForProductList(req, usersBean);
 
+			FindResBean bean = new FindResBean();
+			int page = req.getPage();
+			int size = req.getSize();
+			if (page == 0) {
+				long total_count = productService.countByFilter(filterSE);
+				if (total_count <= 0) {
+					return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
+				}
+				bean.setTotal_count(total_count);
+			}
+			if (size < 1) {
+				page = default_page;
+				size = default_size;
+			}
+			Pagination pagination = new Pagination(page, size);
+			filterSE.setPagination(pagination);
+
 			List<Products> listP = productService.repoFind(filterSE);
 			if (CollectionUtils.isEmpty(listP)) {
-				return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+				return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
 			}
 
 			Map<String, String> mapImg = this.filterAndFetchImgMap(listP);
@@ -194,7 +221,9 @@ public class ManageProduct_BLService {
 
 			List<ProductDetailsBean> resList = this.convertToBean(null, listP, seller_ids, mapImg);
 
-			return SEResponse.getBasicSuccessResponseList(resList, ResponseCode.SUCCESSFUL);
+			bean.setList(resList);
+
+			return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
 		} catch (Exception e) {
@@ -246,6 +275,7 @@ public class ManageProduct_BLService {
 		default:
 			SEFilter filterS = new SEFilter(SEFilterType.AND);
 			filterS.addClause(WhereClause.notEq(Seller.Fields.status, Seller_Status.ACTIVE.name()));
+			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 			List<Seller> sellers = seller_Service.repoFind(filterS);
 			if (!CollectionUtils.isEmpty(sellers)) {
 				List<String> ids = sellers.parallelStream().map(Seller::getId).toList();
