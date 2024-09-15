@@ -165,10 +165,12 @@ public class ManageSeller_BLService {
 			List<String> unique_phone = spoc_details.parallelStream().map(Spoc_Details::getMobile_no).distinct()
 					.collect(Collectors.toList());
 			Bank_Details bank_details = req.getBank_details();
-			if (bank_details == null) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_BANK_DETAILS);
+//			if (bank_details == null) {
+//				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_BANK_DETAILS);
+//			}
+			if (bank_details != null) {
+				ValidationUtil.validateBankDetails(bank_details);
 			}
-			ValidationUtil.validateBankDetails(bank_details);
 			List<String> serviceable_pincodes = req.getServiceable_pincodes();
 			if (CollectionUtils.isEmpty(serviceable_pincodes)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SERVICEABLE_PINCODE);
@@ -213,8 +215,12 @@ public class ManageSeller_BLService {
 			seller.setBusiness_name(name);
 			seller.setSpoc_details(spoc_details);
 			seller.setServiceable_pincodes(serviceable_pincodes);
-			seller.setCompany_pan(pan_no);
-			seller.setBank_details(bank_details);
+			if (StringUtils.hasText(pan_no)) {
+				seller.setCompany_pan(pan_no);
+			}
+			if (bank_details != null) {
+				seller.setBank_details(bank_details);
+			}
 			SEFilter filterP = new SEFilter(SEFilterType.AND);
 			filterP.addClause(WhereClause.eq(Plans.Fields.name, Defaults.DEFAULT_SELLER_PLAN));
 			filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -587,10 +593,13 @@ public class ManageSeller_BLService {
 		if (!SERegExpUtils.standardTextValidation(req.getName())) {
 			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SELLER_NAME);
 		}
-		if (!StringUtils.hasText(req.getPan_no())) {
-			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_PAN_NO);
-		}
-		if (!SERegExpUtils.isPan(req.getPan_no())) {
+//		if (!StringUtils.hasText(req.getPan_no())) {
+//			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_PAN_NO);
+//		}
+//		if (!SERegExpUtils.isPan(req.getPan_no())) {
+//			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PAN_NO);
+//		}
+		if (StringUtils.hasText(req.getPan_no()) && !SERegExpUtils.isPan(req.getPan_no())) {
 			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PAN_NO);
 		}
 		if (CollectionUtils.isEmpty(req.getSpoc_details())) {
