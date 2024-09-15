@@ -248,9 +248,10 @@ public class ManageProduct_BLService {
 
 	private Map<String, String> filterAndFetchImgMap(List<Products> listP) {
 		// Extract image document IDs from products
-		List<String> imageIds = listP.stream()
+		Set<String> imageIds = listP.stream()
 				.filter(products -> products.getMedia() != null && !products.getMedia().isEmpty())
-				.flatMap(products -> products.getMedia().stream().map(Media::getDocument_id)).toList();
+				.flatMap(products -> products.getMedia().stream().map(Media::getDocument_id))
+				.collect(Collectors.toSet());
 
 		// Initialize maps for file upload details and images
 		Map<String, String> mapFUD = new HashMap<>();
@@ -260,7 +261,7 @@ public class ManageProduct_BLService {
 		if (!CollectionUtils.isEmpty(imageIds)) {
 			// Create a filter to retrieve file upload details based on image IDs
 			SEFilter filterFUD = new SEFilter(SEFilterType.AND);
-			filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, imageIds));
+			filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(imageIds)));
 			filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
 			// Retrieve file upload details
