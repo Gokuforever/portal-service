@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.sorted.commons.beans.AddBulkProductReqBean;
 import com.sorted.commons.beans.Media;
 import com.sorted.commons.beans.ProductReqBean;
 import com.sorted.commons.beans.SelectedSubCatagories;
@@ -99,6 +100,119 @@ public class ManageProduct_BLService {
 	@Value("${se.default.size}")
 	private int default_size;
 
+	@PostMapping("/bulk/create")
+	public SEResponse bulkCreate(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+		try {
+
+			AddBulkProductReqBean req = request.getGenericRequestDataObject(AddBulkProductReqBean.class);
+			CommonUtils.extractHeaders(httpServletRequest, req);
+			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
+					Activity.INVENTORY_MANAGEMENT);
+
+			Role role = usersBean.getRole();
+			UserType user_type = role.getUser_type();
+			Seller seller = null;
+			switch (user_type) {
+			case SELLER:
+				seller = usersBean.getSeller();
+				break;
+			case SUPER_ADMIN:
+				if (!StringUtils.hasText(req.getSeller_id())) {
+					throw new CustomIllegalArgumentsException(ResponseCode.PLEASE_SELECT_SELLER);
+				}
+				SEFilter filterS = new SEFilter(SEFilterType.AND);
+				filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getSeller_id()));
+				filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+				seller = seller_Service.repoFindOne(filterS);
+				if (seller == null) {
+					throw new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND);
+				}
+				break;
+			default:
+				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+			}
+			List<ProductReqBean> products = req.getProducts();
+			if (CollectionUtils.isEmpty(products)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCTS);
+			}
+
+			this.validateRequestForBulk(products);
+			Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
+
+			Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master);
+
+			Map<String, Media> mapMedia = products.stream().flatMap(e -> e.getMedia().stream())
+					.filter(a -> StringUtils.hasText(a.getDocument_id()))
+					.collect(Collectors.toMap(e -> e.getDocument_id(), e -> e));
+			if (!CollectionUtils.isEmpty(mapMedia)) {
+				Set<String> document_ids = mapMedia.keySet();
+				document_ids.remove(null);
+				if (CollectionUtils.isEmpty(document_ids)) {
+					throw new CustomIllegalArgumentsException(ResponseCode.DOC_IDS_MISSING);
+				}
+				document_ids.remove(null);
+				SEFilter filterFUD = new SEFilter(SEFilterType.AND);
+				filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(document_ids)));
+				filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+				filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.document_type_id,
+						DocumentType.PRODUCT_IMAGE.getId()));
+				if (user_type == UserType.SELLER) {
+					filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.user_type, user_type.name()));
+					filterFUD.addClause(
+							WhereClause.eq(File_Upload_Details.Fields.entity_id, usersBean.getSeller().getId()));
+				}
+
+				List<File_Upload_Details> repoFind = file_Upload_Details_Service.repoFind(filterFUD);
+				if (CollectionUtils.isEmpty(repoFind)) {
+					throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
+				}
+				List<String> db_document_ids = repoFind.stream().map(e -> e.getId()).toList();
+				if (!db_document_ids.containsAll(document_ids)) {
+					throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
+				}
+			}
+
+			List<Products> listP = new ArrayList<>();
+
+			for (ProductReqBean productReqBean : products) {
+				List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(productReqBean, mapSC);
+				this.validateMandatorySubCategories(category_Master, listSC);
+				BigDecimal mrp = new BigDecimal(productReqBean.getMrp());
+				BigDecimal sp = new BigDecimal(productReqBean.getSelling_price());
+				Products product = new Products();
+				product.setName(productReqBean.getName());
+				product.setMrp(CommonUtils.rupeeToPaise(mrp));
+				product.setSelling_price(CommonUtils.rupeeToPaise(sp));
+				product.setSelected_sub_catagories(listSC);
+				product.setSeller_id(seller.getId());
+				product.setSeller_code(seller.getCode());
+				product.setCategory_id(category_Master.getId());
+				product.setQuantity(Long.valueOf(productReqBean.getQuantity()));
+//				product.setVarient_mapping_id(varient_mapping_id);
+				product.setDescription(
+						StringUtils.hasText(productReqBean.getDescription()) ? productReqBean.getDescription() : null);
+
+				if (!CollectionUtils.isEmpty(productReqBean.getMedia())) {
+					List<Media> listMedia = productReqBean.getMedia().stream()
+							.filter(e -> StringUtils.hasText(e.getDocument_id())).toList();
+					product.setMedia(listMedia);
+				}
+
+				listP.add(product);
+			}
+
+			productService.bulkCreate(listP, usersBean.getId());
+
+			return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
+		} catch (CustomIllegalArgumentsException ex) {
+			throw ex;
+		} catch (Exception e) {
+			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
 	@PostMapping("/create")
 	public SEResponse create(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
@@ -131,7 +245,7 @@ public class ManageProduct_BLService {
 				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
 			}
 
-			this.validateRequest(req);
+			this.validateRequest(req, false);
 
 			Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
 
@@ -532,8 +646,8 @@ public class ManageProduct_BLService {
 		return mapV;
 	}
 
-	private void validateRequest(ProductReqBean req) {
-		if (!StringUtils.hasText(req.getCategory_id())) {
+	private void validateRequest(ProductReqBean req, boolean isBulk) {
+		if (!isBulk && !StringUtils.hasText(req.getCategory_id())) {
 			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_CATEGORY);
 		}
 		if (!StringUtils.hasText(req.getName())) {
@@ -570,6 +684,12 @@ public class ManageProduct_BLService {
 		}
 		if (StringUtils.hasText(req.getDescription()) && !SERegExpUtils.standardTextValidation(req.getDescription())) {
 			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
+		}
+	}
+
+	private void validateRequestForBulk(List<ProductReqBean> list) {
+		for (ProductReqBean req : list) {
+			this.validateRequest(req, true);
 		}
 	}
 
