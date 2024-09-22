@@ -23,6 +23,7 @@ import com.sorted.commons.entity.service.Category_MasterService;
 import com.sorted.commons.entity.service.ProductService;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
+import com.sorted.commons.enums.All_Status.ProductCurrentStatus;
 import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
@@ -190,7 +191,7 @@ public class ManageCart_BLService {
 			List<String> product_ids = cart_items.stream().map(Item::getProduct_id).toList();
 			SEFilter filterP = new SEFilter(SEFilterType.AND);
 			filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, product_ids));
-			filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//			filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
 			List<Products> listP = productService.repoFind(filterP);
 			if (!CollectionUtils.isEmpty(listP)) {
@@ -203,8 +204,15 @@ public class ManageCart_BLService {
 						items.setProduct_code(e.getProduct_code());
 						items.setQuantity(e.getQuantity());
 						items.setSelling_price(products.getSelling_price());
-						items.setIn_stock(products.getQuantity().compareTo(e.getQuantity()) >= 0);
+//						items.setIn_stock(products.getQuantity().compareTo(e.getQuantity()) >= 0);
 						items.setSecure_item(e.is_secure());
+						if (products.isDeleted()) {
+							items.setCurrent_status(ProductCurrentStatus.CURRENTLY_UNAVAILABLE.getStatus_id());
+						} else if (products.getQuantity().compareTo(e.getQuantity()) >= 0) {
+							items.setCurrent_status(ProductCurrentStatus.IN_STOCK.getStatus_id());
+						} else {
+							items.setCurrent_status(ProductCurrentStatus.OUT_OF_STOCK.getStatus_id());
+						}
 						cartItems.add(items);
 					}
 				});

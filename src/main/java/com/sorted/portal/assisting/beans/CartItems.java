@@ -11,4 +11,5 @@ public class CartItems {
 	private Long quantity;
 	private boolean in_stock;
 	private boolean secure_item;
+	private Integer current_status;
 }
