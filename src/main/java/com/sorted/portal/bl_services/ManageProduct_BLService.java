@@ -311,6 +311,115 @@ public class ManageProduct_BLService {
 		}
 	}
 
+	@PostMapping("/edit")
+	public SEResponse edit(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+		try {
+			ProductReqBean req = request.getGenericRequestDataObject(ProductReqBean.class);
+			CommonUtils.extractHeaders(httpServletRequest, req);
+			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
+					Activity.INVENTORY_MANAGEMENT);
+
+			Role role = usersBean.getRole();
+			UserType user_type = role.getUser_type();
+			Seller seller = null;
+			switch (user_type) {
+			case SELLER:
+				seller = usersBean.getSeller();
+				break;
+			case SUPER_ADMIN:
+				if (!StringUtils.hasText(req.getSeller_id())) {
+					throw new CustomIllegalArgumentsException(ResponseCode.PLEASE_SELECT_SELLER);
+				}
+				SEFilter filterS = new SEFilter(SEFilterType.AND);
+				filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getSeller_id()));
+				filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+				seller = seller_Service.repoFindOne(filterS);
+				if (seller == null) {
+					throw new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND);
+				}
+				break;
+			default:
+				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+			}
+
+			if (!StringUtils.hasText(req.getProduct_id())) {
+				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_ID);
+			}
+
+			SEFilter filterP = new SEFilter(SEFilterType.AND);
+			filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getProduct_id()));
+			filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+			filterP.addClause(WhereClause.eq(Products.Fields.seller_id, req.getSeller_id()));
+
+			Products product = productService.repoFindOne(filterP);
+			if (product == null) {
+				throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+			}
+
+			this.validateRequest(req, false);
+
+			Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
+
+			Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master);
+
+			List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(req, mapSC);
+
+			this.validateMandatorySubCategories(category_Master, listSC);
+
+			String varient_mapping_id = this.upsertAndGetVarientMappingId(req, usersBean, role);
+
+			BigDecimal mrp = new BigDecimal(req.getMrp());
+			BigDecimal sp = new BigDecimal(req.getSelling_price());
+			product.setName(req.getName());
+			product.setMrp(CommonUtils.rupeeToPaise(mrp));
+			product.setSelling_price(CommonUtils.rupeeToPaise(sp));
+			product.setSelected_sub_catagories(listSC);
+			product.setCategory_id(category_Master.getId());
+			product.setQuantity(Long.valueOf(req.getQuantity()));
+			product.setVarient_mapping_id(varient_mapping_id);
+			product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
+			if (!CollectionUtils.isEmpty(req.getMedia())) {
+				Set<String> document_ids = req.getMedia().stream().filter(e -> StringUtils.hasText(e.getDocument_id()))
+						.map(Media::getDocument_id).collect(Collectors.toSet());
+				if (CollectionUtils.isEmpty(document_ids)) {
+					throw new CustomIllegalArgumentsException(ResponseCode.DOC_IDS_MISSING);
+				}
+				document_ids.remove(null);
+				SEFilter filterFUD = new SEFilter(SEFilterType.AND);
+				filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(document_ids)));
+				filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+				filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.document_type_id,
+						DocumentType.PRODUCT_IMAGE.getId()));
+				if (user_type == UserType.SELLER) {
+					filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.user_type, user_type.name()));
+					filterFUD.addClause(
+							WhereClause.eq(File_Upload_Details.Fields.entity_id, usersBean.getSeller().getId()));
+				}
+
+				List<File_Upload_Details> repoFind = file_Upload_Details_Service.repoFind(filterFUD);
+				if (CollectionUtils.isEmpty(repoFind)) {
+					throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
+				}
+				List<String> db_document_ids = repoFind.stream().map(e -> e.getId()).toList();
+				if (!db_document_ids.containsAll(document_ids)) {
+					throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
+				}
+				List<Media> listMedia = req.getMedia().stream().filter(e -> StringUtils.hasText(e.getDocument_id()))
+						.toList();
+				product.setMedia(listMedia);
+			}
+
+			product = productService.update(product.getId(), product, usersBean.getId());
+			return SEResponse.getBasicSuccessResponseObject(product, ResponseCode.SUCCESSFUL);
+		} catch (CustomIllegalArgumentsException ex) {
+			throw ex;
+		} catch (Exception e) {
+			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
 	@PostMapping("/find")
 	public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
@@ -357,6 +466,122 @@ public class ManageProduct_BLService {
 		} catch (Exception e) {
 			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
 			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
+	@PostMapping("/delete")
+	public SEResponse delete(@RequestBody SERequest request) {
+		try {
+
+			FindProductBean req = request.getGenericRequestDataObject(FindProductBean.class);
+			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
+					Activity.INVENTORY_MANAGEMENT);
+
+			Role role = usersBean.getRole();
+			UserType user_type = role.getUser_type();
+			if (!(user_type == UserType.SELLER || user_type == UserType.SUPER_ADMIN)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+			}
+			if (!StringUtils.hasText(req.getId())) {
+				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
+			}
+			SEFilter filterSE = new SEFilter(SEFilterType.AND);
+			filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getId()));
+
+			Products product = productService.repoFindOne(filterSE);
+			if (product == null) {
+				return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+			}
+			if (product.isDeleted()) {
+				return SEResponse.getEmptySuccessResponse(ResponseCode.ALREADY_DELETED);
+			}
+			productService.deleteOne(product.getId(), usersBean.getId());
+			return SEResponse.getEmptySuccessResponse(ResponseCode.PRODUCT_DELETED);
+		} catch (CustomIllegalArgumentsException ex) {
+			throw ex;
+		} catch (Exception e) {
+			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
+	@PostMapping("/findOne")
+	public SEResponse findOne(@RequestBody SERequest request) {
+		try {
+			FindProductBean req = request.getGenericRequestDataObject(FindProductBean.class);
+			if (!StringUtils.hasText(req.getId())) {
+				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
+			}
+			SEFilter filterSE = new SEFilter(SEFilterType.AND);
+			filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getId()));
+			filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			Products product = productService.repoFindOne(filterSE);
+			if (product == null) {
+				return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+			}
+
+			Map<String, List<String>> relatedFilters = new HashMap<>();
+
+			product.getSelected_sub_catagories().stream().forEach(s -> {
+				if (!relatedFilters.containsKey(s.getSub_category())) {
+					relatedFilters.put(s.getSub_category(), new ArrayList<>());
+				}
+				relatedFilters.get(s.getSub_category()).addAll(s.getSelected_attributes());
+			});
+
+			this.makeValuesUnique(relatedFilters);
+
+			if (CollectionUtils.isEmpty(relatedFilters)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+			}
+			SEFilter filterRI = new SEFilter(SEFilterType.AND);
+			List<SEFilterNode> nodes = new ArrayList<>();
+			for (Entry<String, List<String>> entry : relatedFilters.entrySet()) {
+				SEFilterNode node = new SEFilterNode(SEFilterType.OR);
+				if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
+					Map<String, Object> map = new HashMap<>();
+					map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
+					map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
+					node.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+					nodes.add(node);
+				}
+			}
+			filterRI.addNodes(nodes);
+			filterRI.addClause(WhereClause.notEq(BaseMongoEntity.Fields.id, product.getId()));
+			filterRI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			List<Products> listRI = productService.repoFind(filterRI);
+
+			Map<String, List<Products>> mapV = this.getVarients(product);
+			Set<String> seller_ids = this.getSellerByPincode(req.getPincode());
+			Map<String, String> mapImg = this.filterAndFetchImgMap(Arrays.asList(product));
+
+			ProductDetailsBean resBean = this.productToBean(listRI, mapV, product, seller_ids, mapImg);
+
+			return SEResponse.getBasicSuccessResponseObject(resBean, ResponseCode.SUCCESSFUL);
+		} catch (CustomIllegalArgumentsException ex) {
+			throw ex;
+		} catch (Exception e) {
+			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
+	@PostMapping("/upload/image")
+	public SEResponse uploadPhoto(@RequestParam("file") MultipartFile file, HttpServletRequest httpServletRequest) {
+		try {
+			String req_user_id = httpServletRequest.getHeader("req_user_id");
+			String req_role_id = httpServletRequest.getHeader("req_role_id");
+			if (!StringUtils.hasText(req_user_id) || !StringUtils.hasText(req_role_id)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+			}
+			UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.INVENTORY_MANAGEMENT);
+			String file_id = googleDriveService.uploadPhoto(file, usersBean, DocumentType.PRODUCT_IMAGE);
+			return SEResponse.getBasicSuccessResponseObject(file_id, ResponseCode.SUCCESSFUL);
+		} catch (IOException | GeneralSecurityException e) {
+			e.printStackTrace();
+			return SEResponse.getBadRequestFailureResponse(ResponseCode.ERR_0001);
 		}
 	}
 
@@ -445,86 +670,6 @@ public class ManageProduct_BLService {
 			}
 		}
 		return seller_ids;
-	}
-
-	@PostMapping("/findOne")
-	public SEResponse findOne(@RequestBody SERequest request) {
-		try {
-			FindProductBean req = request.getGenericRequestDataObject(FindProductBean.class);
-			if (!StringUtils.hasText(req.getId())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
-			}
-			SEFilter filterSE = new SEFilter(SEFilterType.AND);
-			filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getId()));
-			filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-			Products product = productService.repoFindOne(filterSE);
-			if (product == null) {
-				return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
-			}
-
-			Map<String, List<String>> relatedFilters = new HashMap<>();
-
-			product.getSelected_sub_catagories().stream().forEach(s -> {
-				if (!relatedFilters.containsKey(s.getSub_category())) {
-					relatedFilters.put(s.getSub_category(), new ArrayList<>());
-				}
-				relatedFilters.get(s.getSub_category()).addAll(s.getSelected_attributes());
-			});
-
-			this.makeValuesUnique(relatedFilters);
-
-			if (CollectionUtils.isEmpty(relatedFilters)) {
-				throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-			}
-			SEFilter filterRI = new SEFilter(SEFilterType.AND);
-			List<SEFilterNode> nodes = new ArrayList<>();
-			for (Entry<String, List<String>> entry : relatedFilters.entrySet()) {
-				SEFilterNode node = new SEFilterNode(SEFilterType.OR);
-				if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
-					Map<String, Object> map = new HashMap<>();
-					map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
-					map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
-					node.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
-					nodes.add(node);
-				}
-			}
-			filterRI.addNodes(nodes);
-			filterRI.addClause(WhereClause.notEq(BaseMongoEntity.Fields.id, product.getId()));
-			filterRI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-			List<Products> listRI = productService.repoFind(filterRI);
-
-			Map<String, List<Products>> mapV = this.getVarients(product);
-			Set<String> seller_ids = this.getSellerByPincode(req.getPincode());
-			Map<String, String> mapImg = this.filterAndFetchImgMap(Arrays.asList(product));
-
-			ProductDetailsBean resBean = this.productToBean(listRI, mapV, product, seller_ids, mapImg);
-
-			return SEResponse.getBasicSuccessResponseObject(resBean, ResponseCode.SUCCESSFUL);
-		} catch (CustomIllegalArgumentsException ex) {
-			throw ex;
-		} catch (Exception e) {
-			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
-			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-		}
-	}
-
-	@PostMapping("/upload/image")
-	public SEResponse uploadPhoto(@RequestParam("file") MultipartFile file, HttpServletRequest httpServletRequest) {
-		try {
-			String req_user_id = httpServletRequest.getHeader("req_user_id");
-			String req_role_id = httpServletRequest.getHeader("req_role_id");
-			if (!StringUtils.hasText(req_user_id) || !StringUtils.hasText(req_role_id)) {
-				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
-			}
-			UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.INVENTORY_MANAGEMENT);
-			String file_id = googleDriveService.uploadPhoto(file, usersBean, DocumentType.PRODUCT_IMAGE);
-			return SEResponse.getBasicSuccessResponseObject(file_id, ResponseCode.SUCCESSFUL);
-		} catch (IOException | GeneralSecurityException e) {
-			e.printStackTrace();
-			return SEResponse.getBadRequestFailureResponse(ResponseCode.ERR_0001);
-		}
 	}
 
 	private void makeValuesUnique(Map<String, List<String>> map) {
