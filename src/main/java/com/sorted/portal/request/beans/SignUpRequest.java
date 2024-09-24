@@ -16,6 +16,6 @@ public class SignUpRequest extends ReqBaseBean {
 	private String password;
 	private String branch;
 	private String desc;
-	private String semister;
+	private String semester;
 	private String college;
 }

@@ -22,7 +22,7 @@ import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.EntityDetails;
 import com.sorted.commons.enums.ProcessType;
 import com.sorted.commons.enums.ResponseCode;
-import com.sorted.commons.enums.Semister;
+import com.sorted.commons.enums.Semester;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
@@ -91,9 +91,9 @@ public class ManageSignUp_BLService {
 			}
 			boolean isOtherBranch = req.getBranch().equalsIgnoreCase("other");
 			if (isOtherBranch && !StringUtils.hasText(req.getDesc())) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SEMISTER_DESC);
+				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SEMESTER_DESC);
 			}
-			if (!StringUtils.hasText(req.getSemister())) {
+			if (!StringUtils.hasText(req.getSemester())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SEMISTER);
 			}
 			if (!SERegExpUtils.isAlphabeticString(req.getFirst_name())) {
@@ -111,8 +111,8 @@ public class ManageSignUp_BLService {
 			if (!SERegExpUtils.standardTextValidation(req.getBranch())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_BRANCH);
 			}
-			Semister semister = Semister.getByAlias(req.getSemister());
-			if (semister == null) {
+			Semester semester = Semester.getByAlias(req.getSemester());
+			if (semester == null) {
 				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SEMISTER);
 			}
 			if (StringUtils.hasText(req.getCollege()) && SERegExpUtils.standardTextValidation(req.getCollege())) {
@@ -151,7 +151,7 @@ public class ManageSignUp_BLService {
 			user.setEmail_id(req.getEmail_id());
 			user.setBranch(req.getBranch());
 			user.setBranch_desc(isOtherBranch ? req.getDesc() : null);
-			user.setSemister(semister.getAlias());
+			user.setSemister(semester.getAlias());
 			user.setCollege(StringUtils.hasText(req.getCollege()) ? req.getCollege() : null);
 
 			user.setPassword(encode);
