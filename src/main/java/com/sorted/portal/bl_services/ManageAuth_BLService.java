@@ -200,7 +200,8 @@ public class ManageAuth_BLService {
 			if (!StringUtils.hasText(entity_id)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
 			}
-			manageOtp.verify(EntityDetails.USERS, reference_id, otp, entity_id, ProcessType.FORGOT_PASS, Defaults.FORGOT_PASS);
+			manageOtp.verify(EntityDetails.USERS, reference_id, otp, entity_id, ProcessType.FORGOT_PASS,
+					Defaults.FORGOT_PASS);
 			SEFilter filterU = new SEFilter(SEFilterType.AND);
 			filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, entity_id));
 			filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -276,11 +277,16 @@ public class ManageAuth_BLService {
 			if (passwordEncoder.matches(password, db_password)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.BR_OLD_PASSWORD);
 			}
+			if (!users.isPass_changed()) {
+				users.setPass_changed(true);
+			}
+
 			users.setOld_password(db_password);
 			users.setPassword(encode);
 			users.setReset_pass_request_expiry(now);
-			users.setUuid(null); 
+			users.setUuid(null);
 			users_Service.update(users.getId(), users, users.getId());
+
 			log.info("signin:: API ended");
 			return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
