@@ -163,7 +163,7 @@ public class ManageSeller_BLService {
 			List<Spoc_Details> spoc_details = req.getSpoc_details();
 			Spoc_Details primary_spoc = validateSPOC(spoc_details);
 			List<String> unique_phone = spoc_details.parallelStream().map(Spoc_Details::getMobile_no).distinct()
-					.collect(Collectors.toList());
+					.toList();
 			Bank_Details bank_details = req.getBank_details();
 //			if (bank_details == null) {
 //				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_BANK_DETAILS);
@@ -317,7 +317,7 @@ public class ManageSeller_BLService {
 			if (db_spocHash != req_spocHash) {
 
 				List<String> unique_phone = spoc_details.parallelStream().map(Spoc_Details::getMobile_no).distinct()
-						.collect(Collectors.toList());
+						.toList();
 
 				SEFilter filterS = new SEFilter(SEFilterType.AND);
 				filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -483,6 +483,71 @@ public class ManageSeller_BLService {
 		}
 	}
 
+	@PostMapping("/resend")
+	public SEResponse resend(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+		try {
+			FidnSellerBean req = request.getGenericRequestDataObject(FidnSellerBean.class);
+			CommonUtils.extractHeaders(httpServletRequest, req);
+			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(),
+					Activity.SELLER_MANAGEMENT);
+
+			Role role = usersBean.getRole();
+			if (role.getUser_type() != UserType.SUPER_ADMIN) {
+				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+			}
+
+			SEFilter filterS = new SEFilter(SEFilterType.AND);
+			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getId()));
+			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			Seller seller = seller_Service.repoFindOne(filterS);
+			if (seller == null) {
+				throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+			}
+			Optional<Spoc_Details> optional = seller.getSpoc_details().stream().filter(e -> e.isPrimary()).findFirst();
+			if (!optional.isPresent()) {
+				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRIMARY_SPOC);
+			}
+			Spoc_Details spoc_Details = optional.get();
+			String mobile_no = spoc_Details.getMobile_no();
+			SEFilter filterU = new SEFilter(SEFilterType.AND);
+			filterU.addClause(WhereClause.eq(Users.Fields.mobile_no, mobile_no));
+			filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			Users users = users_Service.repoFindOne(filterU);
+			if (users == null) {
+				throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+			}
+
+			if (users.isPass_changed()) {
+				throw new CustomIllegalArgumentsException(ResponseCode.PASSWORD_ALREADY_RESET);
+			}
+
+			String generatePassword = PasswordValidatorUtils.generatePassword();
+			String encode = passwordEncoder.encode(generatePassword);
+			users.setPassword(encode);
+
+			users_Service.update(users.getId(), users, usersBean.getId());
+
+			String first_name = spoc_Details.getFirst_name();
+
+			String cont = first_name + "|" + mobile_no + "|" + generatePassword;
+			MailBuilder builder = new MailBuilder();
+			builder.setTo(spoc_Details.getEmail_id());
+			builder.setContent(cont);
+			builder.setTemplate(MailTemplate.SELLER_WELCOME_MAIL);
+			emailSenderImpl.sendEmailHtmlTemplate(builder);
+
+			return SEResponse.getEmptySuccessResponse(ResponseCode.RESEND_SUCCESS);
+		} catch (CustomIllegalArgumentsException ex) {
+			throw ex;
+		} catch (Exception e) {
+			log.error("/seller/create:: exception occurred");
+			log.error("/seller/create:: {}", e.getMessage());
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
 	@PostMapping("/find")
 	public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
@@ -545,8 +610,26 @@ public class ManageSeller_BLService {
 
 			List<Address> listAdd = address_Service.repoFind(filterSE);
 			if (!CollectionUtils.isEmpty(listAdd)) {
-				mapAdd.putAll(listAdd.stream().collect(Collectors.toMap(e -> e.getEntity_id(), e -> e)));
+				mapAdd.putAll(listAdd.stream().collect(Collectors.toMap(Address::getEntity_id, e -> e)));
 			}
+
+			List<String> primary_contacts = listS.stream().flatMap(e -> e.getSpoc_details().stream())
+					.filter(s -> s.isPrimary()).map(p -> p.getMobile_no()).filter(Objects::nonNull).distinct().toList();
+
+			SEFilter filterU = new SEFilter(SEFilterType.AND);
+			filterU.addClause(WhereClause.in(Users.Fields.mobile_no, primary_contacts));
+			filterU.addClause(WhereClause.eq(Users.Fields.pass_changed, false));
+			filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			List<Users> listPrimary = users_Service.repoFind(filterU);
+
+			Map<String, Boolean> mapIsResend = new HashMap<>();
+			if (!CollectionUtils.isEmpty(listPrimary)) {
+				List<String> list = listPrimary.stream().map(Users::getMobile_no).toList();
+				mapIsResend.putAll(listS.stream().collect(Collectors.toMap(e -> e.getId(), e -> e.getSpoc_details()
+						.stream().anyMatch(s -> s.isPrimary() && list.contains(s.getMobile_no())))));
+			}
+
 			List<CUDSellerBean> resList = new ArrayList<>();
 
 			for (Seller seller : listS) {
@@ -555,6 +638,9 @@ public class ManageSeller_BLService {
 				tempBean.setSeller_id(seller.getId());
 				if (mapAdd.containsKey(seller.getId())) {
 					Address address = mapAdd.get(seller.getId());
+					if (address == null) {
+						continue;
+					}
 
 					AddressDTO address2 = new AddressDTO();
 					address2.setStreet_1(address.getStreet_1());
@@ -572,6 +658,8 @@ public class ManageSeller_BLService {
 				tempBean.setBank_details(seller.getBank_details());
 				tempBean.setServiceable_pincodes(seller.getServiceable_pincodes());
 				tempBean.setStatus_id(seller.getStatus().getId());
+				boolean resend = mapIsResend.containsKey(seller.getId()) && mapIsResend.get(seller.getId());
+				tempBean.setResend(resend);
 				resList.add(tempBean);
 			}
 

@@ -25,4 +25,5 @@ public class CUDSellerBean extends ReqBaseBean {
 	private Bank_Details bank_details;
 	private List<String> serviceable_pincodes;
 	private Integer status;
+	private boolean resend;
 }

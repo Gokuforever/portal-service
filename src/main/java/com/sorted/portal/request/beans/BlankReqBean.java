@@ -7,8 +7,6 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = false)
-public class FidnSellerBean extends ReqBaseBean {
+public class BlankReqBean extends ReqBaseBean {
 
-	private String name;
-	private String id;
 }
