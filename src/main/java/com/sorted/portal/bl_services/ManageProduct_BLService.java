@@ -470,10 +470,11 @@ public class ManageProduct_BLService {
 	}
 
 	@PostMapping("/delete")
-	public SEResponse delete(@RequestBody SERequest request) {
+	public SEResponse delete(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
 
 			FindProductBean req = request.getGenericRequestDataObject(FindProductBean.class);
+			CommonUtils.extractHeaders(httpServletRequest, req);
 			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
 					Activity.INVENTORY_MANAGEMENT);
 
