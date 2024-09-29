@@ -350,7 +350,7 @@ public class ManageProduct_BLService {
 			SEFilter filterP = new SEFilter(SEFilterType.AND);
 			filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getProduct_id()));
 			filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-			filterP.addClause(WhereClause.eq(Products.Fields.seller_id, req.getSeller_id()));
+			filterP.addClause(WhereClause.eq(Products.Fields.seller_id, seller.getId()));
 
 			Products product = productService.repoFindOne(filterP);
 			if (product == null) {
