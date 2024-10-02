@@ -50,9 +50,6 @@ public class ManageMetaData_BLService {
 		List<String> ids = req.getIds();
 		MetaData data = new MetaData();
 		SEFilter filterCM = new SEFilter(SEFilterType.AND);
-		if (!CollectionUtils.isEmpty(ids)) {
-			filterCM.addClause(WhereClause.in(BaseMongoEntity.Fields.id, ids));
-		}
 		filterCM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 		filterCM.addProjection(Category_Master.Fields.name, Category_Master.Fields.groups,
 				Category_Master.Fields.category_code);
@@ -61,7 +58,12 @@ public class ManageMetaData_BLService {
 			data.setCatagories(listCM);
 		}
 
-		List<Product_Master> listPM = product_Master_Service.repoFindAll();
+		SEFilter filterPM = new SEFilter(SEFilterType.AND);
+		if (!CollectionUtils.isEmpty(ids)) {
+			filterPM.addClause(WhereClause.in(BaseMongoEntity.Fields.id, ids));
+		}
+		filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+		List<Product_Master> listPM = product_Master_Service.repoFind(filterPM);
 		if (!CollectionUtils.isEmpty(listPM)) {
 			data.setProducts(listPM);
 		}
