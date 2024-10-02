@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sorted.commons.beans.UsersBean;
@@ -20,7 +21,9 @@ import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
+import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
+import com.sorted.portal.request.beans.MetaDataReq;
 import com.sorted.portal.response.beans.MetaData;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,10 +43,16 @@ public class ManageMetaData_BLService {
 	private Product_Master_Service product_Master_Service;
 
 	@PostMapping("/getMetaData")
-	public SEResponse getMetaData() {
+	public SEResponse getMetaData(@RequestBody SERequest request) {
+
 		log.info("getMetaData:: API started");
+		MetaDataReq req = request.getGenericRequestDataObject(MetaDataReq.class);
+		List<String> ids = req.getIds();
 		MetaData data = new MetaData();
 		SEFilter filterCM = new SEFilter(SEFilterType.AND);
+		if (!CollectionUtils.isEmpty(ids)) {
+			filterCM.addClause(WhereClause.in(BaseMongoEntity.Fields.id, ids));
+		}
 		filterCM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 		filterCM.addProjection(Category_Master.Fields.name, Category_Master.Fields.groups,
 				Category_Master.Fields.category_code);
