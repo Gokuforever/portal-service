@@ -57,6 +57,7 @@ import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.PasswordValidatorUtils;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.commons.utils.ValidationUtil;
+import com.sorted.portal.request.beans.BlankReqBean;
 import com.sorted.portal.request.beans.CUDSellerBean;
 import com.sorted.portal.request.beans.FidnSellerBean;
 import com.sorted.portal.response.beans.FindResBean;
@@ -111,63 +112,12 @@ public class ManageSeller_BLService {
 			validateSellerReq(req);
 
 			Address address = ValidationUtil.validateAddress(req.getAddress(), new Address());
-			// TODO: Remove commented code if create api works fine
-//			List<Spoc_Details> spoc_details = req.getSpoc_details();
-//			List<String> unique_phone = new ArrayList<>();
-//			Spoc_Details primary_spoc = null;
-//			for (Spoc_Details spoc : spoc_details) {
-//				if (!StringUtils.hasText(spoc.getFirst_name())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_FNAME);
-//				}
-//				if (!SERegExpUtils.standardTextValidation(spoc.getFirst_name())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_FNAME);
-//				}
-//				if (!StringUtils.hasText(spoc.getLast_name())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_LNAME);
-//				}
-//				if (!SERegExpUtils.standardTextValidation(spoc.getLast_name())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_LNAME);
-//				}
-//				if (!StringUtils.hasText(spoc.getEmail_id())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_MAIL);
-//				}
-//				if (!SERegExpUtils.isEmail(spoc.getEmail_id())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_MAIL);
-//				}
-//				if (!StringUtils.hasText(spoc.getMobile_no())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_PHONE);
-//				}
-//				if (!SERegExpUtils.isMobileNo(spoc.getMobile_no())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_PHONE);
-//				}
-//				if (!StringUtils.hasText(spoc.getDesignation())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC_DESIGNATION);
-//				}
-//				if (!SERegExpUtils.standardTextValidation(spoc.getDesignation())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SPOC_DESIGNATION);
-//				}
-//				if (unique_phone.contains(spoc.getMobile_no())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.DUPLICATE_SPOC_PHONE);
-//				}
-//				unique_phone.add(spoc.getMobile_no());
-//				if (spoc.isPrimary() && primary_spoc == null) {
-//					primary_spoc = spoc;
-//				} else {
-//					spoc.setPrimary(false);
-//				}
-//			}
-//			if (primary_spoc == null) {
-//				throw new CustomIllegalArgumentsException(ResponseCode.MARK_PRIMARY);
-//			}
 
 			List<Spoc_Details> spoc_details = req.getSpoc_details();
 			Spoc_Details primary_spoc = validateSPOC(spoc_details);
 			List<String> unique_phone = spoc_details.parallelStream().map(Spoc_Details::getMobile_no).distinct()
 					.toList();
 			Bank_Details bank_details = req.getBank_details();
-//			if (bank_details == null) {
-//				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_BANK_DETAILS);
-//			}
 			if (bank_details != null) {
 				ValidationUtil.validateBankDetails(bank_details);
 			}
@@ -380,10 +330,9 @@ public class ManageSeller_BLService {
 			}
 
 			Bank_Details bank_details = req.getBank_details();
-			if (bank_details == null) {
-				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_BANK_DETAILS);
+			if (bank_details != null) {
+				ValidationUtil.validateBankDetails(bank_details);
 			}
-			ValidationUtil.validateBankDetails(bank_details);
 			List<String> serviceable_pincodes = req.getServiceable_pincodes();
 			if (CollectionUtils.isEmpty(serviceable_pincodes)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SERVICEABLE_PINCODE);
@@ -670,6 +619,57 @@ public class ManageSeller_BLService {
 		} catch (Exception e) {
 			log.error("/seller/create:: exception occurred");
 			log.error("/seller/create:: {}", e.getMessage());
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
+	@PostMapping("/findOne")
+	public SEResponse findOne(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+		try {
+			BlankReqBean req = request.getGenericRequestDataObject(BlankReqBean.class);
+			CommonUtils.extractHeaders(httpServletRequest, req);
+			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.USER_PROFILE);
+			Role role = usersBean.getRole();
+			if (role.getUser_type() != UserType.SELLER) {
+				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+			}
+			Seller seller = usersBean.getSeller();
+			SEFilter filterSE = new SEFilter(SEFilterType.AND);
+			filterSE.addClause(WhereClause.eq(Address.Fields.entity_id, seller.getId()));
+			filterSE.addClause(WhereClause.eq(Address.Fields.user_type, UserType.SELLER.name()));
+			filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, false));
+
+			Address address = address_Service.repoFindOne(filterSE);
+
+			CUDSellerBean tempBean = new CUDSellerBean();
+			tempBean.setName(seller.getBusiness_name());
+			tempBean.setSeller_id(seller.getId());
+
+			if (address != null) {
+				AddressDTO address2 = new AddressDTO();
+				address2.setStreet_1(address.getStreet_1());
+				address2.setStreet_2(address.getStreet_2());
+				address2.setLandmark(address.getLandmark());
+				address2.setCity(address.getCity());
+				address2.setState(address.getState());
+				address2.setPincode(address.getPincode());
+				address2.setAddress_type(address.getAddress_type().getType());
+				address2.setAddress_type_desc(address.getAddress_type_desc());
+				tempBean.setAddress(address2);
+			}
+
+			tempBean.setPan_no(seller.getCompany_pan());
+			tempBean.setSpoc_details(seller.getSpoc_details());
+			tempBean.setBank_details(seller.getBank_details());
+			tempBean.setServiceable_pincodes(seller.getServiceable_pincodes());
+			tempBean.setStatus_id(seller.getStatus().getId());
+
+			return SEResponse.getBasicSuccessResponseObject(tempBean, ResponseCode.SUCCESSFUL);
+		} catch (CustomIllegalArgumentsException ex) {
+			throw ex;
+		} catch (Exception e) {
+			log.error("/seller/findOne:: exception occurred");
+			log.error("/seller/findOne:: {}", e.getMessage());
 			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
 		}
 	}
