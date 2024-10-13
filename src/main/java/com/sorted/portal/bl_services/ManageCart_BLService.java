@@ -10,6 +10,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sorted.commons.beans.Item;
@@ -42,6 +43,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+@RequestMapping("/cart")
 @RestController
 public class ManageCart_BLService {
 
@@ -91,7 +93,7 @@ public class ManageCart_BLService {
 		}
 	}
 
-	@PostMapping("/addToCart")
+	@PostMapping("/add")
 	public SEResponse update(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
 			CartCRUDBean req = request.getGenericRequestDataObject(CartCRUDBean.class);
@@ -163,7 +165,11 @@ public class ManageCart_BLService {
 				if (CollectionUtils.isEmpty(cart.getCart_items())) {
 					cart.setCart_items(new ArrayList<>());
 				} else {
-					listItems.addAll(cart.getCart_items());
+					List<Item> list = cart.getCart_items().stream()
+							.filter(e -> !e.getProduct_id().equals(item.getProduct_id())).toList();
+					if (!CollectionUtils.isEmpty(list)) {
+						listItems.addAll(cart.getCart_items());
+					}
 				}
 				cart.getCart_items().add(item);
 			}
