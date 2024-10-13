@@ -1,8 +1,10 @@
 package com.sorted.portal.bl_services;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,13 +16,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sorted.commons.beans.Item;
+import com.sorted.commons.beans.Media;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Cart;
 import com.sorted.commons.entity.mongo.Category_Master;
+import com.sorted.commons.entity.mongo.File_Upload_Details;
 import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.service.Cart_Service;
 import com.sorted.commons.entity.service.Category_MasterService;
+import com.sorted.commons.entity.service.File_Upload_Details_Service;
 import com.sorted.commons.entity.service.ProductService;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
@@ -58,6 +63,9 @@ public class ManageCart_BLService {
 
 	@Autowired
 	private Category_MasterService category_MasterService;
+
+	@Autowired
+	private File_Upload_Details_Service file_Upload_Details_Service;
 
 	@PostMapping("/fetch")
 	public SEResponse fetch(HttpServletRequest httpServletRequest) {
@@ -193,6 +201,7 @@ public class ManageCart_BLService {
 		CartBean cartBean = new CartBean();
 		List<CartItems> cartItems = new ArrayList<>();
 		List<Item> cart_items = cart.getCart_items();
+		Map<String, String> mapImg = new HashMap<>();
 		if (!CollectionUtils.isEmpty(cart_items)) {
 			List<String> product_ids = cart_items.stream().map(Item::getProduct_id).toList();
 			SEFilter filterP = new SEFilter(SEFilterType.AND);
@@ -202,6 +211,30 @@ public class ManageCart_BLService {
 			List<Products> listP = productService.repoFind(filterP);
 			if (!CollectionUtils.isEmpty(listP)) {
 				Map<String, Products> mapP = listP.stream().collect(Collectors.toMap(p -> p.getId(), p -> p));
+				List<String> imageIds = listP.stream().filter(e -> !CollectionUtils.isEmpty(e.getMedia()))
+						.flatMap(p -> p.getMedia().stream()).map(m -> m.getDocument_id()).toList();
+				if (!CollectionUtils.isEmpty(imageIds)) {
+					// Create a filter to retrieve file upload details based on image IDs
+					SEFilter filterFUD = new SEFilter(SEFilterType.AND);
+					filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, imageIds));
+					filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+					// Retrieve file upload details
+					List<File_Upload_Details> listFUD = file_Upload_Details_Service.repoFind(filterFUD);
+
+					Map<String, String> mapFUD = new HashMap<>();
+
+					// Populate mapFUD if file upload details list is not empty
+					if (!CollectionUtils.isEmpty(listFUD)) {
+						mapFUD = listFUD.stream().collect(
+								Collectors.toMap(File_Upload_Details::getId, File_Upload_Details::getDocument_id));
+					}
+
+					// Map the image IDs that have corresponding entries in mapFUD
+					mapImg.putAll(imageIds.stream().filter(mapFUD::containsKey) // Only consider IDs present in mapFUD
+							.collect(Collectors.toMap(id -> id, mapFUD::get))); // Map image ID to corresponding
+																				// document ID
+				}
 				cart_items.stream().forEach(e -> {
 					if (mapP.containsKey(e.getProduct_id())) {
 						CartItems items = new CartItems();
@@ -219,6 +252,16 @@ public class ManageCart_BLService {
 						} else {
 							items.setCurrent_status(ProductCurrentStatus.OUT_OF_STOCK.getStatus_id());
 						}
+						List<Media> media = products.getMedia();
+						if (!CollectionUtils.isEmpty(media)) {
+							Optional<Media> findFirst = media.stream().filter(m -> m.getOrder() == 1).findFirst();
+							if (findFirst.isPresent()) {
+								Media media2 = findFirst.get();
+								if (mapImg.containsKey(media2.getDocument_id()))
+									items.setDocument_id(mapImg.get(media2.getDocument_id()));
+							}
+						}
+
 						cartItems.add(items);
 					}
 				});

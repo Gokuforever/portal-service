@@ -1,5 +1,7 @@
 package com.sorted.portal.assisting.beans;
 
+import com.sorted.commons.beans.Media;
+
 import lombok.Data;
 
 @Data
@@ -12,4 +14,5 @@ public class CartItems {
 	private boolean in_stock;
 	private boolean secure_item;
 	private Integer current_status;
+	private String document_id;
 }
