@@ -727,6 +727,7 @@ public class ManageProduct_BLService {
 		bean.setProduct_code(product.getProduct_code());
 		bean.setSelling_price(CommonUtils.paiseToRupee(product.getSelling_price()));
 		bean.setMrp(CommonUtils.paiseToRupee(product.getMrp()));
+		bean.setSelected_sub_catagories(product.getSelected_sub_catagories());
 		bean.setQuantity(product.getQuantity().intValue());
 		bean.setDescription(product.getDescription());
 		if (!CollectionUtils.isEmpty(product.getMedia())) {

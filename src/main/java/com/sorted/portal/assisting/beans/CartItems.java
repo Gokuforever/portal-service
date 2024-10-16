@@ -1,7 +1,5 @@
 package com.sorted.portal.assisting.beans;
 
-import com.sorted.commons.beans.Media;
-
 import lombok.Data;
 
 @Data
