@@ -459,8 +459,6 @@ public class ManageProduct_BLService {
 		}
 	}
 
-	@Async
-
 	@PostMapping("/delete")
 	public SEResponse delete(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
