@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,6 +57,7 @@ import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
+import com.sorted.commons.helper.SearchHistoryAsyncHelper;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.GoogleDriveService;
 import com.sorted.commons.utils.SERegExpUtils;
@@ -87,6 +89,9 @@ public class ManageProduct_BLService {
 
 	@Autowired
 	private File_Upload_Details_Service file_Upload_Details_Service;
+
+	@Autowired
+	private SearchHistoryAsyncHelper searchHistoryAsyncHelper;
 
 	private final GoogleDriveService googleDriveService;
 
@@ -429,23 +434,8 @@ public class ManageProduct_BLService {
 					Activity.INVENTORY_MANAGEMENT);
 			SEFilter filterSE = this.createFilterForProductList(req, usersBean);
 
-//			FindResBean bean = new FindResBean();
-//			int page = req.getPage();
-//			int size = req.getSize();
-//			if (size < 1) {
-//				page = default_page;
-//				size = default_size;
-//			}
-//			if (page == 0) {
-//				long total_count = productService.countByFilter(filterSE);
-//				if (total_count <= 0) {
-//					return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.NO_RECORD);
-//				}
-//				bean.setTotal_count(total_count);
-//			}
-//			
-//			Pagination pagination = new Pagination(page, size);
-//			filterSE.setPagination(pagination);
+			searchHistoryAsyncHelper.createSearchHistory(usersBean.getId(), usersBean.getRole().getUser_type_id(),
+					filterSE);
 
 			List<Products> listP = productService.repoFind(filterSE);
 			if (CollectionUtils.isEmpty(listP)) {
@@ -468,6 +458,8 @@ public class ManageProduct_BLService {
 			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
 		}
 	}
+
+	@Async
 
 	@PostMapping("/delete")
 	public SEResponse delete(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
