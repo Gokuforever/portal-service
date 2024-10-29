@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -488,6 +487,32 @@ public class ManageProduct_BLService {
 			}
 			productService.deleteOne(product.getId(), usersBean.getId());
 			return SEResponse.getEmptySuccessResponse(ResponseCode.PRODUCT_DELETED);
+		} catch (CustomIllegalArgumentsException ex) {
+			throw ex;
+		} catch (Exception e) {
+			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
+	@PostMapping("/findForEdit")
+	public SEResponse findForEdit(@RequestBody SERequest request) {
+		try {
+			FindProductBean req = request.getGenericRequestDataObject(FindProductBean.class);
+			if (!StringUtils.hasText(req.getId())) {
+				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
+			}
+			SEFilter filterSE = new SEFilter(SEFilterType.AND);
+			filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getId()));
+			filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			Products product = productService.repoFindOne(filterSE);
+			if (product == null) {
+				return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+			}
+			Map<String, String> mapImg = this.filterAndFetchImgMap(Arrays.asList(product));
+			ProductDetailsBean productToBean = this.convertProductToBean(product, null, mapImg);
+			return SEResponse.getBasicSuccessResponseObject(productToBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
 		} catch (Exception e) {
