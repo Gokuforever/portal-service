@@ -23,4 +23,6 @@ public class ProductDetailsBean {
 	private List<ProductDetailsBean> related_products;
 	private List<Media> media;
 	private boolean is_deliverable;
+	private String category_id;
+	private String category_name;
 }
