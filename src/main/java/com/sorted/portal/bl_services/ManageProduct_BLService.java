@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -447,8 +448,6 @@ public class ManageProduct_BLService {
 
 			List<ProductDetailsBean> resList = this.convertToBean(null, listP, seller_ids, mapImg);
 
-//			bean.setList(resList);
-
 			return SEResponse.getBasicSuccessResponseList(resList, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
@@ -511,7 +510,8 @@ public class ManageProduct_BLService {
 				return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
 			}
 			Map<String, String> mapImg = this.filterAndFetchImgMap(Arrays.asList(product));
-			ProductDetailsBean productToBean = this.convertProductToBean(product, null, mapImg);
+			Category_Master category_Master = this.getCategoryMaster(product.getCategory_id());
+			ProductDetailsBean productToBean = this.convertProductToBean(product, null, mapImg, category_Master);
 			return SEResponse.getBasicSuccessResponseObject(productToBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
@@ -699,11 +699,13 @@ public class ManageProduct_BLService {
 			Products product, Set<String> seller_ids, Map<String, String> mapImg) {
 		ProductDetailsBean mainProductDetails = this.convertToBean(variantMap, Arrays.asList(product), null, mapImg)
 				.get(0);
-
 		if (!CollectionUtils.isEmpty(relatedProducts)) {
+			List<String> category_ids = new ArrayList<>();
 			List<ProductDetailsBean> relatedProductDetailsList = new ArrayList<>();
+			Map<String, Category_Master> mapCM = this.getCategoryMaster(relatedProducts, category_ids);
 			for (Products temp : relatedProducts) {
-				relatedProductDetailsList.add(this.convertProductToBean(temp, seller_ids, mapImg));
+				Category_Master category_Master = mapCM.get(temp.getCategory_id());
+				relatedProductDetailsList.add(this.convertProductToBean(temp, seller_ids, mapImg, category_Master));
 			}
 			mainProductDetails.setRelated_products(relatedProductDetailsList);
 		}
@@ -713,15 +715,26 @@ public class ManageProduct_BLService {
 
 	private List<ProductDetailsBean> convertToBean(Map<String, List<Products>> variantMap, List<Products> products,
 			Set<String> seller_ids, Map<String, String> mapImg) {
+
 		List<ProductDetailsBean> productDetailsList = new ArrayList<>();
+		List<String> category_ids = new ArrayList<>();
+		if (variantMap != null && variantMap.size() > 0) {
+			Collection<List<Products>> values = variantMap.values();
+			category_ids
+					.addAll(values.stream().flatMap(e -> e.stream()).map(e -> e.getCategory_id()).distinct().toList());
+		}
+		Map<String, Category_Master> mapCM = this.getCategoryMaster(products, category_ids);
 		for (Products product : products) {
-			ProductDetailsBean productDetailsBean = this.convertProductToBean(product, seller_ids, mapImg);
+			Category_Master category_Master = mapCM.get(product.getCategory_id());
+			ProductDetailsBean productDetailsBean = this.convertProductToBean(product, seller_ids, mapImg,
+					category_Master);
 			if (StringUtils.hasText(product.getVarient_mapping_id()) && !CollectionUtils.isEmpty(variantMap)
 					&& variantMap.containsKey(product.getVarient_mapping_id())) {
 				List<Products> variants = variantMap.get(product.getVarient_mapping_id());
 				for (Products variant : variants) {
 					if (!variant.getId().equals(product.getId())) {
-						ProductDetailsBean variantBean = this.convertProductToBean(variant, seller_ids, mapImg);
+						Category_Master cm = mapCM.get(product.getCategory_id());
+						ProductDetailsBean variantBean = this.convertProductToBean(variant, seller_ids, mapImg, cm);
 						if (CollectionUtils.isEmpty(productDetailsBean.getVarients())) {
 							productDetailsBean.setVarients(new ArrayList<>());
 						}
@@ -734,8 +747,25 @@ public class ManageProduct_BLService {
 		return productDetailsList;
 	}
 
+	private Map<String, Category_Master> getCategoryMaster(List<Products> products, List<String> category_ids) {
+		category_ids.addAll(products.stream().map(e -> e.getCategory_id()).distinct().toList());
+		category_ids.remove(null);
+		Map<String, Category_Master> mapCM = new HashMap<>();
+		if (!CollectionUtils.isEmpty(category_ids)) {
+			SEFilter filterCM = new SEFilter(SEFilterType.AND);
+			filterCM.addClause(WhereClause.in(BaseMongoEntity.Fields.id, category_ids));
+			filterCM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			List<Category_Master> listCM = category_MasterService.repoFind(filterCM);
+			if (!CollectionUtils.isEmpty(listCM)) {
+				mapCM.putAll(listCM.stream().collect(Collectors.toMap(e -> e.getId(), e -> e)));
+			}
+		}
+		return mapCM;
+	}
+
 	private ProductDetailsBean convertProductToBean(Products product, Set<String> seller_ids,
-			Map<String, String> mapImg) {
+			Map<String, String> mapImg, Category_Master category_Master) {
 		ProductDetailsBean bean = new ProductDetailsBean();
 		bean.setName(product.getName());
 		bean.setId(product.getId());
@@ -745,7 +775,6 @@ public class ManageProduct_BLService {
 		bean.setSelected_sub_catagories(product.getSelected_sub_catagories());
 		bean.setQuantity(product.getQuantity().intValue());
 		bean.setDescription(product.getDescription());
-		Category_Master category_Master = this.getCategoryMaster(product.getCategory_id());
 		bean.setCategory_id(category_Master.getId());
 		bean.setCategory_id(category_Master.getName());
 		if (!CollectionUtils.isEmpty(product.getMedia())) {
