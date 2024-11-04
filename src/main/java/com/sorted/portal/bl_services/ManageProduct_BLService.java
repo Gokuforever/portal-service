@@ -776,7 +776,7 @@ public class ManageProduct_BLService {
 		bean.setQuantity(product.getQuantity().intValue());
 		bean.setDescription(product.getDescription());
 		bean.setCategory_id(category_Master.getId());
-		bean.setCategory_id(category_Master.getName());
+		bean.setCategory_name(category_Master.getName());
 		if (!CollectionUtils.isEmpty(product.getMedia())) {
 			List<Media> listMedia = new ArrayList<>();
 			List<Media> list = product.getMedia().stream().sorted((o1, o2) -> o1.getOrder().compareTo(o2.getOrder()))
