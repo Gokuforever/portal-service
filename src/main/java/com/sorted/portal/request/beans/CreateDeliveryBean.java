@@ -6,8 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 @Data
-@EqualsAndHashCode(callSuper = false)
-public class CheckDeliveryBean extends ReqBaseBean {
-
-	private String pincode;
+@EqualsAndHashCode(callSuper = true)
+public class CreateDeliveryBean extends ReqBaseBean {
+	private String order_id;
 }
