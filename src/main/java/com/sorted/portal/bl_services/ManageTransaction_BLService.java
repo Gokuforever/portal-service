@@ -79,6 +79,9 @@ public class ManageTransaction_BLService {
 	@Autowired
 	private Order_Item_Service order_Item_Service;
 
+//	@Autowired
+//	private Transaction_Req_Response_Service transaction_Req_Response_Service;
+
 	@Autowired
 	private RazorpayUtility razorpayUtility;
 
@@ -234,6 +237,8 @@ public class ManageTransaction_BLService {
 				order_Item.setSelling_price(product.getSelling_price());
 				order_Item.setSeller_id(product.getSeller_id());
 				order_Item.setSeller_code(product.getSeller_code());
+				order_Item.setStatus(OrderStatus.ORDER_PLACED);
+				order_Item.setStatus_id(OrderStatus.ORDER_PLACED.getId());
 				order_Item.setTotal_cost(product.getSelling_price() * item.getQuantity());
 				if (item.is_secure()) {
 					order_Item.setType(PurchaseType.SECURE);
@@ -288,6 +293,14 @@ public class ManageTransaction_BLService {
 			pickup_address.setLng(sellerAddress.getLng());
 			order.setPickup_address(pickup_address);
 			// @formatter:on
+
+			for (Products product : mapP.values()) {
+				Long quantity = product.getQuantity();
+				quantity -= 1;
+				product.setQuantity(quantity);
+				productService.update(product.getId(), product, Defaults.SYSTEM_ADMIN);
+			}
+
 			Order_Details order_Details = order_Details_Service.create(order, usersBean.getId());
 
 			for (Order_Item order_Item : listOI) {
@@ -324,26 +337,65 @@ public class ManageTransaction_BLService {
 			}
 			SEFilter filterO = new SEFilter(SEFilterType.AND);
 			filterO.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getOrder_id()));
-//			filterO.addClause(WhereClause.eq(Order_Details.Fields.status, OrderStatus.ORDER_REQUESTED.name()));
+//			filterO.addClause(WhereClause.eq(Order_Details.Fields.status, OrderStatus.ORDER_PLACED.name()));
 			filterO.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 			Order_Details order_details = order_Details_Service.repoFindOne(filterO);
 			if (order_details == null) {
 				throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
 			}
-
-			order_details.setPg_order_id(req.getRazorpay_order_id());
-			order_details.setTransaction_id(req.getRazorpay_payment_id());
-
 			// TODO: verify razorpay signature to validate payment details
+			SEFilter filterOD = new SEFilter(SEFilterType.AND);
+			filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getOrder_id()));
+			// TODO: ?
+//			filterOD.addClause(WhereClause.eq(Order_Item.Fields.status, OrderStatus.ORDER_PLACED.name()));
+			filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+			List<Order_Item> items = order_Item_Service.repoFind(filterOD);
+			if (CollectionUtils.isEmpty(items)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+			}
+			Set<String> product_ids = items.stream().map(Order_Item::getProduct_id).collect(Collectors.toSet());
 
-			order_details.setStatus(OrderStatus.TRANSACTION_PROCESSED);
-			order_details.setStatus_id(OrderStatus.TRANSACTION_PROCESSED.getId());
-			Order_Status_History order_history = Order_Status_History.builder()
-					.status(OrderStatus.TRANSACTION_PROCESSED).modification_date(LocalDateTime.now())
-					.modified_by(Defaults.SYSTEM_ADMIN).build();
-			List<Order_Status_History> order_status_history = order_details.getOrder_status_history();
-			order_status_history.add(order_history);
-			order_details.setOrder_status_history(order_status_history);
+			if (!StringUtils.hasText(req.getRazorpay_payment_id())) {
+				order_details.setStatus(OrderStatus.TRANSACTION_FAILED);
+				order_details.setStatus_id(OrderStatus.TRANSACTION_FAILED.getId());
+				Order_Status_History order_history = Order_Status_History.builder()
+						.status(OrderStatus.TRANSACTION_FAILED).modification_date(LocalDateTime.now())
+						.modified_by(Defaults.SYSTEM_ADMIN).build();
+				List<Order_Status_History> order_status_history = order_details.getOrder_status_history();
+				order_status_history.add(order_history);
+				order_details.setOrder_status_history(order_status_history);
+			} else {
+
+				SEFilter filterC = new SEFilter(SEFilterType.AND);
+				filterC.addClause(WhereClause.eq(Cart.Fields.user_id, order_details.getUser_id()));
+				filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+				Cart cart = cart_Service.repoFindOne(filterC);
+				if (cart == null) {
+					throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+				}
+
+				List<Item> collect = cart.getCart_items().stream().filter(e -> !product_ids.contains(e.getProduct_id()))
+						.collect(Collectors.toList());
+				if (!CollectionUtils.isEmpty(items)) {
+					cart.setCart_items(collect);
+				} else {
+					cart.setCart_items(null);
+				}
+				cart_Service.update(cart.getId(), cart, Defaults.SYSTEM_ADMIN);
+				order_details.setPg_order_id(req.getRazorpay_order_id());
+				order_details.setTransaction_id(req.getRazorpay_payment_id());
+
+				// TODO: verify razorpay signature to validate payment details
+
+				order_details.setStatus(OrderStatus.TRANSACTION_PROCESSED);
+				order_details.setStatus_id(OrderStatus.TRANSACTION_PROCESSED.getId());
+				Order_Status_History order_history = Order_Status_History.builder()
+						.status(OrderStatus.TRANSACTION_PROCESSED).modification_date(LocalDateTime.now())
+						.modified_by(Defaults.SYSTEM_ADMIN).build();
+				List<Order_Status_History> order_status_history = order_details.getOrder_status_history();
+				order_status_history.add(order_history);
+				order_details.setOrder_status_history(order_status_history);
+			}
 			order_Details_Service.update(order_details.getId(), order_details, Defaults.SYSTEM_ADMIN);
 
 			log.info("/saveResponse:: API ended!");
