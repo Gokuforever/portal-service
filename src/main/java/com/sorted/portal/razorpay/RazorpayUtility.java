@@ -26,7 +26,7 @@ public class RazorpayUtility {
 		RazorpayClient razorpay = new RazorpayClient(rzr_key, rzr_secret);
 
 		JSONObject orderRequest = new JSONObject();
-		orderRequest.put("amount", 6000);
+		orderRequest.put("amount", amount);
 		orderRequest.put("currency", "INR");
 		orderRequest.put("receipt", order_id);
 
