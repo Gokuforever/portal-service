@@ -29,11 +29,13 @@ import com.sorted.commons.entity.mongo.Cart;
 import com.sorted.commons.entity.mongo.Order_Details;
 import com.sorted.commons.entity.mongo.Order_Item;
 import com.sorted.commons.entity.mongo.Products;
+import com.sorted.commons.entity.mongo.Seller;
 import com.sorted.commons.entity.service.Address_Service;
 import com.sorted.commons.entity.service.Cart_Service;
 import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Order_Item_Service;
 import com.sorted.commons.entity.service.ProductService;
+import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.OrderStatus;
@@ -79,6 +81,9 @@ public class ManageTransaction_BLService {
 
 	@Autowired
 	private RazorpayUtility razorpayUtility;
+
+	@Autowired
+	private Seller_Service seller_Service;
 
 //	@PostMapping("/findAll")
 //	public SEResponse find(@RequestBody SERequest request) {
@@ -182,6 +187,30 @@ public class ManageTransaction_BLService {
 			if (CollectionUtils.isEmpty(listP)) {
 				throw new CustomIllegalArgumentsException(ResponseCode.OUT_OF_STOCK);
 			}
+			List<String> seller_ids = listP.stream().map(e -> e.getSeller_id()).distinct().toList();
+			if (seller_ids.size() > 1) {
+				// TODO: need to discuss
+			}
+			String seller_id = seller_ids.get(0);
+			SEFilter filterS = new SEFilter(SEFilterType.AND);
+			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, seller_id));
+			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, seller_id));
+
+			Seller seller = seller_Service.repoFindOne(filterS);
+			if (seller == null) {
+				throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+			}
+
+			SEFilter filterSA = new SEFilter(SEFilterType.AND);
+			filterSA.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+			filterSA.addClause(WhereClause.eq(Address.Fields.entity_id, seller.getId()));
+			filterSA.addClause(WhereClause.eq(Address.Fields.user_type, UserType.SELLER.name()));
+
+			Address sellerAddress = address_Service.repoFindOne(filterSA);
+			if (sellerAddress == null) {
+				throw new CustomIllegalArgumentsException(ResponseCode.ADDRESS_NOT_FOUND);
+			}
+
 			Map<String, Products> mapP = listP.stream().collect(Collectors.toMap(e -> e.getId(), e -> e));
 
 			List<Order_Item> listOI = new ArrayList<>();
@@ -191,6 +220,9 @@ public class ManageTransaction_BLService {
 					throw new CustomIllegalArgumentsException(ResponseCode.DELETED_PRODUCT);
 				}
 				Products product = mapP.get(item.getProduct_id());
+				if (product == null) {
+					continue;
+				}
 				if (product.getQuantity().compareTo(item.getQuantity()) < 0) {
 					throw new CustomIllegalArgumentsException(ResponseCode.FEW_OUT_OF_STOCK);
 				}
@@ -224,12 +256,10 @@ public class ManageTransaction_BLService {
 //			FIXME: need to add product total amount, delivery charges, gst and other charges in total amount 
 //			order.setDelivery_charges();
 			order.setTotal_amount(totalSum);
-			order.setStatus(OrderStatus.ORDER_REQUESTED);
-			order.setStatus_id(OrderStatus.ORDER_REQUESTED.getId());
-			Order_Status_History order_history = new Order_Status_History();
-			order_history.setStatus(OrderStatus.ORDER_REQUESTED);
-			order_history.setModification_date(LocalDateTime.now());
-			order_history.setModified_by(usersBean.getId());
+			order.setStatus(OrderStatus.ORDER_PLACED);
+			order.setStatus_id(OrderStatus.ORDER_PLACED.getId());
+			Order_Status_History order_history = Order_Status_History.builder().status(OrderStatus.ORDER_PLACED)
+					.modification_date(LocalDateTime.now()).modified_by(usersBean.getId()).build();
 			order.setOrder_status_history(Arrays.asList(order_history));
 
 			//@formatter:off
@@ -241,8 +271,22 @@ public class ManageTransaction_BLService {
 			if (StringUtils.hasText(address.getState())){del_address.setState(address.getState());}
 			if (StringUtils.hasText(address.getPincode())){del_address.setPincode(address.getPincode());}
 			if (address.getAddress_type()!=null){del_address.setAddress_type(address.getAddress_type().name());}
+			del_address.setLat(address.getLat());
+			del_address.setLng(address.getLng());
 			if (StringUtils.hasText(address.getAddress_type_desc())){del_address.setAddress_type_desc(address.getAddress_type_desc());}
-			order.setDelivery_address(del_address);
+			
+			AddressDTO pickup_address =  new AddressDTO();
+			if (StringUtils.hasText(sellerAddress.getStreet_1())){pickup_address.setStreet_1(sellerAddress.getStreet_1());}
+			if (StringUtils.hasText(sellerAddress.getStreet_2())){pickup_address.setStreet_2(sellerAddress.getStreet_2());}
+			if (StringUtils.hasText(sellerAddress.getLandmark())){pickup_address.setLandmark(sellerAddress.getLandmark());}
+			if (StringUtils.hasText(sellerAddress.getCity())){pickup_address.setCity(sellerAddress.getCity());}
+			if (StringUtils.hasText(sellerAddress.getState())){pickup_address.setState(sellerAddress.getState());}
+			if (StringUtils.hasText(sellerAddress.getPincode())){pickup_address.setPincode(sellerAddress.getPincode());}
+			if (sellerAddress.getAddress_type()!=null){pickup_address.setAddress_type(sellerAddress.getAddress_type().name());}
+			if (StringUtils.hasText(sellerAddress.getAddress_type_desc())){pickup_address.setAddress_type_desc(sellerAddress.getAddress_type_desc());}
+			pickup_address.setLat(sellerAddress.getLat());
+			pickup_address.setLng(sellerAddress.getLng());
+			order.setPickup_address(pickup_address);
 			// @formatter:on
 			Order_Details order_Details = order_Details_Service.create(order, usersBean.getId());
 
@@ -280,7 +324,7 @@ public class ManageTransaction_BLService {
 			}
 			SEFilter filterO = new SEFilter(SEFilterType.AND);
 			filterO.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getOrder_id()));
-			filterO.addClause(WhereClause.eq(Order_Details.Fields.status, OrderStatus.ORDER_REQUESTED.name()));
+//			filterO.addClause(WhereClause.eq(Order_Details.Fields.status, OrderStatus.ORDER_REQUESTED.name()));
 			filterO.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 			Order_Details order_details = order_Details_Service.repoFindOne(filterO);
 			if (order_details == null) {
@@ -292,12 +336,11 @@ public class ManageTransaction_BLService {
 
 			// TODO: verify razorpay signature to validate payment details
 
-			order_details.setStatus(OrderStatus.PAYMENT_PROCESSED);
-			order_details.setStatus_id(OrderStatus.PAYMENT_PROCESSED.getId());
-			Order_Status_History order_history = new Order_Status_History();
-			order_history.setStatus(OrderStatus.PAYMENT_PROCESSED);
-			order_history.setModification_date(LocalDateTime.now());
-			order_history.setModified_by(Defaults.SYSTEM_ADMIN);
+			order_details.setStatus(OrderStatus.TRANSACTION_PROCESSED);
+			order_details.setStatus_id(OrderStatus.TRANSACTION_PROCESSED.getId());
+			Order_Status_History order_history = Order_Status_History.builder()
+					.status(OrderStatus.TRANSACTION_PROCESSED).modification_date(LocalDateTime.now())
+					.modified_by(Defaults.SYSTEM_ADMIN).build();
 			List<Order_Status_History> order_status_history = order_details.getOrder_status_history();
 			order_status_history.add(order_history);
 			order_details.setOrder_status_history(order_status_history);
