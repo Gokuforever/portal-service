@@ -390,7 +390,6 @@ public class ManageProduct_BLService {
 				if (CollectionUtils.isEmpty(document_ids)) {
 					throw new CustomIllegalArgumentsException(ResponseCode.DOC_IDS_MISSING);
 				}
-				document_ids.remove(null);
 				SEFilter filterFUD = new SEFilter(SEFilterType.AND);
 				filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(document_ids)));
 				filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -786,8 +785,8 @@ public class ManageProduct_BLService {
 				if (!mapImg.containsKey(media.getDocument_id())) {
 					continue;
 				}
-				String document_id = mapImg.get(media.getDocument_id());
-				media.setDocument_id(document_id);
+				String key = mapImg.get(media.getDocument_id());
+				media.setKey(key);
 				media.setOrder(order);
 				listMedia.add(media);
 				order++;
