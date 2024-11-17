@@ -592,8 +592,11 @@ public class ManageProduct_BLService {
 				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
 			}
 			UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.INVENTORY_MANAGEMENT);
-			String file_id = googleDriveService.uploadPhoto(file, usersBean, DocumentType.PRODUCT_IMAGE);
-			return SEResponse.getBasicSuccessResponseObject(file_id, ResponseCode.SUCCESSFUL);
+			File_Upload_Details file_Upload_Details = googleDriveService.uploadPhoto(file, usersBean, DocumentType.PRODUCT_IMAGE);
+			Media media = new Media();
+			media.setKey(file_Upload_Details.getDocument_id());
+			media.setDocument_id(file_Upload_Details.getId());
+			return SEResponse.getBasicSuccessResponseObject(media, ResponseCode.SUCCESSFUL);
 		} catch (IOException | GeneralSecurityException e) {
 			e.printStackTrace();
 			return SEResponse.getBadRequestFailureResponse(ResponseCode.ERR_0001);
