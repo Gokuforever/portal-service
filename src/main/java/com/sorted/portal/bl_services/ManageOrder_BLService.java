@@ -1,7 +1,5 @@
 package com.sorted.portal.bl_services;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -15,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sorted.commons.beans.AddressDTO;
-import com.sorted.commons.beans.Order_Status_History;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
@@ -47,6 +44,7 @@ import com.sorted.commons.porter.req.beans.CreateOrderBean.Drop_Details;
 import com.sorted.commons.porter.req.beans.CreateOrderBean.Instruction_List;
 import com.sorted.commons.porter.req.beans.CreateOrderBean.Pickup_Details;
 import com.sorted.commons.porter.res.beans.CreateOrderResBean;
+import com.sorted.commons.porter.res.beans.FetchOrderRes.FareDetails;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.request.beans.CreateDeliveryBean;
@@ -149,86 +147,19 @@ public class ManageOrder_BLService {
 				// TODO:
 			}
 
-			// @formatter:off
-			// Create delivery instructions
-			Delivery_Instructions instruction1 = Delivery_Instructions.builder()
-			        .type("text")
-			        .description("handle with care")
-			        .build();
-
-			Instruction_List instructionsList = Instruction_List.builder()
-			        .instructions_list(Arrays.asList(instruction1))
-			        .build();
-
-			// Create pickup details
-			Address pickupAddress = Address.builder()
-			        .street_address1(pickup_address.getStreet_1())
-			        .street_address2(pickup_address.getStreet_2())
-			        .landmark(pickup_address.getLandmark())
-			        .city(pickup_address.getCity())
-			        .state(pickup_address.getState())
-			        .pincode(pickup_address.getPincode())
-			        .country("India")
-			        .lat(pickup_address.getLat())
-			        .lng(pickup_address.getLng())
-			        .contact_details(Contact_Details.builder()
-			                .name(spoc_Details.getFirst_name() + " " + spoc_Details.getLast_name())
-			                .phone_number("+91"+spoc_Details.getMobile_no())
-			                .build())
-			        .build();
-
-			Pickup_Details pickupDetails = Pickup_Details.builder()
-			        .address(pickupAddress)
-			        .build();
-
-			// Create drop details
-			Address dropAddress = Address.builder()
-			        .street_address1(delivery_address.getStreet_1())
-			        .street_address2(delivery_address.getStreet_2())
-			        .landmark(delivery_address.getLandmark())
-			        .city(delivery_address.getCity())
-			        .state(delivery_address.getState())
-			        .pincode(delivery_address.getPincode())
-			        .country("India")
-			        .lat(delivery_address.getLat())
-			        .lng(delivery_address.getLng())
-			        .contact_details(Contact_Details.builder()
-			                .name(users.getFirst_name() + " " + users.getLast_name())
-			                .phone_number("+91" + users.getMobile_no())
-			                .build())
-			        .build();
-
-			Drop_Details dropDetails = Drop_Details.builder()
-			        .address(dropAddress)
-			        .build();
-
-			// Create the main order bean
-			CreateOrderBean order = CreateOrderBean.builder()
-			        .request_id(order_Details.getCode())
-			        .delivery_instructions(instructionsList)
-			        .pickup_details(pickupDetails)
-			        .drop_details(dropDetails)
-			        .build();
-			// @formatter:on
+			CreateOrderBean order = getCreateOrderReq(order_Details, spoc_Details, delivery_address, pickup_address,
+					users);
 
 			CreateOrderResBean createOrderResBean = porterUtility.createOrder(order);
 			String order_id = createOrderResBean.getOrder_id();
-			Order_Status_History order_Status_History = Order_Status_History.builder()
-					.status(OrderStatus.READY_FOR_PICK_UP).modification_date(LocalDateTime.now())
-					.modified_by(usersBean.getId()).build();
-			List<Order_Status_History> list = CollectionUtils.isEmpty(order_Details.getOrder_status_history())
-					? new ArrayList<>()
-					: order_Details.getOrder_status_history();
-			list.add(order_Status_History);
-			order_Details.setOrder_status_history(list);
+			order_Details.setStatus(OrderStatus.READY_FOR_PICK_UP, usersBean.getId());
 			order_Details.setDp_order_id(order_id);
+			order_Details.setFare_details(FareDetails.builder()
+					.estimated_fare_details(createOrderResBean.getEstimated_fare_details()).build());
+			order_Details.setEstimated_pickup_time(createOrderResBean.getEstimated_pickup_time());
 
 			listOI.stream().forEach(e -> {
-				List<Order_Status_History> temp = CollectionUtils.isEmpty(e.getStatus_history()) ? new ArrayList<>()
-						: e.getStatus_history();
-				temp.add(order_Status_History);
-				e.setStatus_history(list);
-				e.setStatus(OrderStatus.READY_FOR_PICK_UP);
+				e.setStatus(OrderStatus.READY_FOR_PICK_UP, usersBean.getId());
 				order_Item_Service.update(e.getId(), e, usersBean.getId());
 			});
 
@@ -242,5 +173,69 @@ public class ManageOrder_BLService {
 			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
 		}
 		return null;
+	}
+
+	private CreateOrderBean getCreateOrderReq(Order_Details order_Details, Spoc_Details spoc_Details,
+			AddressDTO delivery_address, AddressDTO pickup_address, Users users) {
+		// @formatter:off
+		// Create delivery instructions
+		Delivery_Instructions instruction1 = Delivery_Instructions.builder()
+		        .type("text")
+		        .description("handle with care")
+		        .build();
+
+		Instruction_List instructionsList = Instruction_List.builder()
+		        .instructions_list(Arrays.asList(instruction1))
+		        .build();
+
+		// Create pickup details
+		Address pickupAddress = Address.builder()
+		        .street_address1(pickup_address.getStreet_1())
+		        .street_address2(pickup_address.getStreet_2())
+		        .landmark(pickup_address.getLandmark())
+		        .city(pickup_address.getCity())
+		        .state(pickup_address.getState())
+		        .pincode(pickup_address.getPincode())
+		        .country("India")
+		        .lat(pickup_address.getLat())
+		        .lng(pickup_address.getLng())
+		        .contact_details(Contact_Details.builder()
+		                .name(spoc_Details.getFirst_name() + " " + spoc_Details.getLast_name())
+		                .phone_number("+91"+spoc_Details.getMobile_no())
+		                .build())
+		        .build();
+
+		Pickup_Details pickupDetails = Pickup_Details.builder()
+		        .address(pickupAddress)
+		        .build();
+
+		// Create drop details
+		Address dropAddress = Address.builder()
+		        .street_address1(delivery_address.getStreet_1())
+		        .street_address2(delivery_address.getStreet_2())
+		        .landmark(delivery_address.getLandmark())
+		        .city(delivery_address.getCity())
+		        .state(delivery_address.getState())
+		        .pincode(delivery_address.getPincode())
+		        .country("India")
+		        .lat(delivery_address.getLat())
+		        .lng(delivery_address.getLng())
+		        .contact_details(Contact_Details.builder()
+		                .name(users.getFirst_name() + " " + users.getLast_name())
+		                .phone_number("+91" + users.getMobile_no())
+		                .build())
+		        .build();
+
+		Drop_Details dropDetails = Drop_Details.builder()
+		        .address(dropAddress)
+		        .build();
+
+		// Create the main order bean
+		return CreateOrderBean.builder()
+		        .request_id(order_Details.getCode())
+		        .delivery_instructions(instructionsList)
+		        .pickup_details(pickupDetails)
+		        .drop_details(dropDetails)
+		        .build();
 	}
 }
