@@ -209,7 +209,10 @@ public class ManageSeller_BLService {
 
 			address.setUser_type(UserType.SELLER);
 			address.setEntity_id(seller_record.getId());
-			address_Service.create(address, req.getReq_user_id());
+			address = address_Service.create(address, req.getReq_user_id());
+			
+			seller_record.setAddress_id(address.getId());
+			seller_Service.update(seller.getId(), seller, usersBean.getId());
 
 			String first_name = primary_spoc.getFirst_name();
 			String mobile_no = primary_spoc.getMobile_no();
