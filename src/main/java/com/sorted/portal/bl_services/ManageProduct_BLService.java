@@ -25,11 +25,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.sorted.commons.beans.AddBulkProductReqBean;
 import com.sorted.commons.beans.Media;
 import com.sorted.commons.beans.ProductReqBean;
 import com.sorted.commons.beans.SelectedSubCatagories;
 import com.sorted.commons.beans.UsersBean;
+import com.sorted.commons.entity.mongo.Address;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Category_Master;
 import com.sorted.commons.entity.mongo.Category_Master.SubCategory;
@@ -38,8 +41,10 @@ import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Seller;
 import com.sorted.commons.entity.mongo.Varient_Mapping;
+import com.sorted.commons.entity.service.Address_Service;
 import com.sorted.commons.entity.service.Category_MasterService;
 import com.sorted.commons.entity.service.File_Upload_Details_Service;
+import com.sorted.commons.entity.service.Pincode_Master_Service;
 import com.sorted.commons.entity.service.ProductService;
 import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.Users_Service;
@@ -58,8 +63,10 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
+import com.sorted.commons.porter.req.beans.GetQuoteRequest;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.GoogleDriveService;
+import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.request.beans.FindProductBean;
@@ -88,12 +95,21 @@ public class ManageProduct_BLService {
 	private Seller_Service seller_Service;
 
 	@Autowired
+	private Pincode_Master_Service pincode_Master_Service;
+
+	@Autowired
 	private File_Upload_Details_Service file_Upload_Details_Service;
 
 	@Autowired
 	private SearchHistoryAsyncHelper searchHistoryAsyncHelper;
 
+	@Autowired
+	private Address_Service address_Service;
+
 	private final GoogleDriveService googleDriveService;
+
+	@Autowired
+	private PorterUtility porterUtility;
 
 	public ManageProduct_BLService(GoogleDriveService googleDriveService) {
 		this.googleDriveService = googleDriveService;
@@ -384,7 +400,25 @@ public class ManageProduct_BLService {
 			product.setQuantity(Long.valueOf(req.getQuantity()));
 			product.setVarient_mapping_id(varient_mapping_id);
 			product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
-			if (!CollectionUtils.isEmpty(req.getMedia())) {
+			if (CollectionUtils.isEmpty(req.getMedia())) {
+				SEFilter filterFUD = new SEFilter(SEFilterType.AND);
+				filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+				filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.document_type_id,
+						DocumentType.PRODUCT_IMAGE.getId()));
+				if (user_type == UserType.SELLER) {
+					filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.user_type, user_type.name()));
+					filterFUD.addClause(
+							WhereClause.eq(File_Upload_Details.Fields.entity_id, usersBean.getSeller().getId()));
+				}
+
+				List<File_Upload_Details> repoFind = file_Upload_Details_Service.repoFind(filterFUD);
+				if (!CollectionUtils.isEmpty(repoFind)) {
+					for (File_Upload_Details file_Upload_Details : repoFind) {
+						file_Upload_Details_Service.deleteOne(file_Upload_Details.getId(), usersBean.getId());
+					}
+				}
+				product.setMedia(null);
+			} else {
 				Set<String> document_ids = req.getMedia().stream().filter(e -> StringUtils.hasText(e.getDocument_id()))
 						.map(Media::getDocument_id).collect(Collectors.toSet());
 				if (CollectionUtils.isEmpty(document_ids)) {
@@ -592,7 +626,8 @@ public class ManageProduct_BLService {
 				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
 			}
 			UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.INVENTORY_MANAGEMENT);
-			File_Upload_Details file_Upload_Details = googleDriveService.uploadPhoto(file, usersBean, DocumentType.PRODUCT_IMAGE);
+			File_Upload_Details file_Upload_Details = googleDriveService.uploadPhoto(file, usersBean,
+					DocumentType.PRODUCT_IMAGE);
 			Media media = new Media();
 			media.setKey(file_Upload_Details.getDocument_id());
 			media.setDocument_id(file_Upload_Details.getId());
@@ -996,6 +1031,63 @@ public class ManageProduct_BLService {
 			return varient.getId();
 		}
 		return null;
+	}
+
+	public void getNearestSeller(double lat, double lng, String mobile_no, String user_name, String cud_by)
+			throws JsonMappingException, JsonProcessingException {
+
+//		SEFilter filterPM = new SEFilter(SEFilterType.AND);
+//		filterPM.addClause(WhereClause.eq(Pincode_Master.Fields.pincode, pincode));
+//
+//		List<Pincode_Master> pincode_Masters = pincode_Master_Service.repoFind(filterPM);
+//		if (CollectionUtils.isEmpty(pincode_Masters)) {
+//			throw new CustomIllegalArgumentsException(ResponseCode.NOT_DELIVERIBLE);
+//		}
+
+		SEFilter filterS = new SEFilter(SEFilterType.AND);
+		filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+		filterS.addClause(WhereClause.eq(Seller.Fields.status, Seller_Status.ACTIVE.name()));
+
+		List<Seller> listS = seller_Service.repoFind(filterS);
+		if (CollectionUtils.isEmpty(listS)) {
+			throw new CustomIllegalArgumentsException(ResponseCode.NOT_DELIVERIBLE);
+		}
+		Map<String, String> map = listS.stream().collect(Collectors.toMap(e -> e.getAddress_id(), e -> e.getId()));
+
+		SEFilter filterA = new SEFilter(SEFilterType.AND);
+		filterA.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(map.keySet())));
+		filterA.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+		List<Address> listAdd = address_Service.repoFind(filterA);
+
+		Map<String, Address> mapA = listAdd.stream().collect(Collectors.toMap(e -> e.getId(), e -> e));
+
+		String nearestSeller = CommonUtils.findNearestSeller(lat, lng, listAdd);
+
+		Address address = mapA.get(nearestSeller);
+
+		// @formatter:off
+        GetQuoteRequest quoteRequest = GetQuoteRequest.builder()
+                .pickup_details(GetQuoteRequest.PickupDetails.builder()
+                        .lat(address.getLat().doubleValue())
+                        .lng(address.getLng().doubleValue())
+                        .build())
+                .drop_details(GetQuoteRequest.DropDetails.builder()
+                        .lat(lat)
+                        .lng(lng)
+                        .build())
+                .customer(GetQuoteRequest.Customer.builder()
+                        .name(user_name)
+                        .mobile(GetQuoteRequest.Customer.Mobile.builder()
+                                .country_code("+91")
+                                .number(mobile_no)
+                                .build())
+                        .build())
+                .build();
+        // @formatter:on
+
+		porterUtility.getQuote(quoteRequest, cud_by);
+
 	}
 
 }
