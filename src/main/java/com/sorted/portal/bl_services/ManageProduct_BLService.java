@@ -401,23 +401,23 @@ public class ManageProduct_BLService {
 			product.setVarient_mapping_id(varient_mapping_id);
 			product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
 			if (CollectionUtils.isEmpty(req.getMedia())) {
-				SEFilter filterFUD = new SEFilter(SEFilterType.AND);
-				filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-				filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.document_type_id,
-						DocumentType.PRODUCT_IMAGE.getId()));
-				if (user_type == UserType.SELLER) {
-					filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.user_type, user_type.name()));
-					filterFUD.addClause(
-							WhereClause.eq(File_Upload_Details.Fields.entity_id, usersBean.getSeller().getId()));
-				}
-
-				List<File_Upload_Details> repoFind = file_Upload_Details_Service.repoFind(filterFUD);
-				if (!CollectionUtils.isEmpty(repoFind)) {
-					for (File_Upload_Details file_Upload_Details : repoFind) {
-						file_Upload_Details_Service.deleteOne(file_Upload_Details.getId(), usersBean.getId());
-					}
-				}
-				product.setMedia(null);
+//				SEFilter filterFUD = new SEFilter(SEFilterType.AND);
+//				filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//				filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.document_type_id,
+//						DocumentType.PRODUCT_IMAGE.getId()));
+//				if (user_type == UserType.SELLER) {
+//					filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.user_type, user_type.name()));
+//					filterFUD.addClause(
+//							WhereClause.eq(File_Upload_Details.Fields.entity_id, usersBean.getSeller().getId()));
+//				}
+//
+//				List<File_Upload_Details> repoFind = file_Upload_Details_Service.repoFind(filterFUD);
+//				if (!CollectionUtils.isEmpty(repoFind)) {
+//					for (File_Upload_Details file_Upload_Details : repoFind) {
+//						file_Upload_Details_Service.deleteOne(file_Upload_Details.getId(), usersBean.getId());
+//					}
+//				}
+				product.setMedia(new ArrayList<>());
 			} else {
 				Set<String> document_ids = req.getMedia().stream().filter(e -> StringUtils.hasText(e.getDocument_id()))
 						.map(Media::getDocument_id).collect(Collectors.toSet());
