@@ -343,7 +343,6 @@ public class ManageTransaction_BLService {
 			if (order_details == null) {
 				throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
 			}
-			// TODO: verify razorpay signature to validate payment details
 			SEFilter filterOD = new SEFilter(SEFilterType.AND);
 			filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getOrder_id()));
 			// TODO: ?
@@ -366,6 +365,12 @@ public class ManageTransaction_BLService {
 				order_details.setOrder_status_history(order_status_history);
 			} else {
 
+				boolean verified = razorpayUtility.verifySignature(order_details.getId(), req.getRazorpay_payment_id(),
+						req.getRazorpay_signature());
+				if (!verified) {
+					throw new CustomIllegalArgumentsException(ResponseCode.UNTRUSTED_RESPONSE);
+				}
+
 				SEFilter filterC = new SEFilter(SEFilterType.AND);
 				filterC.addClause(WhereClause.eq(Cart.Fields.user_id, order_details.getUser_id()));
 				filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -384,8 +389,6 @@ public class ManageTransaction_BLService {
 				cart_Service.update(cart.getId(), cart, Defaults.SYSTEM_ADMIN);
 				order_details.setPg_order_id(req.getRazorpay_order_id());
 				order_details.setTransaction_id(req.getRazorpay_payment_id());
-
-				// TODO: verify razorpay signature to validate payment details
 
 				order_details.setStatus(OrderStatus.TRANSACTION_PROCESSED);
 				order_details.setStatus_id(OrderStatus.TRANSACTION_PROCESSED.getId());
