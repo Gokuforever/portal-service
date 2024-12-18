@@ -54,8 +54,7 @@ public class ManageAddress_BLService {
 					Activity.MANAGE_ADDRESS);
 			UserType user_type = usersBean.getRole().getUser_type();
 			switch (user_type) {
-			case CUSTOMER:
-			case GUEST:
+			case CUSTOMER, GUEST:
 				break;
 			default:
 				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
@@ -127,6 +126,7 @@ public class ManageAddress_BLService {
 			if (!CollectionUtils.isEmpty(addresses)) {
 				addresses.stream().forEach(e -> {
 					AddressDTO dto = new AddressDTO();
+					dto.setId(e.getId());
 					dto.setStreet_1(e.getStreet_1());
 					dto.setStreet_2(e.getStreet_2());
 					dto.setLandmark(e.getLandmark());
@@ -136,6 +136,8 @@ public class ManageAddress_BLService {
 					dto.setAddress_type(e.getAddress_type().getType());
 					dto.setAddress_type_desc(e.getAddress_type_desc());
 					dto.setCode(e.getCode());
+					dto.setLat(e.getLat());
+					dto.setLng(e.getLng());
 					dto.setIs_default(e.getIs_default());
 					listA.add(dto);
 				});
