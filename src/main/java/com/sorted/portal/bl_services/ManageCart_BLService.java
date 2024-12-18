@@ -145,7 +145,10 @@ public class ManageCart_BLService {
 				}
 
 				if (product.getQuantity().compareTo(itemBean.getQuantity()) < 0) {
-					throw new CustomIllegalArgumentsException(ResponseCode.OUT_OF_STOCK);
+					String message = product.getQuantity().compareTo(0L) > 0
+							? "We only have " + product.getQuantity() + " in stock"
+							: ResponseCode.OUT_OF_STOCK.getUserMessage();
+					throw new CustomIllegalArgumentsException(message);
 				}
 
 				SEFilter filterCM = new SEFilter(SEFilterType.AND);
@@ -212,7 +215,7 @@ public class ManageCart_BLService {
 			if (!CollectionUtils.isEmpty(listP)) {
 				Map<String, Products> mapP = listP.stream().collect(Collectors.toMap(p -> p.getId(), p -> p));
 				List<String> imageIds = listP.stream().filter(e -> !CollectionUtils.isEmpty(e.getMedia()))
-						.flatMap(p -> p.getMedia().stream()).map(m -> m.getDocument_id()).toList();
+						.flatMap(p -> p.getMedia().stream()).map(m -> m.getDocument_id()).distinct().toList();
 				if (!CollectionUtils.isEmpty(imageIds)) {
 					// Create a filter to retrieve file upload details based on image IDs
 					SEFilter filterFUD = new SEFilter(SEFilterType.AND);
