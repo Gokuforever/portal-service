@@ -23,7 +23,6 @@ import com.sorted.commons.entity.mongo.Seller;
 import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Order_Item_Service;
-import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.OrderStatus;
@@ -62,9 +61,6 @@ public class ManageOrder_BLService {
 
 	@Autowired
 	private Order_Item_Service order_Item_Service;
-
-	@Autowired
-	private Seller_Service seller_Service;
 
 	@Autowired
 	private Users_Service users_Service;
@@ -119,13 +115,9 @@ public class ManageOrder_BLService {
 			}
 			String seller_id = seller_ids.get(0);
 
-			SEFilter filterS = new SEFilter(SEFilterType.AND);
-			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, seller_id));
-			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, seller_id));
-
-			Seller seller = seller_Service.repoFindOne(filterS);
-			if (seller == null) {
-				throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+			Seller seller = usersBean.getSeller();
+			if (!seller.getId().equals(seller_id)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SELLER_FOR_ORDER);
 			}
 
 			Optional<Spoc_Details> primary_spoc = seller.getSpoc_details().stream().filter(e -> e.isPrimary())
@@ -163,7 +155,9 @@ public class ManageOrder_BLService {
 				order_Item_Service.update(e.getId(), e, usersBean.getId());
 			});
 
-			order_Details_Service.update(order_Details.getId(), order_Details, usersBean.getId());
+			Order_Details details = order_Details_Service.update(order_Details.getId(), order_Details,
+					usersBean.getId());
+			return SEResponse.getBasicSuccessResponseObject(details, ResponseCode.READY_FOR_DISPATCH);
 
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
@@ -172,7 +166,6 @@ public class ManageOrder_BLService {
 			log.error("checkDelivery:: {}", e.getMessage());
 			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
 		}
-		return null;
 	}
 
 	private CreateOrderBean getCreateOrderReq(Order_Details order_Details, Spoc_Details spoc_Details,
@@ -232,7 +225,7 @@ public class ManageOrder_BLService {
 
 		// Create the main order bean
 		return CreateOrderBean.builder()
-		        .request_id(order_Details.getCode())
+		        .request_id(order_Details.getId())
 		        .delivery_instructions(instructionsList)
 		        .pickup_details(pickupDetails)
 		        .drop_details(dropDetails)
