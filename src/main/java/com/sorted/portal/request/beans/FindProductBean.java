@@ -17,4 +17,5 @@ public class FindProductBean extends ReqBaseBean {
 	private Map<String, List<String>> filters;
 	private String name;
 	private String pincode;
+	private String nearest_seller;
 }
