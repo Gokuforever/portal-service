@@ -17,7 +17,9 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -455,34 +457,57 @@ public class ManageProduct_BLService {
 		}
 	}
 
-	@PostMapping("/find")
-	public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+	@GetMapping("/find")
+	public SEResponse getFind(@RequestParam(required = false) MultiValueMap<String, List<List<String>>> filters, // Optional
+			// filters
+			@RequestParam(required = false) String name, @RequestParam(required = false) String pincode,
+			@RequestParam(defaultValue = "${se.default.page}") int page,
+			@RequestParam(defaultValue = "${se.default.size}") int size, HttpServletRequest httpServletRequest) {
 		try {
-			FindProductBean req = request.getGenericRequestDataObject(FindProductBean.class);
-			CommonUtils.extractHeaders(httpServletRequest, req);
-			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.PRODUCTS,
-					Activity.INVENTORY_MANAGEMENT);
-			SEFilter filterSE = this.createFilterForProductList(req, usersBean);
-
-			searchHistoryAsyncHelper.createSearchHistory(usersBean.getId(), usersBean.getRole().getUser_type_id(),
-					filterSE);
-
-			List<Products> listP = productService.repoFind(filterSE);
-			if (CollectionUtils.isEmpty(listP)) {
-				return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
-			}
-
-			Map<String, String> mapImg = this.filterAndFetchImgMap(listP);
-
-			List<ProductDetailsBean> resList = this.convertToBean(null, listP, mapImg);
-
-			return SEResponse.getBasicSuccessResponseList(resList, ResponseCode.SUCCESSFUL);
+			FindProductBean req = new FindProductBean();
+			req.creatObj(filters, name, page, size);
+			return findProducts(httpServletRequest, req);
 		} catch (CustomIllegalArgumentsException ex) {
 			throw ex;
 		} catch (Exception e) {
 			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
 			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
 		}
+	}
+
+	@PostMapping("/find")
+	public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+		try {
+			FindProductBean req = request.getGenericRequestDataObject(FindProductBean.class);
+			return findProducts(httpServletRequest, req);
+		} catch (CustomIllegalArgumentsException ex) {
+			throw ex;
+		} catch (Exception e) {
+			log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
+	private SEResponse findProducts(HttpServletRequest httpServletRequest, FindProductBean req)
+			throws JsonProcessingException {
+		CommonUtils.extractHeaders(httpServletRequest, req);
+		UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.PRODUCTS,
+				Activity.INVENTORY_MANAGEMENT);
+		SEFilter filterSE = this.createFilterForProductList(req, usersBean);
+
+		searchHistoryAsyncHelper.createSearchHistory(usersBean.getId(), usersBean.getRole().getUser_type_id(),
+				filterSE);
+
+		List<Products> listP = productService.repoFind(filterSE);
+		if (CollectionUtils.isEmpty(listP)) {
+			return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+		}
+
+		Map<String, String> mapImg = this.filterAndFetchImgMap(listP);
+
+		List<ProductDetailsBean> resList = this.convertToBean(null, listP, mapImg);
+
+		return SEResponse.getBasicSuccessResponseList(resList, ResponseCode.SUCCESSFUL);
 	}
 
 	@PostMapping("/delete")
