@@ -76,6 +76,7 @@ import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
+import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDetailsBuilder;
 import com.sorted.portal.request.beans.FindProductBean;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -653,17 +654,17 @@ public class ManageProduct_BLService {
 
 				Cart cart = cart_Service.repoFindOne(filterC);
 				List<Item> cart_items = cart.getCart_items();
+				CartDetailsBuilder cartDetailsBuilder = CartDetails.builder();
 				if (!CollectionUtils.isEmpty(cart_items)) {
 					Optional<Item> firstItem = cart_items.stream()
 							.filter(e -> e.getProduct_id().equals(product.getId())).findFirst();
 					if (firstItem.isPresent()) {
 						Item item = firstItem.get();
-						CartDetails cartDetails = CartDetails.builder()
-								.normal_items(item.is_secure() ? 0 : item.getQuantity())
-								.secure_items(item.is_secure() ? item.getQuantity() : 0).build();
-						resBean.setCart_info(cartDetails);
+						cartDetailsBuilder.normal_items(item.is_secure() ? 0 : item.getQuantity())
+								.secure_items(item.is_secure() ? item.getQuantity() : 0);
 					}
 				}
+				resBean.setCart_info(cartDetailsBuilder.build());
 			}
 
 			return SEResponse.getBasicSuccessResponseObject(resBean, ResponseCode.SUCCESSFUL);
