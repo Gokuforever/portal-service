@@ -179,14 +179,12 @@ public class ManageCart_BLService {
 					List<Item> list = cart.getCart_items().stream()
 							.filter(e -> !e.getProduct_id().equals(item.getProduct_id())).toList();
 					if (!CollectionUtils.isEmpty(list)) {
-						listItems.addAll(cart.getCart_items());
+						listItems.addAll(list);
 					}
 				}
-				cart.getCart_items().add(item);
 			}
 
 			cart.setCart_items(listItems);
-
 			cart_Service.update(cart.getId(), cart, usersBean.getId());
 
 			CartBean cartBean = this.getCartBean(cart);
