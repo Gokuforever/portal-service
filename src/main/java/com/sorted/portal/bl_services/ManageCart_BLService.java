@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -135,6 +136,7 @@ public class ManageCart_BLService {
 					listItems.addAll(cart_items);
 				}
 			} else {
+
 				SEFilter filterP = new SEFilter(SEFilterType.AND);
 				filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, itemBean.getProduct_id()));
 				filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -143,8 +145,15 @@ public class ManageCart_BLService {
 				if (product == null) {
 					throw new CustomIllegalArgumentsException(ResponseCode.ITEM_NOT_FOUND);
 				}
+				long total_item = itemBean.getQuantity();
 
-				if (product.getQuantity().compareTo(itemBean.getQuantity()) < 0) {
+				Predicate<Item> p1 = x -> x.getProduct_id().equals(itemBean.getProduct_id());
+				Predicate<Item> p2 = x -> x.is_secure() != itemBean.isSecure_item();
+				Optional<Item> optional = cart.getCart_items().stream().filter(p1.and(p2)).findFirst();
+				if (optional.isPresent()) {
+					total_item += optional.get().getQuantity();
+				}
+				if (product.getQuantity().compareTo(total_item) < 0) {
 					String message = product.getQuantity().compareTo(0L) > 0
 							? "We only have " + product.getQuantity() + " in stock"
 							: ResponseCode.OUT_OF_STOCK.getUserMessage();
@@ -176,8 +185,9 @@ public class ManageCart_BLService {
 				if (CollectionUtils.isEmpty(cart.getCart_items())) {
 					cart.setCart_items(new ArrayList<>());
 				} else {
-					List<Item> list = cart.getCart_items().stream()
-							.filter(e -> !e.getProduct_id().equals(item.getProduct_id())).toList();
+					Predicate<Item> p3 = x -> !x.getProduct_id().equals(item.getProduct_id());
+					Predicate<Item> p4 = x -> x.is_secure() != is_secure_item;
+					List<Item> list = cart.getCart_items().stream().filter(p3.or(p4)).toList();
 					if (!CollectionUtils.isEmpty(list)) {
 						listItems.addAll(list);
 					}
