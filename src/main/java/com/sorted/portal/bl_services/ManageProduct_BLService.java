@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -656,12 +657,18 @@ public class ManageProduct_BLService {
 				List<Item> cart_items = cart.getCart_items();
 				CartDetailsBuilder cartDetailsBuilder = CartDetails.builder();
 				if (!CollectionUtils.isEmpty(cart_items)) {
-					Optional<Item> firstItem = cart_items.stream()
-							.filter(e -> e.getProduct_id().equals(product.getId())).findFirst();
-					if (firstItem.isPresent()) {
-						Item item = firstItem.get();
-						cartDetailsBuilder.normal_items(item.is_secure() ? 0 : item.getQuantity())
-								.secure_items(item.is_secure() ? item.getQuantity() : 0);
+					Predicate<Item> p1 = item -> item.getProduct_id().equals(product.getId());
+					Predicate<Item> p2 = Item::is_secure;
+					Predicate<Item> p3 = item -> !item.is_secure();
+					Optional<Item> secureItem = cart_items.stream().filter(p1.and(p2)).findFirst();
+					if (secureItem.isPresent()) {
+						Item item = secureItem.get();
+						cartDetailsBuilder.secure_items(item.is_secure() ? item.getQuantity() : 0);
+					}
+					Optional<Item> normalItem = cart_items.stream().filter(p1.and(p3)).findFirst();
+					if (normalItem.isPresent()) {
+						Item item = normalItem.get();
+						cartDetailsBuilder.normal_items(item.is_secure() ? 0 : item.getQuantity());
 					}
 				}
 				resBean.setCart_info(cartDetailsBuilder.build());
