@@ -130,8 +130,10 @@ public class ManageCart_BLService {
 			}
 			List<Item> listItems = new ArrayList<>();
 			if (itemBean.getQuantity() == 0) {
+				Predicate<Item> p1 = x -> !x.getProduct_id().equals(itemBean.getProduct_id());
+				Predicate<Item> p2 = x -> x.is_secure() != itemBean.isSecure_item();
 				List<Item> cart_items = cart.getCart_items().stream()
-						.filter(e -> !e.getProduct_id().equals(itemBean.getProduct_id())).toList();
+						.filter(p1.or(p2)).toList();
 				if (!CollectionUtils.isEmpty(cart_items)) {
 					listItems.addAll(cart_items);
 				}
