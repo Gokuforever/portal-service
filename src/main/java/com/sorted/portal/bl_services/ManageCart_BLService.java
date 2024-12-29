@@ -68,6 +68,38 @@ public class ManageCart_BLService {
 	@Autowired
 	private File_Upload_Details_Service file_Upload_Details_Service;
 
+	@PostMapping("/clear")
+	public SEResponse clear(HttpServletRequest httpServletRequest) {
+		try {
+			String req_user_id = httpServletRequest.getHeader("req_user_id");
+			UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Permission.VIEW,
+					Activity.CART_MANAGEMENT);
+			switch (usersBean.getRole().getUser_type()) {
+			case CUSTOMER, GUEST:
+				break;
+			default:
+				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+			}
+			SEFilter filterC = new SEFilter(SEFilterType.AND);
+			filterC.addClause(WhereClause.eq(Cart.Fields.user_id, req_user_id));
+			filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+			Cart cart = cart_Service.repoFindOne(filterC);
+			if (cart != null) {
+				cart.setCart_items(new ArrayList<>());
+				cart_Service.update(cart.getId(), cart, req_user_id);
+			}
+			CartBean cartBean = this.getCartBean(cart);
+			return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
+		} catch (CustomIllegalArgumentsException ex) {
+			throw ex;
+		} catch (Exception e) {
+			log.error("/signup/verify:: exception occurred");
+			log.error("/signup/verify:: {}", e.getMessage());
+			throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+		}
+	}
+
 	@PostMapping("/fetch")
 	public SEResponse fetch(HttpServletRequest httpServletRequest) {
 		try {
@@ -132,8 +164,7 @@ public class ManageCart_BLService {
 			if (itemBean.getQuantity() == 0) {
 				Predicate<Item> p1 = x -> !x.getProduct_id().equals(itemBean.getProduct_id());
 				Predicate<Item> p2 = x -> x.is_secure() != itemBean.isSecure_item();
-				List<Item> cart_items = cart.getCart_items().stream()
-						.filter(p1.or(p2)).toList();
+				List<Item> cart_items = cart.getCart_items().stream().filter(p1.or(p2)).toList();
 				if (!CollectionUtils.isEmpty(cart_items)) {
 					listItems.addAll(cart_items);
 				}
