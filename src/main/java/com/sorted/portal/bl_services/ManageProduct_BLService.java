@@ -47,6 +47,7 @@ import com.sorted.commons.entity.mongo.File_Upload_Details;
 import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Seller;
+import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.mongo.Varient_Mapping;
 import com.sorted.commons.entity.service.Address_Service;
 import com.sorted.commons.entity.service.Cart_Service;
@@ -740,6 +741,7 @@ public class ManageProduct_BLService {
 
 	private SEFilter createFilterForProductList(FindProductBean req, UsersBean usersBean)
 			throws JsonProcessingException {
+
 		SEFilter filterSE = new SEFilter(SEFilterType.AND);
 		switch (usersBean.getRole().getUser_type()) {
 		case SELLER:
@@ -756,6 +758,16 @@ public class ManageProduct_BLService {
 			if (nearest_seller == null) {
 				NearestSellerRes nearestSeller = porterUtility.getNearestSeller(properties.get("nearest_pincode"));
 				nearest_seller_id = nearestSeller.getSeller_id();
+				properties.put("nearest_seller", nearest_seller_id);
+				String user_id = usersBean.getId();
+				SEFilter filterU = new SEFilter(SEFilterType.AND);
+				filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, user_id));
+				filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+				Users users = users_Service.repoFindOne(filterU);
+				users.setProperties(properties);
+
+				users_Service.update(user_id, users, user_id);
 			} else {
 				SEFilter filterS = new SEFilter(SEFilterType.AND);
 				filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
