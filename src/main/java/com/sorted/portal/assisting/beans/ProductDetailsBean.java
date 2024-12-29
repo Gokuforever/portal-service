@@ -24,4 +24,5 @@ public class ProductDetailsBean {
 	private List<Media> media;
 	private String category_id;
 	private String category_name;
+	private long quantity_in_cart;
 }

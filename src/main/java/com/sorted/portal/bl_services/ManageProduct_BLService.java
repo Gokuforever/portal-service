@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -30,6 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.sorted.commons.beans.AddBulkProductReqBean;
+import com.sorted.commons.beans.Item;
 import com.sorted.commons.beans.Media;
 import com.sorted.commons.beans.NearestSellerRes;
 import com.sorted.commons.beans.ProductReqBean;
@@ -37,6 +39,7 @@ import com.sorted.commons.beans.SelectedSubCatagories;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.Address;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
+import com.sorted.commons.entity.mongo.Cart;
 import com.sorted.commons.entity.mongo.Category_Master;
 import com.sorted.commons.entity.mongo.Category_Master.SubCategory;
 import com.sorted.commons.entity.mongo.File_Upload_Details;
@@ -45,6 +48,7 @@ import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Seller;
 import com.sorted.commons.entity.mongo.Varient_Mapping;
 import com.sorted.commons.entity.service.Address_Service;
+import com.sorted.commons.entity.service.Cart_Service;
 import com.sorted.commons.entity.service.Category_MasterService;
 import com.sorted.commons.entity.service.File_Upload_Details_Service;
 import com.sorted.commons.entity.service.ProductService;
@@ -83,6 +87,9 @@ public class ManageProduct_BLService {
 
 	@Autowired
 	private ProductService productService;
+
+	@Autowired
+	private Cart_Service cart_Service;
 
 	@Autowired
 	private Varient_Mapping_Service varient_Mapping_Service;
@@ -575,9 +582,12 @@ public class ManageProduct_BLService {
 	}
 
 	@PostMapping("/findOne")
-	public SEResponse findOne(@RequestBody SERequest request) {
+	public SEResponse findOne(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
 			FindProductBean req = request.getGenericRequestDataObject(FindProductBean.class);
+			CommonUtils.extractHeaders(httpServletRequest, req);
+			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.PRODUCTS,
+					Activity.INVENTORY_MANAGEMENT);
 			if (!StringUtils.hasText(req.getId())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
 			}
@@ -634,6 +644,20 @@ public class ManageProduct_BLService {
 			Map<String, String> mapImg = this.filterAndFetchImgMap(Arrays.asList(product));
 
 			ProductDetailsBean resBean = this.productToBean(listRI, mapV, product, mapImg);
+			if (usersBean.getRole().getUser_type() == UserType.CUSTOMER
+					|| usersBean.getRole().getUser_type() == UserType.GUEST) {
+				SEFilter filterC = new SEFilter(SEFilterType.AND);
+				filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
+				filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+				Cart cart = cart_Service.repoFindOne(filterC);
+				List<Item> cart_items = cart.getCart_items();
+				if (!CollectionUtils.isEmpty(cart_items)) {
+					Optional<Item> firstItem = cart_items.stream()
+							.filter(e -> e.getProduct_id().equals(product.getId())).findFirst();
+					resBean.setQuantity_in_cart(firstItem.isPresent() ? firstItem.get().getQuantity() : 0);
+				}
+			}
 
 			return SEResponse.getBasicSuccessResponseObject(resBean, ResponseCode.SUCCESSFUL);
 		} catch (CustomIllegalArgumentsException ex) {
