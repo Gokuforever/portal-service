@@ -898,6 +898,7 @@ public class ManageProduct_BLService {
 		bean.setDescription(product.getDescription());
 		bean.setCategory_id(category_Master.getId());
 		bean.setCategory_name(category_Master.getName());
+		bean.setSecure(category_Master.isSecure_item());
 		if (!CollectionUtils.isEmpty(product.getMedia())) {
 			List<Media> listMedia = new ArrayList<>();
 			List<Media> list = product.getMedia().stream().sorted((o1, o2) -> o1.getOrder().compareTo(o2.getOrder()))

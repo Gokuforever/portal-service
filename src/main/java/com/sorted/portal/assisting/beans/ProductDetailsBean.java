@@ -26,6 +26,7 @@ public class ProductDetailsBean {
 	private String category_id;
 	private String category_name;
 	private CartDetails cart_info;
+	private Boolean secure;
 	
 	@Builder
 	@Data
