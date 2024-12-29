@@ -6,6 +6,7 @@ import java.util.List;
 import com.sorted.commons.beans.Media;
 import com.sorted.commons.beans.SelectedSubCatagories;
 
+import lombok.Builder;
 import lombok.Data;
 
 @Data
@@ -24,5 +25,12 @@ public class ProductDetailsBean {
 	private List<Media> media;
 	private String category_id;
 	private String category_name;
-	private long quantity_in_cart;
+	private CartDetails cart_info;
+	
+	@Builder
+	@Data
+	public static class CartDetails{
+		private long secure_items;
+		private long normal_items;
+	}
 }

@@ -75,6 +75,7 @@ import com.sorted.commons.utils.GoogleDriveService;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
+import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
 import com.sorted.portal.request.beans.FindProductBean;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -655,7 +656,13 @@ public class ManageProduct_BLService {
 				if (!CollectionUtils.isEmpty(cart_items)) {
 					Optional<Item> firstItem = cart_items.stream()
 							.filter(e -> e.getProduct_id().equals(product.getId())).findFirst();
-					resBean.setQuantity_in_cart(firstItem.isPresent() ? firstItem.get().getQuantity() : 0);
+					if (firstItem.isPresent()) {
+						Item item = firstItem.get();
+						CartDetails cartDetails = CartDetails.builder()
+								.normal_items(item.is_secure() ? 0 : item.getQuantity())
+								.secure_items(item.is_secure() ? item.getQuantity() : 0).build();
+						resBean.setCart_info(cartDetails);
+					}
 				}
 			}
 
