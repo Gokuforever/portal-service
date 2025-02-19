@@ -115,7 +115,10 @@ public class ManageSignUp_BLService {
 			if (semester == null) {
 				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SEMISTER);
 			}
-			if (StringUtils.hasText(req.getCollege()) && SERegExpUtils.standardTextValidation(req.getCollege())) {
+			if (!StringUtils.hasText(req.getCollege())) {
+				throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_COLLEGE_NAME);
+			}
+			if (!SERegExpUtils.standardTextValidation(req.getCollege())) {
 				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_COLLEGE_NAME);
 			}
 			String password = req.getPassword().trim();
