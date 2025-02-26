@@ -526,9 +526,7 @@ public class ManageSeller_BLService {
 
 			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
-			OrderBy orderBy = new OrderBy();
-			orderBy.setKey(BaseMongoEntity.Fields.modification_date);
-			orderBy.setType(SortOrder.DESC);
+			OrderBy orderBy = new OrderBy(BaseMongoEntity.Fields.modification_date, SortOrder.DESC);
 			filterS.setOrderBy(orderBy);
 
 			int page = req.getPage();

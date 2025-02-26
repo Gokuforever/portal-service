@@ -64,9 +64,11 @@ import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.helper.AggregationFilter.OrderBy;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterNode;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
+import com.sorted.commons.helper.AggregationFilter.SortOrder;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
@@ -809,6 +811,16 @@ public class ManageProduct_BLService {
 			}
 		}
 		filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+		if (StringUtils.hasText(req.getSort_by())) {
+			OrderBy sort = switch (req.getSort_by()) {
+			case "price_low_to_high" -> new OrderBy(Products.Fields.selling_price, SortOrder.ASC);
+			case "price_high_to_low" -> new OrderBy(Products.Fields.selling_price, SortOrder.DESC);
+			case "newest" -> new OrderBy(BaseMongoEntity.Fields.creation_date, SortOrder.DESC);
+			case "oldest" -> new OrderBy(BaseMongoEntity.Fields.creation_date, SortOrder.ASC);
+			default -> new OrderBy(BaseMongoEntity.Fields.modification_date, SortOrder.DESC);
+			};
+			filterSE.setOrderBy(sort);
+		}
 		return filterSE;
 	}
 

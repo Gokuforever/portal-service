@@ -23,6 +23,7 @@ public class FindProductBean extends ReqBaseBean {
 	private String name;
 	private String pincode;
 	private String nearest_seller;
+	private String sort_by;
 
 	public void creatObj(MultiValueMap<String, List<List<String>>> filters, String name, int page, int size) {
 		if (filters != null) {
