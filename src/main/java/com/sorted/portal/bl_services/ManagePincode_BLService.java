@@ -17,6 +17,7 @@ import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.enums.Semester;
 import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.SERequest;
@@ -57,9 +58,27 @@ public class ManagePincode_BLService {
 //						|| req.getLng().compareTo(BigDecimal.ZERO) < 1)) {
 			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_PINCODE);
 		}
+
+		if (!StringUtils.hasText(req.getBranch())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_BRANCH_NAME);
+		}
+		boolean isOtherBranch = req.getBranch().equalsIgnoreCase("other");
+		if (isOtherBranch && !StringUtils.hasText(req.getDesc())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SEMESTER_DESC);
+		}
+		if (!StringUtils.hasText(req.getSemester())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SEMISTER);
+		}
 		String pincode = req.getPincode();
 		if (!SERegExpUtils.isPincode(pincode)) {
 			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PINCODE);
+		}
+		if (!SERegExpUtils.standardTextValidation(req.getBranch())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_BRANCH);
+		}
+		Semester semester = Semester.getByAlias(req.getSemester());
+		if (semester == null) {
+			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SEMISTER);
 		}
 		NearestSellerRes response = porterUtility.getNearestSeller(pincode);
 		Gson gson = GsonUtils.getGson();
@@ -72,6 +91,9 @@ public class ManagePincode_BLService {
 		properties.remove("nearest_pincode");
 		properties.put("nearest_seller", response.getSeller_id());
 		properties.put("nearest_pincode", pincode);
+		users.setBranch(req.getBranch());
+		users.setBranch_desc(isOtherBranch ? req.getBranch() : null);
+		users.setSemister(semester.getAlias());
 		users.setProperties(properties);
 		users_Service.update(users.getId(), users, "/delivery/check");
 		return SEResponse.getBasicSuccessResponseObject(response, ResponseCode.SUCCESSFUL);
