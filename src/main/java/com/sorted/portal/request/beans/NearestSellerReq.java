@@ -14,4 +14,7 @@ public class NearestSellerReq extends ReqBaseBean {
 	private String pincode;
 	private BigDecimal lat;
 	private BigDecimal lng;
+	private String branch;
+	private String desc;
+	private String semester;
 }
