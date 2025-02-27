@@ -1,5 +1,7 @@
 package com.sorted.portal.response.beans;
 
+import java.util.Map;
+
 import lombok.Data;
 
 @Data
@@ -10,5 +12,6 @@ public class UserProfileBean {
 	private String mobile_no;
 	private String email_id;
 	private String status;
+	private Map<String, String> properties;
 
 }

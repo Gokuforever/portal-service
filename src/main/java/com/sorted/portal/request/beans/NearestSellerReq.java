@@ -17,4 +17,5 @@ public class NearestSellerReq extends ReqBaseBean {
 	private String branch;
 	private String desc;
 	private String semester;
+	private String college;
 }

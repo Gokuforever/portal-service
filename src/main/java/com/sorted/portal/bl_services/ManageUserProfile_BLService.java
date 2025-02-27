@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -58,19 +59,21 @@ public class ManageUserProfile_BLService {
 	@Value("${se.portal.password.reset.window.in_minutes}")
 	private int reset_window;
 
-	@PostMapping("/fetch")
-	public SEResponse fetch(@RequestBody SERequest request, HttpServletRequest servletRequest) {
+	@GetMapping("/fetch")
+	public SEResponse fetch(HttpServletRequest servletRequest) {
 		try {
 			log.info("/profile/fetch:: API started");
-			BlankReqBean req = request.getGenericRequestDataObject(BlankReqBean.class);
-			CommonUtils.extractHeaders(servletRequest, req);
-
-			UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.USER_PROFILE);
+			String req_user_id = servletRequest.getHeader("req_user_id");
+			if (!StringUtils.hasText(req_user_id)) {
+				throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+			}
+			UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.USER_PROFILE);
 			UserProfileBean bean = new UserProfileBean();
 			bean.setFirst_name(usersBean.getFirst_name());
 			bean.setLast_name(usersBean.getLast_name());
 			bean.setMobile_no(usersBean.getMobile_no());
 			bean.setEmail_id(usersBean.getEmail_id());
+			bean.setProperties(usersBean.getProperties());
 
 			log.info("/seller/create:: API ended");
 			return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
