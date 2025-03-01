@@ -11,5 +11,6 @@ import lombok.Data;
 public class CartBean {
 
 	private BigDecimal total_amount = BigDecimal.ZERO;
+	private long total_count;
 	private List<CartItems> cart_items;
 }
