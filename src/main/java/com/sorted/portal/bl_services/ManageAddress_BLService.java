@@ -52,68 +52,7 @@ public class ManageAddress_BLService {
     @PostMapping("/add")
     public SEResponse add(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
-            log.info("address/add:: API started!");
-            AddressBean req = request.getGenericRequestDataObject(AddressBean.class);
-            CommonUtils.extractHeaders(httpServletRequest, req);
-            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
-                    Activity.MANAGE_ADDRESS);
-            String user_id;
-            UserType user_type = usersBean.getRole().getUser_type();
-            switch (user_type) {
-                case CUSTOMER, GUEST:
-                    user_id = usersBean.getId();
-                    break;
-                case SUPER_ADMIN:
-                    if (!StringUtils.hasText(req.getUser_id())) {
-                        throw new CustomIllegalArgumentsException("User id not selected.");
-                    }
-                    user_id = req.getUser_id();
-                    SEFilter filterU = new SEFilter(SEFilterType.AND);
-                    filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, user_id));
-                    filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-                    Users users = users_Service.repoFindOne(filterU);
-                    if (users == null) {
-                        throw new CustomIllegalArgumentsException("Invalid user selected.");
-                    }
-                    SEFilter filterR = new SEFilter(SEFilterType.AND);
-                    filterR.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, users.getRole_id()));
-                    filterR.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-                    Role role = roleService.repoFindOne(filterR);
-                    if (role == null) {
-                        throw new CustomIllegalArgumentsException("Invalid user selected.");
-                    }
-                    break;
-                default:
-                    throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
-            }
-
-            AddressDTO addressDTO = req.getAddress();
-            if (addressDTO == null) {
-                throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ADDRESS);
-            }
-
-            Address address = ValidationUtil.validateAddress(addressDTO, new Address());
-            SEFilter filterA = new SEFilter(SEFilterType.AND);
-            filterA.addClause(WhereClause.eq(Address.Fields.entity_id, user_id));
-            filterA.addClause(WhereClause.eq(Address.Fields.user_type, user_type.name()));
-
-            List<Address> listA = address_Service.repoFind(filterA);
-            if (!CollectionUtils.isEmpty(listA)) {
-                Predicate<Address> p1 = x -> x.getAddress_type() != AddressType.OTHER;
-                Predicate<Address> p2 = x -> x.getAddress_type() == address.getAddress_type();
-                boolean anyMatch = listA.stream().anyMatch(p1.and(p2));
-                if (anyMatch) {
-                    throw new CustomIllegalArgumentsException("If you havel multiple " + address.getAddress_type().getType()
-                            + " address, please use other address type");
-                }
-            }
-
-            address.setUser_type(user_type);
-            address.setEntity_id(usersBean.getId());
-            address_Service.create(address, req.getReq_user_id());
-
-            return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
+            return createOrUpdateAddress(request, httpServletRequest, false);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
@@ -121,6 +60,113 @@ public class ManageAddress_BLService {
             log.error("add/address:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
+    }
+
+    @PostMapping("/update")
+    public SEResponse update(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+        try {
+            return createOrUpdateAddress(request, httpServletRequest, true);
+        } catch (CustomIllegalArgumentsException ex) {
+            throw ex;
+        } catch (Exception e) {
+            log.error("address/update:: exception occurred");
+            log.error("address/update:: {}", e.getMessage());
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+    }
+
+    private SEResponse createOrUpdateAddress(SERequest request, HttpServletRequest httpServletRequest, boolean isEdit) {
+        log.info("createOrUpdateAddress:: method started");
+        log.info("createOrUpdateAddress:: request: {}, isEdit: {}", request, isEdit);
+        AddressBean req = request.getGenericRequestDataObject(AddressBean.class);
+        CommonUtils.extractHeaders(httpServletRequest, req);
+        UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
+                Activity.MANAGE_ADDRESS);
+        String user_id;
+        UserType user_type = usersBean.getRole().getUser_type();
+        switch (user_type) {
+            case CUSTOMER, GUEST:
+                user_id = usersBean.getId();
+                break;
+            case SUPER_ADMIN:
+                if (!StringUtils.hasText(req.getUser_id())) {
+                    throw new CustomIllegalArgumentsException("User id not selected.");
+                }
+                user_id = req.getUser_id();
+                SEFilter filterU = new SEFilter(SEFilterType.AND);
+                filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, user_id));
+                filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+                Users users = users_Service.repoFindOne(filterU);
+                if (users == null) {
+                    throw new CustomIllegalArgumentsException("Invalid user selected.");
+                }
+                SEFilter filterR = new SEFilter(SEFilterType.AND);
+                filterR.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, users.getRole_id()));
+                filterR.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+                Role role = roleService.repoFindOne(filterR);
+                if (role == null) {
+                    throw new CustomIllegalArgumentsException("Invalid user selected.");
+                }
+                break;
+            default:
+                throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+        }
+
+        AddressDTO addressDTO = req.getAddress();
+        if (addressDTO == null) {
+            throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ADDRESS);
+        }
+
+
+        Address address;
+        if (isEdit) {
+            if (!StringUtils.hasText(addressDTO.getId())) {
+                throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ID);
+            } else {
+                SEFilter filterA = new SEFilter(SEFilterType.AND);
+                filterA.addClause(WhereClause.eq(Address.Fields.entity_id, user_id));
+                filterA.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, addressDTO.getId()));
+                filterA.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+                filterA.addClause(WhereClause.eq(Address.Fields.user_type, user_type.name()));
+
+                address = address_Service.repoFindOne(filterA);
+                if (address == null) {
+                    throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+                }
+            }
+        } else {
+            address = new Address();
+        }
+
+        ValidationUtil.validateAddress(addressDTO, address);
+
+
+        SEFilter filterA = new SEFilter(SEFilterType.AND);
+        filterA.addClause(WhereClause.eq(Address.Fields.entity_id, user_id));
+        filterA.addClause(WhereClause.eq(Address.Fields.user_type, user_type.name()));
+        if (isEdit) {
+            filterA.addClause(WhereClause.notEq(BaseMongoEntity.Fields.id, addressDTO.getId()));
+        }
+
+        List<Address> listA = address_Service.repoFind(filterA);
+        if (!CollectionUtils.isEmpty(listA)) {
+            Predicate<Address> p1 = x -> x.getAddress_type() != AddressType.OTHER;
+            Predicate<Address> p2 = x -> x.getAddress_type() == address.getAddress_type();
+            boolean anyMatch = listA.stream().anyMatch(p1.and(p2));
+            if (anyMatch) {
+                throw new CustomIllegalArgumentsException("If you havel multiple " + address.getAddress_type().getType()
+                        + " address, please use other address type");
+            }
+        }
+
+        address.setUser_type(user_type);
+        address.setEntity_id(usersBean.getId());
+        Address entity = address_Service.upsert(address.getId(), address, req.getReq_user_id());
+        if (Boolean.TRUE.equals(addressDTO.getIs_default())) {
+            address_Service.markDefault(entity, entity.getModified_by());
+        }
+        return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
     }
 
     @PostMapping("/fetch")
@@ -207,6 +253,45 @@ public class ManageAddress_BLService {
         } catch (Exception e) {
             log.error("address/remove:: exception occurred");
             log.error("address/remove:: {}", e.getMessage());
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+    }
+
+    @PostMapping("/mark-default")
+    public SEResponse markDefault(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+        try {
+            log.info("address/mark-default:: API started!");
+            AddressBean req = request.getGenericRequestDataObject(AddressBean.class);
+            CommonUtils.extractHeaders(httpServletRequest, req);
+            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.MANAGE_ADDRESS);
+            switch (usersBean.getRole().getUser_type()) {
+                case CUSTOMER:
+                case GUEST:
+                    break;
+                default:
+                    throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+            }
+
+            AddressDTO addressDTO = req.getAddress();
+            if (addressDTO == null || !StringUtils.hasText(addressDTO.getId())) {
+                throw new IllegalArgumentException("Select which address to remove.");
+            }
+
+            SEFilter filterA = new SEFilter(SEFilterType.AND);
+            filterA.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, addressDTO.getId()));
+            filterA.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            filterA.addClause(WhereClause.eq(Address.Fields.entity_id, usersBean.getId()));
+            Address address = address_Service.repoFindOne(filterA);
+            if (address == null) {
+                throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+            }
+            address_Service.markDefault(address, usersBean.getId());
+            return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
+        } catch (CustomIllegalArgumentsException ex) {
+            throw ex;
+        } catch (Exception e) {
+            log.error("address/mark-default:: exception occurred");
+            log.error("address/mark-default:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
