@@ -160,6 +160,10 @@ public class ManageCart_BLService {
 			if (cart == null) {
 				throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
 			}
+			if (CollectionUtils.isEmpty(cart.getCart_items())) {
+				cart.setCart_items(new ArrayList<>());
+			}
+
 			List<Item> listItems = new ArrayList<>();
 			if (itemBean.getQuantity() == 0) {
 				Predicate<Item> p1 = x -> !x.getProduct_id().equals(itemBean.getProduct_id());
