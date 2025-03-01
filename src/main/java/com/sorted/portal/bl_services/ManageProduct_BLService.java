@@ -657,6 +657,11 @@ public class ManageProduct_BLService {
 				filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
 				Cart cart = cart_Service.repoFindOne(filterC);
+				if (cart == null) {
+					cart = new Cart();
+					cart.setUser_id(usersBean.getId());
+					cart = cart_Service.create(cart, usersBean.getId());
+				}
 				List<Item> cart_items = cart.getCart_items();
 				CartDetailsBuilder cartDetailsBuilder = CartDetails.builder();
 				if (!CollectionUtils.isEmpty(cart_items)) {
