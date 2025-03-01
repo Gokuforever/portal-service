@@ -10,6 +10,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 public class AddressBean extends ReqBaseBean {
 
-	private String cus_user_id;
+	private String user_id;
 	private AddressDTO address;
 }
