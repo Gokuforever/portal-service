@@ -104,8 +104,8 @@ public class ManageAddress_BLService {
                 Predicate<Address> p2 = x -> x.getAddress_type() == address.getAddress_type();
                 boolean anyMatch = listA.stream().anyMatch(p1.and(p2));
                 if (anyMatch) {
-                    throw new CustomIllegalArgumentsException("If you havel multiple " + address.getAddress_type_desc()
-                            + " address, please use other adress type");
+                    throw new CustomIllegalArgumentsException("If you havel multiple " + address.getAddress_type().getType()
+                            + " address, please use other address type");
                 }
             }
 
@@ -134,21 +134,6 @@ public class ManageAddress_BLService {
                 case CUSTOMER:
                 case GUEST:
                     break;
-//			case SELLER:
-//			case SUPER_ADMIN:
-//				if (!StringUtils.hasText(req.getCus_user_id())) {
-//					throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_CUST_USER_ID);
-//				}
-//				SEFilter filterU = new SEFilter(SEFilterType.AND);
-//				filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getCus_user_id()));
-//				filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getCus_user_id()));
-//				
-//				Users users = users_Service.repoFindOne(filterU);
-//				if(users==null) {
-//					// Throw exception
-//				}
-//				
-//				break;
                 default:
                     throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
             }
@@ -183,6 +168,45 @@ public class ManageAddress_BLService {
         } catch (Exception e) {
             log.error("add/fetch:: exception occurred");
             log.error("add/fetch:: {}", e.getMessage());
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+    }
+
+    @PostMapping("/remove")
+    public SEResponse remove(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+        try {
+            log.info("address/remove:: API started!");
+            AddressBean req = request.getGenericRequestDataObject(AddressBean.class);
+            CommonUtils.extractHeaders(httpServletRequest, req);
+            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.MANAGE_ADDRESS);
+            switch (usersBean.getRole().getUser_type()) {
+                case CUSTOMER:
+                case GUEST:
+                    break;
+                default:
+                    throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+            }
+
+            AddressDTO addressDTO = req.getAddress();
+            if (addressDTO == null || !StringUtils.hasText(addressDTO.getId())) {
+                throw new IllegalArgumentException("Select which address to remove.");
+            }
+
+            SEFilter filterA = new SEFilter(SEFilterType.AND);
+            filterA.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, addressDTO.getId()));
+            filterA.addClause(WhereClause.eq(Address.Fields.entity_id, usersBean.getId()));
+            Address address = address_Service.repoFindOne(filterA);
+            if (address == null) {
+                throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+            }
+            address.setDeleted(true);
+            address_Service.deleteOne(address.getId(), usersBean.getId());
+            return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
+        } catch (CustomIllegalArgumentsException ex) {
+            throw ex;
+        } catch (Exception e) {
+            log.error("address/remove:: exception occurred");
+            log.error("address/remove:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
