@@ -163,9 +163,9 @@ public class ManageAddress_BLService {
         address.setUser_type(user_type);
         address.setEntity_id(usersBean.getId());
         Address entity = address_Service.upsert(address.getId(), address, req.getReq_user_id());
-        if (Boolean.TRUE.equals(addressDTO.getIs_default())) {
-            address_Service.markDefault(entity, entity.getModified_by());
-        }
+
+        address_Service.markDefault(entity, entity.getModified_by());
+
         return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
     }
 
