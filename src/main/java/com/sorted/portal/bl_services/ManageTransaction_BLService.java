@@ -16,7 +16,9 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.req.beans.GetQuoteRequest;
+import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
+import com.sorted.commons.utils.GsonUtils;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.razorpay.CheckoutReqbean;
 import com.sorted.portal.razorpay.RazorpayUtility;
@@ -24,8 +26,10 @@ import com.sorted.portal.request.beans.FindOrderReqBean;
 import com.sorted.portal.request.beans.PayNowBean;
 import com.sorted.portal.response.beans.FndOrderResBean;
 import com.sorted.portal.response.beans.PGResponseBean;
+import com.sorted.portal.service.OrderService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
@@ -53,11 +57,14 @@ public class ManageTransaction_BLService {
     private final RazorpayUtility razorpayUtility;
     private final Seller_Service seller_Service;
     private final PorterUtility porterUtility;
+    private final Order_Dump_Service orderDumpService;
+    private final OrderService orderService;
 
     @Autowired
     public ManageTransaction_BLService(Users_Service users_Service, Cart_Service cart_Service, ProductService productService,
                                        Address_Service address_Service, Order_Details_Service order_Details_Service, Order_Item_Service order_Item_Service,
-                                       RazorpayUtility razorpayUtility, Seller_Service seller_Service, PorterUtility porterUtility) {
+                                       RazorpayUtility razorpayUtility, Seller_Service seller_Service, PorterUtility porterUtility,
+                                       Order_Dump_Service orderDumpService, OrderService orderService) {
         this.users_Service = users_Service;
         this.cart_Service = cart_Service;
         this.productService = productService;
@@ -67,6 +74,8 @@ public class ManageTransaction_BLService {
         this.razorpayUtility = razorpayUtility;
         this.seller_Service = seller_Service;
         this.porterUtility = porterUtility;
+        this.orderDumpService = orderDumpService;
+        this.orderService = orderService;
     }
 
     @PostMapping("/order/find")
@@ -122,6 +131,8 @@ public class ManageTransaction_BLService {
 
     @PostMapping("/pay")
     public SEResponse pay(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+        Order_Dump orderDump = new Order_Dump(GsonUtils.getGson().toJson(request.getRequestData()));
+        orderDumpService.create(orderDump, this.getClass().getSimpleName());
         try {
             log.info("/pay:: API started!");
             PayNowBean req = request.getGenericRequestDataObject(PayNowBean.class);
@@ -188,7 +199,8 @@ public class ManageTransaction_BLService {
             }
             List<String> seller_ids = listP.stream().map(Products::getSeller_id).distinct().toList();
             if (seller_ids.isEmpty()) {
-                // TODO: need to discuss
+                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SELLER_FOR_ORDER);
+//                throw new CustomIllegalArgumentsException(ResponseCode.MULTIPLE_SELLERS);
             }
             String seller_id = seller_ids.get(0);
             SEFilter filterS = new SEFilter(SEFilterType.AND);
@@ -226,22 +238,7 @@ public class ManageTransaction_BLService {
                     throw new CustomIllegalArgumentsException(ResponseCode.FEW_OUT_OF_STOCK);
                 }
 
-                Order_Item order_Item = new Order_Item();
-                order_Item.setProduct_id(product.getId());
-                order_Item.setProduct_code(product.getProduct_code());
-                order_Item.setQuantity(item.getQuantity());
-                order_Item.setSelling_price(product.getSelling_price());
-                order_Item.setSeller_id(product.getSeller_id());
-                order_Item.setSeller_code(product.getSeller_code());
-                order_Item.setStatus(OrderStatus.ORDER_PLACED);
-                order_Item.setStatus_id(OrderStatus.ORDER_PLACED.getId());
-                order_Item.setTotal_cost(product.getSelling_price() * item.getQuantity());
-                if (item.is_secure()) {
-                    order_Item.setType(PurchaseType.SECURE);
-                    order_Item.setReturn_date(return_date);
-                } else {
-                    order_Item.setType(PurchaseType.BUY);
-                }
+                Order_Item order_Item = getOrderItem(item, product, return_date);
                 listOI.add(order_Item);
             }
             Map<String, Long> mapPQ = listOI.stream()
@@ -270,15 +267,13 @@ public class ManageTransaction_BLService {
 				                        .build())
 				                .build();
 						// @formatter:on
-            porterUtility.getQuote(quoteRequest, usersBean.getId());
+            GetQuoteResponse quote = porterUtility.getQuote(quoteRequest, usersBean.getId());
 
             Order_Details order = new Order_Details();
 
             if (StringUtils.hasText(usersBean.getId())) {
                 order.setUser_id(usersBean.getId());
             }
-//			FIXME: need to add product total amount, delivery charges, gst and other charges in total amount 
-//			order.setDelivery_charges();
             order.setTotal_amount(totalSum);
             order.setStatus(OrderStatus.ORDER_PLACED);
             order.setStatus_id(OrderStatus.ORDER_PLACED.getId());
@@ -312,28 +307,18 @@ public class ManageTransaction_BLService {
 			pickup_address.setLng(sellerAddress.getLng());
 			order.setPickup_address(pickup_address);
 			order.setDelivery_address(del_address);
+            order.setEstimated_quote(GsonUtils.getGson().toJson(quote));
 			// @formatter:on
 
-            for (Products product : mapP.values()) {
-                Long quantity = mapPQ.getOrDefault(product.getId(), null);
-                if (quantity == null) {
-                    continue;
-                }
-                quantity = product.getQuantity() - quantity;
-                product.setQuantity(quantity);
-                productService.update(product.getId(), product, Defaults.SYSTEM_ADMIN);
-            }
+            orderService.reduceProductQuantity(mapP.values().stream().toList(), mapPQ);
 
 //			cart.setCart_items(null);
 //			cart_Service.update(cart.getId(), cart, usersBean.getId());
 
             Order_Details order_Details = order_Details_Service.create(order, usersBean.getId());
 
-            for (Order_Item order_Item : listOI) {
-                order_Item.setOrder_id(order_Details.getId());
-                order_Item.setOrder_code(order_Details.getCode());
-                order_Item_Service.create(order_Item, usersBean.getId());
-            }
+            orderService.createOrderItems(listOI, order_Details.getId(), order_Details.getCode(), usersBean.getId());
+
             Order rzrp_order = razorpayUtility.createOrder(totalSum, order_Details.getId());
             if (rzrp_order == null) {
                 throw new CustomIllegalArgumentsException(ResponseCode.PG_ORDER_GEN_FAILED);
@@ -344,15 +329,38 @@ public class ManageTransaction_BLService {
             order_Details_Service.update(order_Details.getId(), order_Details, usersBean.getId());
 
             CheckoutReqbean checkoutPayload = razorpayUtility.createCheckoutPayload(rzrp_order);
-
+            orderDumpService.markSuccess(orderDump, order_Details.getId(), this.getClass().getSimpleName());
             return SEResponse.getBasicSuccessResponseObject(checkoutPayload, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
+            orderDumpService.markFailed(orderDump, ex.getResponseCode().getErrorMessage(), ex.getResponseCode().getCode(), this.getClass().getSimpleName());
             throw ex;
         } catch (Exception e) {
             log.error("/pay:: exception occurred");
             log.error("/pay:: {}", e.getMessage());
+            orderDumpService.markFailed(orderDump, e.getMessage(), ResponseCode.ERR_0001.getCode(), this.getClass().getSimpleName());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
+    }
+
+    @NotNull
+    private static Order_Item getOrderItem(Item item, Products product, LocalDateTime return_date) {
+        Order_Item order_Item = new Order_Item();
+        order_Item.setProduct_id(product.getId());
+        order_Item.setProduct_code(product.getProduct_code());
+        order_Item.setQuantity(item.getQuantity());
+        order_Item.setSelling_price(product.getSelling_price());
+        order_Item.setSeller_id(product.getSeller_id());
+        order_Item.setSeller_code(product.getSeller_code());
+        order_Item.setStatus(OrderStatus.ORDER_PLACED);
+        order_Item.setStatus_id(OrderStatus.ORDER_PLACED.getId());
+        order_Item.setTotal_cost(product.getSelling_price() * item.getQuantity());
+        if (item.is_secure()) {
+            order_Item.setType(PurchaseType.SECURE);
+            order_Item.setReturn_date(return_date);
+        } else {
+            order_Item.setType(PurchaseType.BUY);
+        }
+        return order_Item;
     }
 
     @PostMapping("/saveResponse")
@@ -369,7 +377,7 @@ public class ManageTransaction_BLService {
             }
             SEFilter filterO = new SEFilter(SEFilterType.AND);
             filterO.addClause(WhereClause.eq(Order_Details.Fields.pg_order_id, req.getRazorpay_order_id()));
-//			filterO.addClause(WhereClause.eq(Order_Details.Fields.status, OrderStatus.ORDER_PLACED.name()));
+            filterO.addClause(WhereClause.eq(Order_Details.Fields.status, OrderStatus.ORDER_PLACED.name()));
             filterO.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
             Order_Details order_details = order_Details_Service.repoFindOne(filterO);
             if (order_details == null) {
