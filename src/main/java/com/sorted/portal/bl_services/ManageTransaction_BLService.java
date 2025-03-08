@@ -10,9 +10,11 @@ import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
+import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.req.beans.GetQuoteRequest;
@@ -25,6 +27,7 @@ import com.sorted.portal.razorpay.RazorpayUtility;
 import com.sorted.portal.request.beans.FindOrderReqBean;
 import com.sorted.portal.request.beans.PayNowBean;
 import com.sorted.portal.response.beans.FndOrderResBean;
+import com.sorted.portal.response.beans.OrderItemDTO;
 import com.sorted.portal.response.beans.PGResponseBean;
 import com.sorted.portal.service.OrderService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,6 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,6 +46,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -59,12 +64,14 @@ public class ManageTransaction_BLService {
     private final PorterUtility porterUtility;
     private final Order_Dump_Service orderDumpService;
     private final OrderService orderService;
+    private final int defaultPage;
+    private final int defaultSize;
 
     @Autowired
     public ManageTransaction_BLService(Users_Service users_Service, Cart_Service cart_Service, ProductService productService,
                                        Address_Service address_Service, Order_Details_Service order_Details_Service, Order_Item_Service order_Item_Service,
                                        RazorpayUtility razorpayUtility, Seller_Service seller_Service, PorterUtility porterUtility,
-                                       Order_Dump_Service orderDumpService, OrderService orderService) {
+                                       Order_Dump_Service orderDumpService, OrderService orderService, @Value("${se.default.page}") int defaultPage, @Value("${se.default.size}") int defaultSize) {
         this.users_Service = users_Service;
         this.cart_Service = cart_Service;
         this.productService = productService;
@@ -76,14 +83,16 @@ public class ManageTransaction_BLService {
         this.porterUtility = porterUtility;
         this.orderDumpService = orderDumpService;
         this.orderService = orderService;
+        this.defaultPage = defaultPage;
+        this.defaultSize = defaultSize;
     }
 
     @PostMapping("/order/find")
     public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         FindOrderReqBean req = request.getGenericRequestDataObject(FindOrderReqBean.class);
-        SEFilter filterSE = new SEFilter(SEFilterType.AND);
+        SEFilter filterOD = new SEFilter(SEFilterType.AND);
         if (StringUtils.hasText(req.getCode())) {
-            filterSE.addClause(WhereClause.eq(Order_Details.Fields.code, req.getCode()));
+            filterOD.addClause(WhereClause.eq(Order_Details.Fields.code, req.getCode()));
         }
         CommonUtils.extractHeaders(httpServletRequest, req);
         UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(),
@@ -100,32 +109,58 @@ public class ManageTransaction_BLService {
             if (orderStatus == null) {
                 throw new IllegalArgumentException("Invalid status");
             }
-            filterSE.addClause(WhereClause.eq(Order_Details.Fields.status_id, orderStatus.getId()));
+            filterOD.addClause(WhereClause.eq(Order_Details.Fields.status_id, orderStatus.getId()));
         }
 
         if (StringUtils.hasText(req.getFrom_date()) && StringUtils.hasText(req.getTo_date())) {
             LocalDateTime from = LocalDate.parse(req.getFrom_date()).atTime(LocalTime.MIN);
             LocalDateTime to = LocalDate.parse(req.getFrom_date()).atTime(LocalTime.MAX);
-            filterSE.addClause(WhereClause.gte(BaseMongoEntity.Fields.creation_date, from));
-            filterSE.addClause(WhereClause.lte(BaseMongoEntity.Fields.creation_date, to));
+            filterOD.addClause(WhereClause.gte(BaseMongoEntity.Fields.creation_date, from));
+            filterOD.addClause(WhereClause.lte(BaseMongoEntity.Fields.creation_date, to));
         }
 
-        filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
-        List<Order_Details> ordersList = order_Details_Service.repoFind(filterSE);
+        AggregationFilter.OrderBy orderBy = new AggregationFilter.OrderBy(BaseMongoEntity.Fields.creation_date, AggregationFilter.SortOrder.DESC);
+        filterOD.setOrderBy(orderBy);
+
+        int page = req.getPage() < 0 ? defaultPage : req.getPage();
+        int size = req.getSize() < 1 ? defaultSize : req.getSize();
+        Pagination pagination = new Pagination(page, size);
+        filterOD.setPagination(pagination);
+
+        List<Order_Details> ordersList = order_Details_Service.repoFind(filterOD);
         if (CollectionUtils.isEmpty(ordersList)) {
             return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
         }
 
-        List<FndOrderResBean> resList = ordersList.stream().map(this::entToBean).toList();
+        List<String> orderIds = ordersList.stream().map(BaseMongoEntity::getId).toList();
+        SEFilter filterOI = new SEFilter(SEFilterType.AND);
+        filterOI.addClause(WhereClause.in(Order_Item.Fields.order_id, orderIds));
+        filterOI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Order_Item> orderItems = order_Item_Service.repoFind(filterOI);
+        Map<String, List<Order_Item>> mapOI = orderItems.stream().collect(Collectors.groupingBy(Order_Item::getOrder_id, Collectors.mapping(Function.identity(), Collectors.toList())));
+
+        List<FndOrderResBean> resList = ordersList.stream().map(order -> this.entToBean(order, mapOI)).toList();
         return SEResponse.getBasicSuccessResponseList(resList, ResponseCode.SUCCESSFUL);
     }
 
-    private FndOrderResBean entToBean(Order_Details order_Details) {
+    private FndOrderResBean entToBean(Order_Details order_Details, Map<String, List<Order_Item>> mapOI) {
         return FndOrderResBean.builder().id(order_Details.getId()).code(order_Details.getCode())
                 .status(order_Details.getStatus().getInternal_status())
                 .transaction_id(order_Details.getTransaction_id()).total_amount(order_Details.getTotal_amount())
                 .pickup_address(order_Details.getPickup_address()).delivery_address(order_Details.getDelivery_address())
+                .orderItems(mapOI.get(order_Details.getId()).stream().map(this::entToBean).toList())
+                .creation_date_str(order_Details.getCreation_date_str())
+                .build();
+    }
+
+    private OrderItemDTO entToBean(Order_Item orderItem) {
+        return OrderItemDTO.builder().id(orderItem.getId()).product_id(orderItem.getProduct_id())
+                .product_code(orderItem.getProduct_code()).quantity(orderItem.getQuantity()).total_cost(orderItem.getTotal_cost())
+                .selling_price(orderItem.getSelling_price()).type(orderItem.getType()).status(orderItem.getStatus())
+                .status_id(orderItem.getStatus_id())
                 .build();
     }
 
