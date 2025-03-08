@@ -104,7 +104,7 @@ public class ManagePincode_BLService {
         properties.put("college", req.getCollege());
         users.setBranch(req.getBranch());
         users.setBranch_desc(isOtherBranch ? req.getBranch() : null);
-        users.setSemister(semester.getAlias());
+        users.setSemester(semester.getAlias());
         users.setProperties(properties);
         users_Service.update(users.getId(), users, "/delivery/check");
         return SEResponse.getBasicSuccessResponseObject(response, ResponseCode.SUCCESSFUL);
