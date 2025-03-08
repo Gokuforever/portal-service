@@ -28,6 +28,7 @@ import com.sorted.portal.request.beans.VerifyOtpBean;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,12 +47,12 @@ public class ManageSignUp_BLService {
     private final Cart_Service cart_Service;
 
     // Constructor Injection
-    public ManageSignUp_BLService(ManageOtp manageOtp, Users_Service users_Service, RoleService roleService, PasswordEncoder passwordEncoder,
+    public ManageSignUp_BLService(ManageOtp manageOtp, Users_Service users_Service, RoleService roleService,
                                   @Value("${se.portal.customer.signup.role}") String customer_signup_role, Cart_Service cart_Service) {
         this.manageOtp = manageOtp;
         this.users_Service = users_Service;
         this.roleService = roleService;
-        this.passwordEncoder = passwordEncoder;
+        this.passwordEncoder = new BCryptPasswordEncoder();
         this.customer_signup_role = customer_signup_role;
         this.cart_Service = cart_Service;
     }
