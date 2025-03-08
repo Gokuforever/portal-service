@@ -1,15 +1,5 @@
 package com.sorted.portal.bl_services;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.springframework.util.CollectionUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Category_Master;
@@ -26,9 +16,17 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.portal.request.beans.MetaDataReq;
 import com.sorted.portal.response.beans.MetaData;
-
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @RestController
@@ -38,8 +36,10 @@ public class ManageMetaData_BLService {
     private final Users_Service usersService;
     private final Product_Master_Service productMasterService;
 
-    private final Map<String, List<Category_Master>> cache = new ConcurrentHashMap<>();
-    private static final String CACHE_KEY = "CM_DATA";
+    private final Map<String, List<Category_Master>> categoryCache = new ConcurrentHashMap<>();
+    private final Map<String, List<Product_Master>> productCache = new ConcurrentHashMap<>();
+    private static final String CM_CACHE_KEY = "CM_DATA";
+    private static final String PM_CACHE_KEY = "PM_DATA";
 
     public ManageMetaData_BLService(Category_MasterService categoryMasterService,
                                     Users_Service usersService,
@@ -51,7 +51,8 @@ public class ManageMetaData_BLService {
 
     @PostMapping("/cache/clear")
     public void clearCache() {
-        cache.clear();
+        categoryCache.clear();
+        productCache.clear();
     }
 
     @PostMapping("/getMetaData")
@@ -62,18 +63,12 @@ public class ManageMetaData_BLService {
         List<String> ids = req.getIds();
         MetaData data = new MetaData();
 
-        // Consider adding a cache invalidation mechanism to prevent stale data
-        List<Category_Master> categoryMasterData = cache.computeIfAbsent(CACHE_KEY, key -> this.getCategoryMasterData());
+        List<Category_Master> categoryMasterData = categoryCache.computeIfAbsent(CM_CACHE_KEY, key -> this.getCategoryMasterData());
         if (!CollectionUtils.isEmpty(categoryMasterData)) {
             data.setCatagories(categoryMasterData);
         }
 
-        SEFilter filterPM = new SEFilter(SEFilterType.AND);
-        if (!CollectionUtils.isEmpty(ids)) {
-            filterPM.addClause(WhereClause.in(BaseMongoEntity.Fields.id, ids));
-        }
-        filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        List<Product_Master> listPM = productMasterService.repoFind(filterPM);
+        List<Product_Master> listPM = productCache.computeIfAbsent(PM_CACHE_KEY, key -> this.getProductMasters());
         if (!CollectionUtils.isEmpty(listPM)) {
             data.setProducts(listPM);
         }
@@ -81,6 +76,12 @@ public class ManageMetaData_BLService {
 
         log.info("getMetaData:: API ended");
         return SEResponse.getBasicSuccessResponseObject(data, ResponseCode.SUCCESSFUL);
+    }
+
+    private List<Product_Master> getProductMasters() {
+        SEFilter filterPM = new SEFilter(SEFilterType.AND);
+        filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        return productMasterService.repoFind(filterPM);
     }
 
     private List<Category_Master> getCategoryMasterData() {
