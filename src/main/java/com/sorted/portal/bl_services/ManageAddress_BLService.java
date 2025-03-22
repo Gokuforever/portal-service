@@ -245,6 +245,9 @@ public class ManageAddress_BLService {
             if (address == null) {
                 throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
             }
+            if(address.isDeleted()){
+                return SEResponse.getEmptySuccessResponse(ResponseCode.ADD_ALREADY_DELETED);
+            }
             address.setDeleted(true);
             address_Service.deleteOne(address.getId(), usersBean.getId());
             return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
