@@ -281,6 +281,7 @@ public class ManageCart_BLService {
                         Products products = mapP.get(e.getProduct_id());
                         items.setProduct_name(products.getName());
                         items.setProduct_code(e.getProduct_code());
+                        items.setProduct_id(e.getProduct_id());
                         items.setQuantity(e.getQuantity());
                         items.setSelling_price(CommonUtils.paiseToRupee(products.getSelling_price()));
 //						items.setIn_stock(products.getQuantity().compareTo(e.getQuantity()) >= 0);
