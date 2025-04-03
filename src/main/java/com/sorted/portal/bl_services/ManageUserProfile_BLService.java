@@ -27,6 +27,7 @@ import com.sorted.portal.request.beans.VerifyOtpBean;
 import com.sorted.portal.response.beans.UserProfileBean;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -62,15 +63,7 @@ public class ManageUserProfile_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
             }
             UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.USER_PROFILE);
-            UserProfileBean bean = new UserProfileBean();
-            bean.setFirst_name(usersBean.getFirst_name());
-            bean.setLast_name(usersBean.getLast_name());
-            bean.setMobile_no(usersBean.getMobile_no());
-            bean.setEmail_id(usersBean.getEmail_id());
-            bean.setProperties(usersBean.getProperties());
-            bean.setGender(usersBean.getGender());
-            bean.setUser_type(usersBean.getRole().getUser_type());
-            bean.setUser_type_id(usersBean.getRole().getUser_type().getId());
+            UserProfileBean bean = getUserProfileBean(usersBean);
 
             log.info("/profile/fetch:: API ended");
             return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
@@ -81,6 +74,20 @@ public class ManageUserProfile_BLService {
             log.error("/profile/fetch:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
+    }
+
+    @NotNull
+    private static UserProfileBean getUserProfileBean(UsersBean usersBean) {
+        UserProfileBean bean = new UserProfileBean();
+        bean.setFirst_name(usersBean.getFirst_name());
+        bean.setLast_name(usersBean.getLast_name());
+        bean.setMobile_no(usersBean.getMobile_no());
+        bean.setEmail_id(usersBean.getEmail_id());
+        bean.setProperties(usersBean.getProperties());
+        bean.setGender(usersBean.getGender());
+        bean.setUser_type(usersBean.getRole().getUser_type());
+        bean.setUser_type_id(usersBean.getRole().getUser_type().getId());
+        return bean;
     }
 
     @PostMapping("/updatePass")
@@ -101,13 +108,13 @@ public class ManageUserProfile_BLService {
             response.setReference_id(uuid);
             response.setProcess_type(ProcessType.UPDATE_PASS.name());
             response.setEntity_id(usersBean.getId());
-            log.info("signin:: API ended");
+            log.info("/updatePass:: API ended");
             return SEResponse.getBasicSuccessResponseObject(response, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("signin:: exception occurred");
-            log.error("signin:: {}", e.getMessage());
+            log.error("/updatePass:: exception occurred");
+            log.error("/updatePass:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -115,7 +122,7 @@ public class ManageUserProfile_BLService {
     @PostMapping("/updatePass/verifyOtp")
     public SEResponse updatePassVerifyOtp(@RequestBody SERequest request, HttpServletRequest servletRequest) {
         try {
-            log.info("auth/forgotpass/verifyOtp:: API started!");
+            log.info("/updatePass/verifyOtp:: API started!");
             VerifyOtpBean req = request.getGenericRequestDataObject(VerifyOtpBean.class);
             CommonUtils.extractHeaders(servletRequest, req);
             UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.USER_PROFILE);
@@ -156,16 +163,16 @@ public class ManageUserProfile_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("auth/verifyOtp:: exception occurred");
-            log.error("auth/verifyOtp:: {}", e.getMessage());
+            log.error("/updatePass/verifyOtp:: exception occurred");
+            log.error("/updatePass/verifyOtp:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
 
     @PostMapping("/updatePass/changePassword")
-    public SEResponse changepassword(@RequestBody SERequest request, HttpServletRequest servletRequest) {
+    public SEResponse changePassword(@RequestBody SERequest request, HttpServletRequest servletRequest) {
         try {
-            log.info("/profile/fetch:: API started");
+            log.info("/updatePass/changePassword:: API started");
             ChangePassword req = request.getGenericRequestDataObject(ChangePassword.class);
             CommonUtils.extractHeaders(servletRequest, req);
 
@@ -213,13 +220,13 @@ public class ManageUserProfile_BLService {
             users.setUuid(null);
             users_Service.update(users.getId(), users, users.getId());
 
-            log.info("/seller/create:: API ended");
+            log.info("/updatePass/changePassword:: API ended");
             return SEResponse.getBasicSuccessResponseObject("", ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("/seller/create:: exception occurred");
-            log.error("/seller/create:: {}", e.getMessage());
+            log.error("/updatePass/changePassword:: exception occurred");
+            log.error("/updatePass/changePassword:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }

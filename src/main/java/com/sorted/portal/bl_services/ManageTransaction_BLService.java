@@ -89,19 +89,25 @@ public class ManageTransaction_BLService {
 
     @PostMapping("/order/find")
     public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+        log.info("/order/find:: API started");
+        log.info("/order/find:: request: {}", request);
         FindOrderReqBean req = request.getGenericRequestDataObject(FindOrderReqBean.class);
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
-        if (StringUtils.hasText(req.getCode())) {
-            filterOD.addClause(WhereClause.eq(Order_Details.Fields.code, req.getCode()));
-        }
         CommonUtils.extractHeaders(httpServletRequest, req);
         UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(),
                 Activity.INVENTORY_MANAGEMENT);
         switch (usersBean.getRole().getUser_type()) {
-            case SELLER, SUPER_ADMIN:
+            case SELLER:
+                filterOD.addClause(WhereClause.eq(Order_Details.Fields.seller_id, usersBean.getSeller().getId()));
+                break;
+            case SUPER_ADMIN:
                 break;
             default:
                 throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+        }
+
+        if (StringUtils.hasText(req.getCode())) {
+            filterOD.addClause(WhereClause.eq(Order_Details.Fields.code, req.getCode()));
         }
 
         if (StringUtils.hasText(req.getOrder_status())) {
@@ -309,6 +315,7 @@ public class ManageTransaction_BLService {
             if (StringUtils.hasText(usersBean.getId())) {
                 order.setUser_id(usersBean.getId());
             }
+            order.setSeller_id(seller_id);
             order.setTotal_amount(totalSum);
             order.setStatus(OrderStatus.ORDER_PLACED);
             order.setStatus_id(OrderStatus.ORDER_PLACED.getId());

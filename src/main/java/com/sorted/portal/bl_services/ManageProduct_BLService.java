@@ -78,7 +78,7 @@ public class ManageProduct_BLService {
     @PostMapping("/bulk/create")
     public SEResponse bulkCreate(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
-
+            log.info("/bulk/create:: AOI started");
             AddBulkProductReqBean req = request.getGenericRequestDataObject(AddBulkProductReqBean.class);
             CommonUtils.extractHeaders(httpServletRequest, req);
             UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
@@ -182,7 +182,7 @@ public class ManageProduct_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+            log.error("/bulk/create:: error occurred:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -190,6 +190,7 @@ public class ManageProduct_BLService {
     @PostMapping("/create")
     public SEResponse create(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
+            log.info("/product/create API started");
             ProductReqBean req = request.getGenericRequestDataObject(ProductReqBean.class);
             CommonUtils.extractHeaders(httpServletRequest, req);
             UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
@@ -280,7 +281,7 @@ public class ManageProduct_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+            log.error("/product/create:: error occurred:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -288,6 +289,7 @@ public class ManageProduct_BLService {
     @PostMapping("/edit")
     public SEResponse edit(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
+            log.info("/product/edit:: API started");
             ProductReqBean req = request.getGenericRequestDataObject(ProductReqBean.class);
             CommonUtils.extractHeaders(httpServletRequest, req);
             UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
@@ -406,7 +408,7 @@ public class ManageProduct_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+            log.error("/product/edit:: error occurred:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }

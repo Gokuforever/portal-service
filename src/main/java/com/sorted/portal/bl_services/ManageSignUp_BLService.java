@@ -153,7 +153,7 @@ public class ManageSignUp_BLService {
             user.setGender(req.getGender());
             user.setPassword(encode);
 
-            user = users_Service.upsert(user.getId(), user, Defaults.SIGN_UP);
+            users_Service.upsert(user.getId(), user, Defaults.SIGN_UP);
 
             String uuid = manageOtp.send(req.getMobile_no(), user.getId(), ProcessType.SIGN_UP, EntityDetails.USERS, Defaults.SIGN_UP);
             OTPResponse response = new OTPResponse();

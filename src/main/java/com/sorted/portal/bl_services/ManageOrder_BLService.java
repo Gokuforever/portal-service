@@ -68,6 +68,23 @@ public class ManageOrder_BLService {
 	@Autowired
 	private PorterUtility porterUtility;
 
+	@PostMapping("/secure/return")
+	public SEResponse initiateSecureReturn(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+		CreateDeliveryBean req = request.getGenericRequestDataObject(CreateDeliveryBean.class);
+		CommonUtils.extractHeaders(httpServletRequest, req);
+		UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
+				Activity.SECURE_RETURN);
+		Role role = usersBean.getRole();
+		UserType user_type = role.getUser_type();
+		if (user_type != UserType.SUPER_ADMIN) {
+			throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+		}
+		if (!StringUtils.hasText(req.getOrder_id())) {
+			throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_ORDER_ID);
+		}
+		return null;
+		
+	}
 	@PostMapping("/readyForPickup")
 	public SEResponse createOrder(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 		try {
