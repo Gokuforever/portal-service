@@ -6,7 +6,6 @@ import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Users;
-import com.sorted.commons.entity.service.Cart_Service;
 import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.EntityDetails;
@@ -44,19 +43,17 @@ public class ManageSignUp_BLService {
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
     private final String customer_signup_role;
-    private final Cart_Service cart_Service;
     private final SignUpService signUpService;
 
     // Constructor Injection
     public ManageSignUp_BLService(ManageOtp manageOtp, Users_Service users_Service, RoleService roleService,
-                                  @Value("${se.portal.customer.signup.role}") String customer_signup_role, Cart_Service cart_Service, SignUpService signUpService) {
+                                  @Value("${se.portal.customer.signup.role}") String customer_signup_role, SignUpService signUpService) {
         this.manageOtp = manageOtp;
         this.users_Service = users_Service;
         this.roleService = roleService;
         this.signUpService = signUpService;
         this.passwordEncoder = new BCryptPasswordEncoder();
         this.customer_signup_role = customer_signup_role;
-        this.cart_Service = cart_Service;
     }
 
     @PostMapping("/signup")
