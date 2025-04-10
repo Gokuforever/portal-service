@@ -8,7 +8,7 @@ import java.util.List;
 
 @Builder
 @Getter
-public class FndOrderResBean {
+public class FindOrderResBean {
 
     private String id;
     private String code;
