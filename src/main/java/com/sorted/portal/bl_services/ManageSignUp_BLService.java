@@ -4,7 +4,6 @@ import com.sorted.commons.beans.OTPResponse;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
-import com.sorted.commons.entity.mongo.Cart;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.Cart_Service;
@@ -25,6 +24,7 @@ import com.sorted.commons.utils.PasswordValidatorUtils;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.request.beans.SignUpRequest;
 import com.sorted.portal.request.beans.VerifyOtpBean;
+import com.sorted.portal.service.SignUpService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,13 +45,15 @@ public class ManageSignUp_BLService {
     private final PasswordEncoder passwordEncoder;
     private final String customer_signup_role;
     private final Cart_Service cart_Service;
+    private final SignUpService signUpService;
 
     // Constructor Injection
     public ManageSignUp_BLService(ManageOtp manageOtp, Users_Service users_Service, RoleService roleService,
-                                  @Value("${se.portal.customer.signup.role}") String customer_signup_role, Cart_Service cart_Service) {
+                                  @Value("${se.portal.customer.signup.role}") String customer_signup_role, Cart_Service cart_Service, SignUpService signUpService) {
         this.manageOtp = manageOtp;
         this.users_Service = users_Service;
         this.roleService = roleService;
+        this.signUpService = signUpService;
         this.passwordEncoder = new BCryptPasswordEncoder();
         this.customer_signup_role = customer_signup_role;
         this.cart_Service = cart_Service;
@@ -215,23 +217,13 @@ public class ManageSignUp_BLService {
             users.setRole_id(customer_signup_role);
             users_Service.update(users.getId(), users, Defaults.SIGN_UP);
 
-            Cart new_cart = new Cart();
-            new_cart.setUser_id(users.getId());
-            String req_user_id = httpServletRequest.getHeader("req_user_id");
-            if (StringUtils.hasText(req_user_id)) {
-                SEFilter filterC = new SEFilter(SEFilterType.AND);
-                filterC.addClause(WhereClause.eq(Cart.Fields.user_id, req_user_id));
-                filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-                Cart cart = cart_Service.repoFindOne(filterC);
-                if (cart != null) {
-                    new_cart.setCart_items(cart.getCart_items());
-                }
-            }
-
-            cart_Service.create(new_cart, Defaults.SIGN_UP);
-
             UsersBean usersBean = users_Service.validateAndGetUserInfo(users.getId());
+
+            String guest_user_id = httpServletRequest.getHeader("req_user_id");
+            if (guest_user_id != null) {
+                signUpService.migrateCart(guest_user_id, users.getId());
+                signUpService.migrateAddressForCustomer(guest_user_id, users.getId());
+            }
 
             return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
@@ -242,4 +234,6 @@ public class ManageSignUp_BLService {
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
+
+
 }
