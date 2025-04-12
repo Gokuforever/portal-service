@@ -392,6 +392,8 @@ public class ManageOrder_BLService {
                         }
                         log.debug("find:: Applying status filter: {}", orderStatus);
                         filterOD.addClause(WhereClause.eq(Order_Details.Fields.status_id, orderStatus.getId()));
+                    } else {
+                        filterOD.addClause(WhereClause.in(Order_Details.Fields.status_id, sellerAllowedStatus.stream().map(OrderStatus::getId).toList()));
                     }
                     break;
                 case SUPER_ADMIN:
