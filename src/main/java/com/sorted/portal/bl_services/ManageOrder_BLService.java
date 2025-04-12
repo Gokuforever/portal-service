@@ -8,6 +8,7 @@ import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Order_Item_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.*;
+import com.sorted.commons.exceptions.AccessDeniedException;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
@@ -22,12 +23,13 @@ import com.sorted.commons.porter.req.beans.CreateOrderBean.*;
 import com.sorted.commons.porter.res.beans.CreateOrderResBean;
 import com.sorted.commons.porter.res.beans.FetchOrderRes.FareDetails;
 import com.sorted.commons.utils.CommonUtils;
-import com.sorted.commons.utils.FileExportUtils;
 import com.sorted.commons.utils.PorterUtility;
+import com.sorted.commons.utils.Preconditions;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
 import com.sorted.portal.request.beans.CreateDeliveryBean;
 import com.sorted.portal.request.beans.FindOrderReqBean;
+import com.sorted.portal.request.beans.OrderAcceptRejectRequest;
 import com.sorted.portal.response.beans.FindOrderResBean;
 import com.sorted.portal.response.beans.OrderItemDTO;
 import com.sorted.portal.response.beans.OrderItemReportsDTO;
@@ -42,16 +44,16 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static com.sorted.commons.enums.OrderStatus.*;
 
 /**
  * Controller class that handles order management operations including status changes,
@@ -70,6 +72,8 @@ public class ManageOrder_BLService {
     private final PorterUtility porterUtility;
     private final int defaultPage;
     private final int defaultSize;
+
+    private List<OrderStatus> sellerAllowedStatus = List.of(TRANSACTION_PROCESSED, ORDER_ACCEPTED, READY_FOR_PICK_UP, RIDER_ASSIGNED, OUT_FOR_DELIVERY, DELIVERED);
 
     /**
      * Constructor for ManageOrder_BLService with all required dependencies.
@@ -184,7 +188,7 @@ public class ManageOrder_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
             }
 
-            if (order_Details.getStatus() != OrderStatus.TRANSACTION_PROCESSED) {
+            if (order_Details.getStatus() != TRANSACTION_PROCESSED) {
                 log.warn("createOrder:: Invalid order status: {} for order ID: {}",
                         order_Details.getStatus(), req.getOrder_id());
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_ORDER_STATUS);
@@ -238,6 +242,7 @@ public class ManageOrder_BLService {
             if (users == null) {
                 log.warn("createOrder:: User not found with ID: {}", user_id);
                 // TODO: Handle missing user case
+                throw new CustomIllegalArgumentsException(ResponseCode.INTERNAL_SERVER_ERROR);
             }
 
             log.debug("createOrder:: Preparing order creation request for Porter");
@@ -379,9 +384,27 @@ public class ManageOrder_BLService {
                     log.debug("find:: Applying seller-specific filter for seller ID: {}",
                             usersBean.getSeller().getId());
                     filterOD.addClause(WhereClause.eq(Order_Details.Fields.seller_id, usersBean.getSeller().getId()));
+                    if (StringUtils.hasText(req.getOrder_status())) {
+                        OrderStatus orderStatus = OrderStatus.getByInternalStatus(req.getOrder_status());
+                        if (orderStatus == null || !sellerAllowedStatus.contains(orderStatus)) {
+                            log.warn("find:: Invalid status: {}", req.getOrder_status());
+                            throw new IllegalArgumentException("Invalid status");
+                        }
+                        log.debug("find:: Applying status filter: {}", orderStatus);
+                        filterOD.addClause(WhereClause.eq(Order_Details.Fields.status_id, orderStatus.getId()));
+                    }
                     break;
                 case SUPER_ADMIN:
                     log.debug("find:: User is SUPER_ADMIN, no seller-specific filter applied");
+                    if (StringUtils.hasText(req.getOrder_status())) {
+                        OrderStatus orderStatus = OrderStatus.getByInternalStatus(req.getOrder_status());
+                        if (orderStatus == null) {
+                            log.warn("find:: Invalid status: {}", req.getOrder_status());
+                            throw new IllegalArgumentException("Invalid status");
+                        }
+                        log.debug("find:: Applying status filter: {}", orderStatus);
+                        filterOD.addClause(WhereClause.eq(Order_Details.Fields.status_id, orderStatus.getId()));
+                    }
                     break;
                 default:
                     log.warn("find:: Access denied for user type: {}", usersBean.getRole().getUser_type());
@@ -394,15 +417,6 @@ public class ManageOrder_BLService {
                 filterOD.addClause(WhereClause.eq(Order_Details.Fields.code, req.getCode()));
             }
 
-            if (StringUtils.hasText(req.getOrder_status())) {
-                OrderStatus orderStatus = OrderStatus.getByInternalStatus(req.getOrder_status());
-                if (orderStatus == null) {
-                    log.warn("find:: Invalid status: {}", req.getOrder_status());
-                    throw new IllegalArgumentException("Invalid status");
-                }
-                log.debug("find:: Applying status filter: {}", orderStatus);
-                filterOD.addClause(WhereClause.eq(Order_Details.Fields.status_id, orderStatus.getId()));
-            }
 
             if (StringUtils.hasText(req.getFrom_date()) && StringUtils.hasText(req.getTo_date())) {
                 LocalDateTime from = LocalDate.parse(req.getFrom_date()).atTime(LocalTime.MIN);
@@ -468,12 +482,9 @@ public class ManageOrder_BLService {
      * @param request            The search request containing filter criteria
      * @param httpServletRequest The HTTP servlet request
      * @return A response containing the generated Excel file as bytes
-     * @throws FileExportUtils.ReflectionException If there's an error during file generation
-     * @throws IOException                         If there's an I/O error during file generation
      */
     @PostMapping("/order/report")
-    public SEResponse report(@RequestBody SERequest request, HttpServletRequest httpServletRequest)
-            throws FileExportUtils.ReflectionException, IOException {
+    public SEResponse report(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("report:: API started for order report generation");
         log.debug("report:: Request: {}", request);
 
@@ -574,6 +585,44 @@ public class ManageOrder_BLService {
             log.error("report:: Unexpected exception occurred", e);
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
+    }
+
+    @PostMapping("/order/accept-or-reject")
+    public SEResponse acceptOrReject(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+
+        OrderAcceptRejectRequest req = request.getGenericRequestDataObject(OrderAcceptRejectRequest.class);
+        CommonUtils.extractHeaders(httpServletRequest, req);
+        log.debug("report:: Validating user permissions for user ID: {}", req.getReq_user_id());
+        UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(),
+                Permission.EDIT, Activity.INVENTORY_MANAGEMENT);
+        // Apply user-specific filters based on role
+        if (!usersBean.getRole().getUser_type().equals(UserType.SELLER)) {
+            throw new AccessDeniedException();
+        }
+        Preconditions.check(StringUtils.hasText(req.getOrderId()), ResponseCode.MISSING_ORDER_ID);
+        SEFilter filterOD = new SEFilter(SEFilterType.AND);
+        filterOD.addClause(WhereClause.eq(Order_Details.Fields.seller_id, usersBean.getSeller().getId()));
+        filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getOrderId()));
+
+        Order_Details orderDetails = order_Details_Service.repoFindOne(filterOD);
+        if (orderDetails == null) {
+            throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+        }
+
+        if (!orderDetails.getStatus().equals(TRANSACTION_PROCESSED)) {
+            throw new CustomIllegalArgumentsException(ResponseCode.INVALID_ORDER_STATUS);
+        }
+
+        if (req.isAccepted()) {
+            orderDetails.setStatus(ORDER_ACCEPTED);
+        } else {
+            orderDetails.setStatus(ORDER_REJECTED);
+            orderDetails.setRejection_remarks(req.getRemark());
+        }
+
+        order_Details_Service.update(orderDetails.getId(), orderDetails, usersBean.getId());
+        return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
     }
 
     /**
