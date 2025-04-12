@@ -1,9 +1,15 @@
 package com.sorted.portal.service;
 
+import com.sorted.commons.exceptions.ExcelGenerationException;
+import com.sorted.portal.enums.ReportType;
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.CollectionUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
@@ -11,9 +17,10 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.*;
 
 /**
  * Utility class for generating Excel files from data collections.
@@ -379,4 +386,155 @@ public class ExcelGenerationUtility {
         }
         return Optional.empty();
     }
+
+    /**
+     * Generates an Excel report based on the provided data and report type
+     * with memory optimization and enhanced features
+     *
+     * @param data       The data to include in the report
+     * @param reportType The type of report to generate
+     * @param response   The HTTP response to write the Excel file to
+     * @throws IOException If an error occurs while writing the Excel file
+     */
+    public static <T> void generateExcelReport(List<T> data, ReportType reportType,
+                                               HttpServletResponse response) throws IOException {
+        if (CollectionUtils.isEmpty(data)) {
+            response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+            return;
+        }
+
+        // Set response headers for Excel download
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition",
+                "attachment; filename=" + reportType.getFileName());
+
+        // Use SXSSFWorkbook for memory optimization with large datasets
+        try (SXSSFWorkbook workbook = new SXSSFWorkbook(100)) { // 100 rows in memory, rest flushed to disk
+            SXSSFSheet sheet = workbook.createSheet(reportType.getSheetName());
+
+            // Create cell styles cache to avoid creating duplicate styles
+            Map<String, CellStyle> styles = createStyles(workbook);
+
+            // Create header row
+            Row headerRow = sheet.createRow(0);
+            List<String> headers = reportType.getHeaders();
+
+            for (int i = 0; i < headers.size(); i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers.get(i));
+                cell.setCellStyle(styles.get("header"));
+
+                // Set column width constraints to prevent excessive auto-sizing
+                sheet.setColumnWidth(i, 15 * 256); // 15 characters width as default
+            }
+
+            // Create data rows with optimized cell value setting
+            int rowNum = 1;
+            CellStyle dateStyle = styles.get("date");
+            CellStyle numberStyle = styles.get("number");
+
+            for (T item : data) {
+                Row row = sheet.createRow(rowNum++);
+                List<Object> rowData = reportType.getDataExtractor().apply(item);
+
+                for (int i = 0; i < rowData.size(); i++) {
+                    Cell cell = row.createCell(i);
+                    Object value = rowData.get(i);
+                    setCellValue(cell, value, dateStyle, numberStyle);
+                }
+
+                // Flush rows to disk every 1000 rows to optimize memory usage
+                if (rowNum % 1000 == 0) {
+                    sheet.flushRows(1000);
+                }
+            }
+
+            // Auto-size columns only if data size is reasonable
+            if (data.size() <= 5000) {
+                for (int i = 0; i < headers.size(); i++) {
+                    // Cast to SXSSFSheet to use the tracking method
+                    sheet.trackColumnForAutoSizing(i);
+                    sheet.autoSizeColumn(i);
+                    // Add a little extra width for better readability
+                    int currentWidth = sheet.getColumnWidth(i);
+                    sheet.setColumnWidth(i, (int) (currentWidth * 1.2));
+                }
+            }
+
+            // Write to response output stream and clean up temp files
+            workbook.write(response.getOutputStream());
+            workbook.dispose(); // Important for SXSSFWorkbook to clean up temp files
+        } catch (IOException e) {
+            // Log the error and throw a more specific exception
+            throw new ExcelGenerationException("Failed to generate Excel report", e);
+        }
+    }
+
+    /**
+     * Creates and caches common cell styles for reuse across the workbook
+     *
+     * @param workbook The workbook to create styles for
+     * @return Map of named styles
+     */
+    private static Map<String, CellStyle> createStyles(Workbook workbook) {
+        Map<String, CellStyle> styles = new HashMap<>();
+
+        // Header style
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font headerFont = workbook.createFont();
+        headerFont.setBold(true);
+        headerFont.setFontHeightInPoints((short) 12);
+        headerStyle.setFont(headerFont);
+        headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        headerStyle.setAlignment(HorizontalAlignment.CENTER);
+        headerStyle.setBorderBottom(BorderStyle.THIN);
+        styles.put("header", headerStyle);
+
+        // Date style
+        CellStyle dateStyle = workbook.createCellStyle();
+        CreationHelper createHelper = workbook.getCreationHelper();
+        dateStyle.setDataFormat(createHelper.createDataFormat().getFormat("dd-mm-yyyy"));
+        styles.put("date", dateStyle);
+
+        // Number style
+        CellStyle numberStyle = workbook.createCellStyle();
+        numberStyle.setDataFormat(createHelper.createDataFormat().getFormat("#,##0.00"));
+        styles.put("number", numberStyle);
+
+        return styles;
+    }
+
+    /**
+     * Sets cell value with appropriate formatting based on value type
+     *
+     * @param cell        The cell to set the value for
+     * @param value       The value to set
+     * @param dateStyle   Style for date values
+     * @param numberStyle Style for numeric values
+     */
+    private static void setCellValue(Cell cell, Object value, CellStyle dateStyle, CellStyle numberStyle) {
+        if (value == null) {
+            cell.setCellValue("");
+        } else if (value instanceof Number) {
+            double numValue = ((Number) value).doubleValue();
+            cell.setCellValue(numValue);
+            cell.setCellStyle(numberStyle);
+        } else if (value instanceof Boolean) {
+            cell.setCellValue((Boolean) value);
+        } else if (value instanceof Date) {
+            cell.setCellValue((Date) value);
+            cell.setCellStyle(dateStyle);
+        } else if (value instanceof LocalDate) {
+            cell.setCellValue(Date.from(((LocalDate) value).atStartOfDay(ZoneId.systemDefault()).toInstant()));
+            cell.setCellStyle(dateStyle);
+        } else if (value instanceof LocalDateTime) {
+            cell.setCellValue(Date.from(((LocalDateTime) value).atZone(ZoneId.systemDefault()).toInstant()));
+            cell.setCellStyle(dateStyle);
+        } else {
+            cell.setCellValue(value.toString());
+        }
+    }
+
+
 }

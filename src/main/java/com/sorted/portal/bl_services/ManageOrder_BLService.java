@@ -62,7 +62,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @RestController
-@RequestMapping("/change/status")
 public class ManageOrder_BLService {
 
     private final Order_Details_Service order_Details_Service;
@@ -105,7 +104,7 @@ public class ManageOrder_BLService {
      * @param httpServletRequest The HTTP servlet request
      * @return A response indicating the success or failure of the operation
      */
-    @PostMapping("/secure/return")
+    @PostMapping("/change/status/secure/return")
     public SEResponse initiateSecureReturn(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("initiateSecureReturn:: API started!");
 

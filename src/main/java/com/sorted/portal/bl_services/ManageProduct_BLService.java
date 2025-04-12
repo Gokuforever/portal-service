@@ -20,9 +20,18 @@ import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDetailsBuilder;
+import com.sorted.portal.enums.OrderItemsProperties;
+import com.sorted.portal.enums.OrderProperties;
+import com.sorted.portal.enums.ReportType;
 import com.sorted.portal.request.beans.FindProductBean;
+import com.sorted.portal.response.beans.OrderItemReportsDTO;
+import com.sorted.portal.response.beans.OrderReportDTO;
+import com.sorted.portal.service.ExcelGenerationUtility;
+import com.sorted.portal.service.FileGeneratorUtil;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.MultiValueMap;
@@ -422,7 +431,8 @@ public class ManageProduct_BLService {
         try {
             FindProductBean req = new FindProductBean();
             req.creatObj(filters, name, page, size);
-            return findProducts(httpServletRequest, req);
+            List<ProductDetailsBean> products = findProducts(httpServletRequest, req);
+            return SEResponse.getBasicSuccessResponseList(products, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
@@ -435,7 +445,8 @@ public class ManageProduct_BLService {
     public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
             FindProductBean req = request.getGenericRequestDataObject(FindProductBean.class);
-            return findProducts(httpServletRequest, req);
+            List<ProductDetailsBean> products = findProducts(httpServletRequest, req);
+            return SEResponse.getBasicSuccessResponseList(products, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
@@ -444,7 +455,42 @@ public class ManageProduct_BLService {
         }
     }
 
-    private SEResponse findProducts(HttpServletRequest httpServletRequest, FindProductBean req)
+    @PostMapping("/report")
+    public void report(@RequestBody SERequest request, HttpServletRequest httpServletRequest,
+                       HttpServletResponse response) {
+        try {
+            FindProductBean req = request.getGenericRequestDataObject(FindProductBean.class);
+            List<ProductDetailsBean> products = findProducts(httpServletRequest, req);
+
+            // Generate and send the report
+            ExcelGenerationUtility.generateExcelReport(products, ReportType.PRODUCT_DETAILED, response);
+        } catch (CustomIllegalArgumentsException ex) {
+            throw ex;
+        } catch (Exception e) {
+            log.error("product/report:: error occurred:: {}", e.getMessage());
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+    }
+
+
+    @NotNull
+    private static Map<String, FileGeneratorUtil.SheetConfig<?, ?>> getSheetConfigMap(
+            List<OrderReportDTO> orders, List<OrderItemReportsDTO> orderItemList) {
+        log.debug("getSheetConfigMap:: Creating sheet config for {} orders and {} order items",
+                orders.size(), orderItemList.size());
+
+        FileGeneratorUtil.SheetConfig<OrderReportDTO, OrderProperties> orderConfig =
+                new FileGeneratorUtil.SheetConfig<>(orders, OrderProperties.class);
+        FileGeneratorUtil.SheetConfig<OrderItemReportsDTO, OrderItemsProperties> orderItemsConfig =
+                new FileGeneratorUtil.SheetConfig<>(orderItemList, OrderItemsProperties.class);
+
+        Map<String, FileGeneratorUtil.SheetConfig<?, ?>> sheetConfigMap = new HashMap<>();
+        sheetConfigMap.put("Orders", orderConfig);
+        sheetConfigMap.put("Order Items", orderItemsConfig);
+        return sheetConfigMap;
+    }
+
+    private List<ProductDetailsBean> findProducts(HttpServletRequest httpServletRequest, FindProductBean req)
             throws JsonProcessingException {
         CommonUtils.extractHeaders(httpServletRequest, req);
         UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.PRODUCTS,
@@ -456,14 +502,12 @@ public class ManageProduct_BLService {
 
         List<Products> listP = productService.repoFind(filterSE);
         if (CollectionUtils.isEmpty(listP)) {
-            return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+            return Collections.emptyList();
         }
 
         Map<String, String> mapImg = this.filterAndFetchImgMap(listP);
 
-        List<ProductDetailsBean> resList = this.convertToBean(null, listP, mapImg);
-
-        return SEResponse.getBasicSuccessResponseList(resList, ResponseCode.SUCCESSFUL);
+        return this.convertToBean(null, listP, mapImg);
     }
 
     @PostMapping("/delete")
