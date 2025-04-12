@@ -1,5 +1,6 @@
 package com.sorted.portal.razorpay;
 
+import com.sorted.commons.entity.mongo.Order_Details;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -73,6 +74,18 @@ public class RazorpayUtility {
 		options.put("razorpay_signature", signature);
 		return Utils.verifyPaymentSignature(options, rzr_secret);
 
+	}
+
+	public void refund(Order_Details orderDetails) throws RazorpayException {
+		RazorpayClient razorpay = new RazorpayClient(rzr_key, rzr_secret);
+		JSONObject instantRefundRequest = new JSONObject();
+		instantRefundRequest.put("amount", orderDetails.getTotal_amount());
+		instantRefundRequest.put("speed", "optimum");
+		instantRefundRequest.put("receipt", "Receipt No. 31");
+		instantRefundRequest.put("notes", "Receipt No. 31");
+
+
+//		razorpay.refunds.create();
 	}
 
 }

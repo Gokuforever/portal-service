@@ -6,6 +6,7 @@ import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Order_Item_Service;
+import com.sorted.commons.entity.service.ProductService;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.AccessDeniedException;
@@ -68,6 +69,7 @@ public class ManageOrder_BLService {
 
     private final Order_Details_Service order_Details_Service;
     private final Order_Item_Service order_Item_Service;
+    private final ProductService productService;
     private final Users_Service users_Service;
     private final PorterUtility porterUtility;
     private final int defaultPage;
@@ -87,13 +89,14 @@ public class ManageOrder_BLService {
      */
     public ManageOrder_BLService(
             Order_Details_Service order_Details_Service,
-            Order_Item_Service order_Item_Service,
+            Order_Item_Service order_Item_Service, ProductService productService,
             Users_Service users_Service,
             PorterUtility porterUtility,
             @Value("${se.default.page}") int defaultPage,
             @Value("${se.default.size}") int defaultSize) {
         this.order_Details_Service = order_Details_Service;
         this.order_Item_Service = order_Item_Service;
+        this.productService = productService;
         this.users_Service = users_Service;
         this.porterUtility = porterUtility;
         this.defaultPage = defaultPage;
@@ -461,9 +464,17 @@ public class ManageOrder_BLService {
                     .collect(Collectors.groupingBy(Order_Item::getOrder_id,
                             Collectors.mapping(Function.identity(), Collectors.toList())));
 
+            List<String> productIds = orderItems.stream().map(Order_Item::getProduct_id).toList();
+
+            SEFilter filterP = new SEFilter(SEFilterType.AND);
+            filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productIds));
+
+            Map<String, Products> mapP = productService.repoFind(filterP).stream().collect(Collectors.toMap(Products::getId, products -> products));
+
+
             // Convert to response beans
             List<FindOrderResBean> resList = ordersList.stream()
-                    .map(order -> this.entToBean(order, mapOI))
+                    .map(order -> this.entToBean(order, mapOI, mapP))
                     .toList();
 
             log.info("find:: API completed successfully, returning {} orders", resList.size());
@@ -621,6 +632,8 @@ public class ManageOrder_BLService {
         } else {
             orderDetails.setStatus(ORDER_REJECTED);
             orderDetails.setRejection_remarks(req.getRemark());
+
+
         }
 
         order_Details_Service.update(orderDetails.getId(), orderDetails, usersBean.getId());
@@ -658,12 +671,12 @@ public class ManageOrder_BLService {
      * @param mapOI         Map of order items
      * @return FindOneResponseBean
      */
-    private FindOrderResBean entToBean(Order_Details order_Details, Map<String, List<Order_Item>> mapOI) {
+    private FindOrderResBean entToBean(Order_Details order_Details, Map<String, List<Order_Item>> mapOI, Map<String, Products> mapP) {
         return FindOrderResBean.builder().id(order_Details.getId()).code(order_Details.getCode())
                 .status(order_Details.getStatus().getInternal_status())
                 .transaction_id(order_Details.getTransaction_id()).total_amount(order_Details.getTotal_amount())
                 .pickup_address(order_Details.getPickup_address()).delivery_address(order_Details.getDelivery_address())
-                .orderItems(mapOI.get(order_Details.getId()).stream().map(this::entToBean).toList())
+                .orderItems(mapOI.get(order_Details.getId()).stream().map(orderItem -> this.entToBean(orderItem, mapP)).toList())
                 .creation_date_str(order_Details.getCreation_date_str())
                 .build();
     }
@@ -675,8 +688,11 @@ public class ManageOrder_BLService {
      * @return OrderItemDTO
      */
 
-    private OrderItemDTO entToBean(Order_Item orderItem) {
+    private OrderItemDTO entToBean(Order_Item orderItem, Map<String, Products> mapP) {
+
+        Products products = mapP.getOrDefault(orderItem.getProduct_id(), null);
         return OrderItemDTO.builder().id(orderItem.getId()).product_id(orderItem.getProduct_id())
+                .product_name(products == null ? "" : products.getName()).product_image(products == null || products.getMedia() == null ? "" : products.getMedia().get(0).getKey())
                 .product_code(orderItem.getProduct_code()).quantity(orderItem.getQuantity()).total_cost(orderItem.getTotal_cost())
                 .selling_price(orderItem.getSelling_price()).type(orderItem.getType()).status(orderItem.getStatus())
                 .status_id(orderItem.getStatus_id())
