@@ -197,7 +197,7 @@ public class ManageOrder_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
             }
 
-            if (order_Details.getStatus() != TRANSACTION_PROCESSED) {
+            if (order_Details.getStatus() != ORDER_ACCEPTED) {
                 log.warn("createOrder:: Invalid order status: {} for order ID: {}",
                         order_Details.getStatus(), req.getOrder_id());
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_ORDER_STATUS);
