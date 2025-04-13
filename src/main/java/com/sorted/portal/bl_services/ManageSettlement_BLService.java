@@ -59,7 +59,7 @@ public class ManageSettlement_BLService {
         FindSettlementBean req = request.getGenericRequestDataObject(FindSettlementBean.class);
         CommonUtils.extractHeaders(httpServletRequest, req);
 
-        UsersBean usersBean = usersService.validateUserForActivity(req, Permission.EDIT, Activity.SETTLEMENT);
+        UsersBean usersBean = usersService.validateUserForActivity(req, Permission.VIEW, Activity.SETTLEMENT);
         if (usersBean == null) {
             throw new AccessDeniedException();
         }
