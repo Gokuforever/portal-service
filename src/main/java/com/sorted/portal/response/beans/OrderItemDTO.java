@@ -1,6 +1,6 @@
 package com.sorted.portal.response.beans;
 
-import com.sorted.commons.beans.Refund_Details;
+import com.sorted.commons.beans.Return_Details;
 import com.sorted.commons.enums.OrderStatus;
 import com.sorted.commons.enums.PurchaseType;
 import lombok.Builder;
@@ -21,5 +21,5 @@ public class OrderItemDTO {
     private Integer status_id;
     private OrderStatus status;
     private LocalDateTime return_date;
-    private Refund_Details refund_details;
+    private Return_Details return_details;
 }
