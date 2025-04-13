@@ -18,9 +18,11 @@ import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.Preconditions;
 import com.sorted.commons.utils.SERegExpUtils;
+import com.sorted.portal.request.beans.BlankReqBean;
 import com.sorted.portal.request.beans.FindSettlementBean;
 import com.sorted.portal.request.beans.SettlementReqBean;
 import com.sorted.portal.response.beans.FindSettlementResponse;
+import com.sorted.portal.response.beans.SettlementAnalyticsResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -32,7 +34,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.sorted.commons.enums.OrderStatus.*;
 
@@ -51,6 +56,55 @@ public class ManageSettlement_BLService {
         this.usersService = usersService;
         this.fileUploadDetailsService = fileUploadDetailsService;
         this.orderDetailsService = orderDetailsService;
+    }
+
+    @PostMapping("/settlement/analytics")
+    public SEResponse analytics(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+        log.info("/settlement/find:: API started");
+        BlankReqBean req = request.getGenericRequestDataObject(BlankReqBean.class);
+        CommonUtils.extractHeaders(httpServletRequest, req);
+
+        UsersBean usersBean = usersService.validateUserForActivity(req, Permission.VIEW, Activity.SETTLEMENT);
+        if (usersBean == null) {
+            throw new AccessDeniedException();
+        }
+
+        AggregationFilter.SEFilter filter = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
+        switch (usersBean.getRole().getUser_type()) {
+            case SELLER:
+                filter.addClause(AggregationFilter.WhereClause.eq(Order_Details.Fields.seller_id, usersBean.getSeller().getId()));
+            case SUPER_ADMIN:
+                break;
+            default:
+                throw new AccessDeniedException();
+        }
+        filter.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filter.addClause(AggregationFilter.WhereClause.in(Order_Details.Fields.status_id, List.of(DELIVERED.getId(), OUT_FOR_DELIVERY.getId(),
+                READY_FOR_PICK_UP.getId(), RIDER_ASSIGNED.getId(), ORDER_ACCEPTED.getId())));
+
+        List<Order_Details> orderDetails = orderDetailsService.repoFind(filter);
+        if (CollectionUtils.isEmpty(orderDetails)) {
+            return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+        }
+
+        // Split orders into paid and unpaid with a single pass
+        Map<Boolean, List<Order_Details>> ordersByPayoutStatus = orderDetails.stream()
+                .collect(Collectors.partitioningBy(order -> Boolean.TRUE.equals(order.getIs_payout_done())));
+
+        List<Order_Details> paidOrders = ordersByPayoutStatus.get(true);
+        List<Order_Details> unpaidOrders = ordersByPayoutStatus.get(false);
+
+        // Calculate earning and pendingRevenue directly with sum operations
+        BigDecimal paid = paidOrders.stream()
+                .map(order -> order.getSettlement_details().getAmount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal unpaid = unpaidOrders.stream()
+                .map(order -> CommonUtils.calculateFees(order.getTotal_amount(), 10).cost())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        SettlementAnalyticsResponse response = new SettlementAnalyticsResponse(paid, unpaid);
+        return SEResponse.getBasicSuccessResponseObject(response, ResponseCode.SUCCESSFUL);
     }
 
     @PostMapping("/settlement/find")
