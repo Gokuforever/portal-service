@@ -1,5 +1,6 @@
 package com.sorted.portal.bl_services;
 
+import com.sorted.commons.beans.FeeResult;
 import com.sorted.commons.beans.SettlementDetails;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
@@ -33,6 +34,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
+import static com.sorted.commons.enums.OrderStatus.*;
+
 @Slf4j
 @RestController
 public class ManageSettlement_BLService {
@@ -40,6 +43,7 @@ public class ManageSettlement_BLService {
     private final Users_Service usersService;
     private final File_Upload_Details_Service fileUploadDetailsService;
     private final Order_Details_Service orderDetailsService;
+    private final static int fee_percentage = 10;
 
     public ManageSettlement_BLService(Users_Service usersService,
                                       File_Upload_Details_Service fileUploadDetailsService,
@@ -49,7 +53,7 @@ public class ManageSettlement_BLService {
         this.orderDetailsService = orderDetailsService;
     }
 
-    @PostMapping("/find")
+    @PostMapping("/settlement/find")
     public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("/settlement/find:: API started");
         FindSettlementBean req = request.getGenericRequestDataObject(FindSettlementBean.class);
@@ -78,7 +82,8 @@ public class ManageSettlement_BLService {
         }
 
         filter.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        filter.addClause(AggregationFilter.WhereClause.in(Order_Details.Fields.status_id, List.of(OrderStatus.DELIVERED.getId())));
+        filter.addClause(AggregationFilter.WhereClause.in(Order_Details.Fields.status_id, List.of(DELIVERED.getId(), OUT_FOR_DELIVERY.getId(),
+                READY_FOR_PICK_UP.getId(), RIDER_ASSIGNED.getId(), ORDER_ACCEPTED.getId())));
 
         List<Order_Details> orderDetails = orderDetailsService.repoFind(filter);
         if (CollectionUtils.isEmpty(orderDetails)) {
@@ -90,17 +95,19 @@ public class ManageSettlement_BLService {
                         .orderId(order.getId())
                         .orderCode(order.getCode())
                         .amount(CommonUtils.paiseToRupee(order.getTotal_amount()))
-                        .feeAndCost(CommonUtils.calculateFees(order.getTotal_amount(), 10))
-                        .expectedPayoutDate(order.getCreation_date().plusDays(2).toLocalDate().toString())
+                        .feeAndCost(CommonUtils.calculateFees(order.getTotal_amount(), fee_percentage))
+                        .expectedPayoutDate(order.getOrder_status_history().stream()
+                                .filter(orderStatusHistory -> orderStatusHistory.getStatus().equals(ORDER_ACCEPTED))
+                                .findFirst().get().getModification_date().plusDays(7).toLocalDate().toString())
                         .actualPayoutDate(Boolean.TRUE.equals(order.getIs_payout_done()) ? order.getSettlement_details().getTxnDate() : null)
-                        .status(order.getIs_payout_done())
+                        .status(Boolean.TRUE.equals(order.getIs_payout_done()))
                         .build()
         ).toList();
         return SEResponse.getBasicSuccessResponseList(responseList, ResponseCode.SUCCESSFUL);
     }
 
     @PostMapping("/settle")
-    public void settle(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+    public SEResponse settle(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("settlement:: API started");
         SettlementReqBean req = request.getGenericRequestDataObject(SettlementReqBean.class);
         CommonUtils.extractHeaders(httpServletRequest, req);
@@ -185,9 +192,10 @@ public class ManageSettlement_BLService {
         }
 
         // Validate settlement amount
-        Long settlementAmount = CommonUtils.rupeeToPaise(settlementDetails.getAmount());
-        Preconditions.check(settlementAmount.compareTo(orderDetails.getTotal_amount()) == 0,
-                ResponseCode.AMOUNT_VALIDATION_FAILED);
+        Long costInPaise = CommonUtils.calculateFees(orderDetails.getTotal_amount(), fee_percentage).costInPaise();
+        Long settlementAmount = CommonUtils.rupeeToPaise(req.getSettlementDetails().getAmount());
+        Preconditions.check(costInPaise.compareTo(settlementAmount) == 0, ResponseCode.AMOUNT_VALIDATION_FAILED);
+
 
         SettlementDetails details = new SettlementDetails(settlementDetails);
 
@@ -197,6 +205,7 @@ public class ManageSettlement_BLService {
 
         orderDetailsService.update(orderDetails.getId(), orderDetails, usersBean.getId());
         log.info("Settlement successful for order ID: {}", req.getOrderId());
+        return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
     }
 
 }
