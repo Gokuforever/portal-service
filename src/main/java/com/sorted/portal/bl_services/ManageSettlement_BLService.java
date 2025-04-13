@@ -125,8 +125,10 @@ public class ManageSettlement_BLService {
 
         // Validate Payment Mode specific fields
         switch (settlementDetails.getPaymentMode()) {
-            case UPI ->
-                    Preconditions.check(StringUtils.isNoneBlank(settlementDetails.getVpa()), ResponseCode.MISSING_VPA);
+            case UPI -> {
+                Preconditions.check(StringUtils.isNoneBlank(settlementDetails.getVpa()), ResponseCode.MISSING_VPA);
+                Preconditions.check(StringUtils.isNoneBlank(settlementDetails.getTxnId()), ResponseCode.MISSING_TRANSACTION_ID);
+            }
             case IMPS, NEFT, RTGS -> {
                 Preconditions.check(StringUtils.isNoneBlank(settlementDetails.getAccountNumber()), ResponseCode.MISSING_ACCOUNT_NUMBER);
                 Preconditions.check(StringUtils.isNoneBlank(settlementDetails.getIfscCode()), ResponseCode.MISSING_IFSC_CODE);
