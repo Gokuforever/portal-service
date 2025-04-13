@@ -1,5 +1,7 @@
 package com.sorted.portal.bl_services;
 
+import com.razorpay.RazorpayException;
+import com.razorpay.Refund;
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.beans.UsersBean;
@@ -28,6 +30,7 @@ import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.Preconditions;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
+import com.sorted.portal.razorpay.RazorpayUtility;
 import com.sorted.portal.request.beans.CreateDeliveryBean;
 import com.sorted.portal.request.beans.FindOrderReqBean;
 import com.sorted.portal.request.beans.OrderAcceptRejectRequest;
@@ -40,6 +43,7 @@ import com.sorted.portal.service.FileGeneratorUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -74,8 +78,9 @@ public class ManageOrder_BLService {
     private final PorterUtility porterUtility;
     private final int defaultPage;
     private final int defaultSize;
+    private final RazorpayUtility razorpayUtility;
 
-    private List<OrderStatus> sellerAllowedStatus = List.of(TRANSACTION_PROCESSED, ORDER_ACCEPTED, READY_FOR_PICK_UP, RIDER_ASSIGNED, OUT_FOR_DELIVERY, DELIVERED);
+    private final List<OrderStatus> sellerAllowedStatus = List.of(TRANSACTION_PROCESSED, ORDER_ACCEPTED, READY_FOR_PICK_UP, RIDER_ASSIGNED, OUT_FOR_DELIVERY, DELIVERED);
 
     /**
      * Constructor for ManageOrder_BLService with all required dependencies.
@@ -93,7 +98,7 @@ public class ManageOrder_BLService {
             Users_Service users_Service,
             PorterUtility porterUtility,
             @Value("${se.default.page}") int defaultPage,
-            @Value("${se.default.size}") int defaultSize) {
+            @Value("${se.default.size}") int defaultSize, RazorpayUtility razorpayUtility) {
         this.order_Details_Service = order_Details_Service;
         this.order_Item_Service = order_Item_Service;
         this.productService = productService;
@@ -101,6 +106,7 @@ public class ManageOrder_BLService {
         this.porterUtility = porterUtility;
         this.defaultPage = defaultPage;
         this.defaultSize = defaultSize;
+        this.razorpayUtility = razorpayUtility;
     }
 
     /**
@@ -601,7 +607,7 @@ public class ManageOrder_BLService {
     }
 
     @PostMapping("/order/accept-or-reject")
-    public SEResponse acceptOrReject(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+    public SEResponse acceptOrReject(@RequestBody SERequest request, HttpServletRequest httpServletRequest) throws RazorpayException {
 
         OrderAcceptRejectRequest req = request.getGenericRequestDataObject(OrderAcceptRejectRequest.class);
         CommonUtils.extractHeaders(httpServletRequest, req);
@@ -628,14 +634,50 @@ public class ManageOrder_BLService {
         }
 
         if (req.isAccepted()) {
-            orderDetails.setStatus(ORDER_ACCEPTED);
-        } else {
-            orderDetails.setStatus(ORDER_REJECTED);
-            orderDetails.setRejection_remarks(req.getRemark());
-
-
+            orderDetails.setStatus(ORDER_ACCEPTED, usersBean.getId());
+            order_Details_Service.update(orderDetails.getId(), orderDetails, usersBean.getId());
+            //TODO: send notification mail and sms to seller
+            return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
         }
 
+        orderDetails.setStatus(ORDER_REJECTED, usersBean.getId());
+        orderDetails.setRejection_remarks(req.getRemark());
+        order_Details_Service.update(orderDetails.getId(), orderDetails, usersBean.getId());
+
+        Refund refund = razorpayUtility.refund(orderDetails.getTransaction_id(), orderDetails.getTotal_amount());
+        if (refund == null) {
+            orderDetails.setStatus(PENDING_REFUND, usersBean.getId());
+            // TODO: initiate internal email
+            // TODO: notify customer about rejection and pending refund request
+            order_Details_Service.update(orderDetails.getId(), orderDetails, usersBean.getId());
+            return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
+        }
+
+
+        JSONObject json = refund.toJson();
+        String status = json.get("status").toString();
+        RazorpayRefundStatus refundStatus;
+        try {
+            refundStatus = RazorpayRefundStatus.valueOf(status);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        switch (refundStatus) {
+            case failed:
+                // TODO: trigger email to studeaze informing about this failure
+                orderDetails.setStatus(REFUND_FAILED, usersBean.getId());
+                break;
+            case pending:
+                // TODO: trigger email and text message to customer informing about 5-7 business days.
+                orderDetails.setStatus(REFUND_REQUESTED, usersBean.getId());
+                orderDetails.setRefund_transaction_id(json.get("id").toString());
+                break;
+            case processed:
+                // TODO: trigger email and text to customer informing refund is processed
+                orderDetails.setStatus(FULLY_REFUNDED, usersBean.getId());
+                orderDetails.setRefund_transaction_id(json.get("id").toString());
+                break;
+        }
         order_Details_Service.update(orderDetails.getId(), orderDetails, usersBean.getId());
         return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
     }
