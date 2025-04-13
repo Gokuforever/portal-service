@@ -224,7 +224,7 @@ public class ManageTransaction_BLService {
             }
             order.setSeller_id(seller_id);
             order.setTotal_amount(totalSum);
-            order.setStatus(OrderStatus.ORDER_PLACED);
+            order.setStatus(OrderStatus.ORDER_PLACED, usersBean.getId());
             order.setStatus_id(OrderStatus.ORDER_PLACED.getId());
             Order_Status_History order_history = Order_Status_History.builder().status(OrderStatus.ORDER_PLACED)
                     .modification_date(LocalDateTime.now()).modified_by(usersBean.getId()).build();
