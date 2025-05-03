@@ -116,5 +116,6 @@ jobs:
           --name portal-service \
           --restart always \
           -p 8080:8080 \
+          -e SE_ENV=/app/config \
           -v /home/ubuntu/studeaze/config:/app/config \
           ghcr.io/gokuforever/portal-service:latest 
