@@ -1,0 +1,32 @@
+# Git
+.git
+.github
+.gitignore
+
+# Maven
+target/*
+!target/*.jar
+.mvn
+mvnw
+mvnw.cmd
+
+# IDE files
+.idea
+.vscode
+*.iml
+.classpath
+.project
+.settings
+.factorypath
+
+# Logs
+logs
+*.log
+
+# Temporary files
+tmp
+temp
+
+# Documentation
+README.md
+*.md 

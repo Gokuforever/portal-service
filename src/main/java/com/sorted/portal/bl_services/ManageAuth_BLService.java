@@ -20,6 +20,7 @@ import com.sorted.commons.manage.otp.ManageOtp;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.PasswordValidatorUtils;
 import com.sorted.commons.utils.SERegExpUtils;
+import com.sorted.portal.annotation.RateLimited;
 import com.sorted.portal.request.beans.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -56,6 +57,7 @@ public class ManageAuth_BLService {
     }
 
     @PostMapping("/signin")
+    @RateLimited(value = 5.0) // 5 requests per second
     public SEResponse signin(@RequestBody SERequest request) {
         try {
             LoginBean req = request.getGenericRequestDataObject(LoginBean.class);
@@ -78,6 +80,7 @@ public class ManageAuth_BLService {
     }
 
     @PostMapping("/verifyOtp")
+    @RateLimited(value = 5.0)
     public SEResponse verifyOtp(@RequestBody SERequest request) {
         try {
             log.info("auth/verifyOtp:: API started!");
@@ -110,6 +113,7 @@ public class ManageAuth_BLService {
     }
 
     @PostMapping("/resendOtp")
+    @RateLimited(value = 5.0)
     public SEResponse resendOtp(@RequestBody SERequest request) {
         try {
             log.info("auth/resendOtp:: API started!");
@@ -143,6 +147,7 @@ public class ManageAuth_BLService {
     }
 
     @PostMapping("/forgotPass")
+    @RateLimited(value = 5.0)
     public SEResponse forgotPass(@RequestBody SERequest request) {
         try {
             ForgotPassBean req = request.getGenericRequestDataObject(ForgotPassBean.class);
@@ -181,6 +186,7 @@ public class ManageAuth_BLService {
     }
 
     @PostMapping("/forgotPass/verifyOtp")
+    @RateLimited(value = 5.0)
     public SEResponse forgotpassVerifyOtp(@RequestBody SERequest request) {
         try {
             log.info("auth/forgotpass/verifyOtp:: API started!");

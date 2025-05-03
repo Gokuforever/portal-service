@@ -46,6 +46,7 @@ import java.util.*;
 import java.util.Map.Entry;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @RestController
@@ -64,6 +65,9 @@ public class ManageProduct_BLService {
     private final GoogleDriveService googleDriveService;
     private final int defaultPage;
     private final int defaultSize;
+    private final Map<String, Category_Master> categoryMasterCache = new ConcurrentHashMap<>();
+    private static final long CACHE_EXPIRY_TIME = 30 * 60 * 1000; // 30 minutes
+    private long lastCacheClearTime = System.currentTimeMillis();
 
     public ManageProduct_BLService(GoogleDriveService googleDriveService, ProductService productService, Cart_Service cart_Service,
                                    Varient_Mapping_Service varient_Mapping_Service, Category_MasterService category_MasterService,
@@ -156,34 +160,32 @@ public class ManageProduct_BLService {
                 }
             }
 
-            List<Products> listP = new ArrayList<>();
+            List<Products> listP = products.parallelStream()
+                .map(productReqBean -> {
+                    List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(productReqBean, mapSC);
+                    this.validateMandatorySubCategories(category_Master, listSC);
+                    BigDecimal mrp = new BigDecimal(productReqBean.getMrp());
+                    BigDecimal sp = new BigDecimal(productReqBean.getSelling_price());
+                    Products product = new Products();
+                    product.setName(productReqBean.getName());
+                    product.setMrp(CommonUtils.rupeeToPaise(mrp));
+                    product.setSelling_price(CommonUtils.rupeeToPaise(sp));
+                    product.setSelected_sub_catagories(listSC);
+                    product.setSeller_id(seller.getId());
+                    product.setSeller_code(seller.getCode());
+                    product.setCategory_id(category_Master.getId());
+                    product.setQuantity(Long.valueOf(productReqBean.getQuantity()));
+                    product.setDescription(
+                            StringUtils.hasText(productReqBean.getDescription()) ? productReqBean.getDescription() : null);
 
-            for (ProductReqBean productReqBean : products) {
-                List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(productReqBean, mapSC);
-                this.validateMandatorySubCategories(category_Master, listSC);
-                BigDecimal mrp = new BigDecimal(productReqBean.getMrp());
-                BigDecimal sp = new BigDecimal(productReqBean.getSelling_price());
-                Products product = new Products();
-                product.setName(productReqBean.getName());
-                product.setMrp(CommonUtils.rupeeToPaise(mrp));
-                product.setSelling_price(CommonUtils.rupeeToPaise(sp));
-                product.setSelected_sub_catagories(listSC);
-                product.setSeller_id(seller.getId());
-                product.setSeller_code(seller.getCode());
-                product.setCategory_id(category_Master.getId());
-                product.setQuantity(Long.valueOf(productReqBean.getQuantity()));
-//				product.setVarient_mapping_id(varient_mapping_id);
-                product.setDescription(
-                        StringUtils.hasText(productReqBean.getDescription()) ? productReqBean.getDescription() : null);
-
-                if (!CollectionUtils.isEmpty(productReqBean.getMedia())) {
-                    List<Media> listMedia = productReqBean.getMedia().stream()
-                            .filter(e -> StringUtils.hasText(e.getDocument_id())).toList();
-                    product.setMedia(listMedia);
-                }
-
-                listP.add(product);
-            }
+                    if (!CollectionUtils.isEmpty(productReqBean.getMedia())) {
+                        List<Media> listMedia = productReqBean.getMedia().stream()
+                                .filter(e -> StringUtils.hasText(e.getDocument_id())).toList();
+                        product.setMedia(listMedia);
+                    }
+                    return product;
+                })
+                .collect(Collectors.toList());
 
             productService.bulkCreate(listP, usersBean.getId());
 
@@ -702,33 +704,35 @@ public class ManageProduct_BLService {
         Set<String> imageIds = listP.stream()
                 .filter(products -> products.getMedia() != null && !products.getMedia().isEmpty())
                 .flatMap(products -> products.getMedia().stream().map(Media::getDocument_id))
+                .filter(StringUtils::hasText)
                 .collect(Collectors.toSet());
 
-        // Initialize maps for file upload details and images
-        Map<String, String> mapFUD = new HashMap<>();
-        Map<String, String> mapImg = new HashMap<>();
+        if (CollectionUtils.isEmpty(imageIds)) {
+            return new HashMap<>();
+        }
 
-        // Process only if imageIds list is not empty
-        if (!CollectionUtils.isEmpty(imageIds)) {
-            // Create a filter to retrieve file upload details based on image IDs
+        // Batch process file upload details
+        int batchSize = 100; // Process in batches of 100
+        Map<String, String> mapFUD = new HashMap<>();
+        
+        List<String> imageIdList = new ArrayList<>(imageIds);
+        for (int i = 0; i < imageIdList.size(); i += batchSize) {
+            List<String> batch = imageIdList.subList(i, Math.min(i + batchSize, imageIdList.size()));
+            
             SEFilter filterFUD = new SEFilter(SEFilterType.AND);
-            filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(imageIds)));
+            filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, batch));
             filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
-            // Retrieve file upload details
             List<File_Upload_Details> listFUD = file_Upload_Details_Service.repoFind(filterFUD);
-
-            // Populate mapFUD if file upload details list is not empty
             if (!CollectionUtils.isEmpty(listFUD)) {
-                mapFUD = listFUD.stream()
-                        .collect(Collectors.toMap(File_Upload_Details::getId, File_Upload_Details::getDocument_id));
+                listFUD.forEach(fud -> mapFUD.put(fud.getId(), fud.getDocument_id()));
             }
-
-            // Map the image IDs that have corresponding entries in mapFUD
-            mapImg.putAll(imageIds.stream().filter(mapFUD::containsKey) // Only consider IDs present in mapFUD
-                    .collect(Collectors.toMap(id -> id, mapFUD::get))); // Map image ID to corresponding document ID
         }
-        return mapImg;
+
+        // Map the image IDs that have corresponding entries in mapFUD
+        return imageIds.stream()
+                .filter(mapFUD::containsKey)
+                .collect(Collectors.toMap(id -> id, mapFUD::get));
     }
 
     private SEFilter createFilterForProductList(FindProductBean req, UsersBean usersBean)
@@ -1032,6 +1036,18 @@ public class ManageProduct_BLService {
     }
 
     private Category_Master getCategoryMaster(String categoryId) {
+        // Clear cache if expired
+        if (System.currentTimeMillis() - lastCacheClearTime > CACHE_EXPIRY_TIME) {
+            categoryMasterCache.clear();
+            lastCacheClearTime = System.currentTimeMillis();
+        }
+
+        // Try to get from cache first
+        Category_Master cached = categoryMasterCache.get(categoryId);
+        if (cached != null) {
+            return cached;
+        }
+
         SEFilter filterC = new SEFilter(SEFilterType.AND);
         filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, categoryId));
         filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -1040,6 +1056,9 @@ public class ManageProduct_BLService {
         if (categoryMaster == null) {
             throw new CustomIllegalArgumentsException(ResponseCode.CATEGORY_NOT_FOUND);
         }
+
+        // Cache the result
+        categoryMasterCache.put(categoryId, categoryMaster);
         return categoryMaster;
     }
 
