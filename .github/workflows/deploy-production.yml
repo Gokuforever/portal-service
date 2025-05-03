@@ -104,8 +104,8 @@ jobs:
         # Ensure config directory exists
         mkdir -p /home/ubuntu/studeaze/config
         
-        # Verify files in config directory
-        echo "Files in config directory:"
+        # Check if the files exist
+        echo "Checking files in /home/ubuntu/studeaze/config:"
         ls -la /home/ubuntu/studeaze/config/
         
         # Stop and remove existing container if it exists
@@ -131,4 +131,8 @@ jobs:
         
         # Check if files are visible inside the container
         echo "Files inside container:"
-        docker exec portal-service ls -la /app/config || echo "Failed to list files in container" 
+        docker exec portal-service ls -la /app/config/ || echo "Failed to list files in container"
+        
+        # Check if the specific file is visible inside the container
+        echo "Checking if portal-prod.properties exists inside container:"
+        docker exec portal-service ls -la /app/config/portal-prod.properties || echo "File not found in container" 
