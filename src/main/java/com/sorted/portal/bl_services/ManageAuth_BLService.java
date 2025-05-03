@@ -68,7 +68,7 @@ public class ManageAuth_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PASS);
             }
             OTPResponse response = users_Service.validateUserForLogin(req.getMobile_no(), req.getPassword());
-            log.info("signin:: API ended");
+            log.info("signin:: API ended.");
             return SEResponse.getBasicSuccessResponseObject(response, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
