@@ -58,6 +58,9 @@ jobs:
         # Add current user to docker group
         sudo usermod -aG docker $USER
         
+        # Fix Docker socket permissions
+        sudo chmod 666 /var/run/docker.sock
+        
         # Verify Docker installation
         docker --version
     
