@@ -110,7 +110,7 @@ jobs:
         # Check if the files exist
         echo "*** Step 2: Listing files in config directory ***"
         echo "Files in /home/ubuntu/studeaze/config:"
-        ls -la /home/ubuntu/studeaze/config/ || echo "Error listing files"
+        ls /home/ubuntu/studeaze/config/ || echo "Error listing files"
         
         # Stop and remove existing container if it exists
         echo "*** Step 3: Stopping existing container ***"
