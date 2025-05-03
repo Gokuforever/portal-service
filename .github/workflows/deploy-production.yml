@@ -81,7 +81,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ghcr.io/${{ github.repository_owner }}/portal-service
+        images: ghcr.io/gokuforever/portal-service
         tags: |
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
@@ -109,7 +109,7 @@ jobs:
         docker rm portal-service || true
         
         # Pull latest image
-        docker pull ghcr.io/${{ github.repository_owner }}/portal-service:latest
+        docker pull ghcr.io/gokuforever/portal-service:latest
         
         # Run the container with proper configuration
         docker run -d \
@@ -117,4 +117,4 @@ jobs:
           --restart always \
           -p 8080:8080 \
           -v /home/ubuntu/studeaze/config:/app/config \
-          ghcr.io/${{ github.repository_owner }}/portal-service:latest 
+          ghcr.io/gokuforever/portal-service:latest 
