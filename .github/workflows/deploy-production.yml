@@ -128,7 +128,7 @@ jobs:
         docker run -d \
           --name portal-service \
           --restart always \
-          -p 8080:8080 \
+          -p 443:443 \
           -e SE_ENV=/app/config \
           -e SPRING_PROFILES_ACTIVE=prod \
           --mount type=bind,source=/home/ubuntu/studeaze/config,target=/app/config \
