@@ -104,6 +104,10 @@ jobs:
         # Ensure config directory exists
         mkdir -p /home/ubuntu/studeaze/config
         
+        # Verify files in config directory
+        echo "Files in config directory:"
+        ls -la /home/ubuntu/studeaze/config/
+        
         # Stop and remove existing container if it exists
         docker stop portal-service || true
         docker rm portal-service || true
@@ -117,5 +121,14 @@ jobs:
           --restart always \
           -p 8080:8080 \
           -e SE_ENV=/app/config \
-          -v /home/ubuntu/studeaze/config:/app/config \
-          ghcr.io/gokuforever/portal-service:latest 
+          -e SPRING_PROFILES_ACTIVE=prod \
+          --mount type=bind,source=/home/ubuntu/studeaze/config,target=/app/config \
+          ghcr.io/gokuforever/portal-service:latest
+        
+        # Verify the mount
+        echo "Verifying container mounts:"
+        docker inspect portal-service | grep -A 10 Mounts
+        
+        # Check if files are visible inside the container
+        echo "Files inside container:"
+        docker exec portal-service ls -la /app/config || echo "Failed to list files in container" 
