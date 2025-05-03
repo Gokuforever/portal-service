@@ -152,4 +152,4 @@ jobs:
         echo "Looking for portal-prod.properties:"
         docker exec portal-service ls -la /app/config/portal-prod.properties || echo "portal-prod.properties not found in container"
         
-        echo "======== DEPLOYMENT COMPLETED ========" 
+        echo "======== DEPLOYMENT COMPLETED ======="
