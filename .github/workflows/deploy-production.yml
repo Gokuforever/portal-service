@@ -25,6 +25,11 @@ jobs:
         server-username: GITHUB_ACTOR
         server-password: GITHUB_PACKAGES_TOKEN
     
+    - name: Setup Maven
+      uses: stCarolas/setup-maven@v4.5
+      with:
+        maven-version: 3.8.6
+    
     - name: Build with Maven
       run: mvn clean install -Dmaven.test.skip=true
       env:
@@ -48,6 +53,8 @@ jobs:
         tags: |
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
+          type=ref,event=branch
+          type=sha
           latest
     
     - name: Build and push Docker image
@@ -60,12 +67,22 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         
-    # Example deployment step - adjust as needed for your infrastructure
     - name: Deploy to Production Server
       run: |
         # Ensure config directory exists
         mkdir -p /home/ubuntu/studeaze/config
+        
+        # Stop and remove existing container if it exists
+        docker stop portal-service || true
+        docker rm portal-service || true
+        
         # Pull latest image
         docker pull ghcr.io/${{ github.repository_owner }}/portal-service:latest
-        # Deploy with docker-compose
-        docker-compose -f ~/docker-compose.yml up -d portal-service 
+        
+        # Run the container with proper configuration
+        docker run -d \
+          --name portal-service \
+          --restart always \
+          -p 8080:8080 \
+          -v /home/ubuntu/studeaze/config:/app/config \
+          ghcr.io/${{ github.repository_owner }}/portal-service:latest 
