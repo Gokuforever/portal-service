@@ -73,8 +73,18 @@ jobs:
     needs: build
     runs-on: self-hosted
     environment: production
+    permissions:
+      contents: read
+      packages: read
     
     steps:
+    - name: Login to GitHub Container Registry on EC2
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
     - name: Deploy to Production Server
       run: |
         echo "======== DEPLOYMENT STARTED ========"
@@ -92,8 +102,21 @@ jobs:
           docker rm portal-service || true
         fi
         
-        # Pull latest image and run in one step to reduce overhead
-        echo "*** Pulling latest image and starting container ***"
+        # Pull latest image explicitly before running
+        echo "*** Pulling latest image ***"
+        docker pull ghcr.io/gokuforever/portal-service:latest
+        if [ $? -ne 0 ]; then
+          echo "ERROR: Failed to pull the image. Checking Docker login status."
+          docker login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
+          docker pull ghcr.io/gokuforever/portal-service:latest
+          if [ $? -ne 0 ]; then
+            echo "ERROR: Still failed to pull the image. Exiting with error."
+            exit 1
+          fi
+        fi
+        
+        # Run the container
+        echo "*** Starting container ***"
         docker run -d \
           --name portal-service \
           --restart always \
@@ -102,11 +125,15 @@ jobs:
           -e SPRING_PROFILES_ACTIVE=prod \
           --mount type=bind,source=/home/ubuntu/studeaze/config,target=/app/config \
           --mount type=bind,source=/home/ubuntu/api.studeaze.in.keystore.p12,target=/app/ssl/api.studeaze.in.keystore.p12 \
-          --pull always \
           ghcr.io/gokuforever/portal-service:latest
         
         # Verify the container is running
         echo "*** Verifying deployment ***"
         docker ps | grep portal-service
+        if [ $? -ne 0 ]; then
+          echo "ERROR: Container failed to start. Checking container logs:"
+          docker logs portal-service || echo "Could not get container logs."
+          exit 1
+        fi
         
         echo "======== DEPLOYMENT COMPLETED ======="
