@@ -114,6 +114,9 @@ jobs:
         
         # Stop and remove existing container if it exists
         echo "*** Step 3: Stopping existing container ***"
+        echo "Gracefully stopping application..."
+        docker exec portal-service sh -c "kill -15 1" || echo "No running process to stop gracefully"
+        sleep 10 # Give application time to shutdown gracefully
         docker stop portal-service || echo "No container to stop"
         docker rm portal-service || echo "No container to remove"
         
