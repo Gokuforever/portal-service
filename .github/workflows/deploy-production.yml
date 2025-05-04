@@ -104,30 +104,20 @@ jobs:
         echo "======== DEPLOYMENT STARTED ========"
         
         # Ensure config directory exists
-        echo "*** Step 1: Checking config directory ***"
         mkdir -p /home/ubuntu/studeaze/config
         
-        # Check if the files exist
-        echo "*** Step 2: Listing files in config directory ***"
-        echo "Files in /home/ubuntu/studeaze/config:"
-        ls -la /home/ubuntu/studeaze/config/ || echo "Error listing files"
-        
         # Stop and remove existing container if it exists
-        echo "*** Step 3: Stopping existing container ***"
-        echo "Gracefully stopping application..."
-        docker exec portal-service sh -c "kill -15 1" || echo "No running process to stop gracefully"
-        sleep 10 # Give application time to shutdown gracefully
-        docker stop portal-service || echo "No container to stop"
-        docker rm portal-service || echo "No container to remove"
+        echo "*** Gracefully stopping application ***"
+        if docker ps -q -f name=portal-service | grep -q .; then
+          docker exec portal-service sh -c "kill -15 1" || true
+          # Wait up to 5 seconds for graceful shutdown
+          timeout 5s sh -c 'until ! docker ps -q -f name=portal-service | grep -q .; do sleep 0.5; done' || true
+          docker stop portal-service --time=3 || true
+          docker rm portal-service || true
+        fi
         
-        # Pull latest image
-        echo "*** Step 4: Pulling latest image ***"
-        docker pull ghcr.io/gokuforever/portal-service:latest
-        pull_status=$?
-        echo "Pull status: $pull_status"
-        
-        # Run the container with proper configuration
-        echo "*** Step 5: Starting container ***"
+        # Pull latest image and run in one step to reduce overhead
+        echo "*** Pulling latest image and starting container ***"
         docker run -d \
           --name portal-service \
           --restart always \
@@ -136,23 +126,11 @@ jobs:
           -e SPRING_PROFILES_ACTIVE=prod \
           --mount type=bind,source=/home/ubuntu/studeaze/config,target=/app/config \
           --mount type=bind,source=/home/ubuntu/api.studeaze.in.keystore.p12,target=/app/ssl/api.studeaze.in.keystore.p12 \
+          --pull always \
           ghcr.io/gokuforever/portal-service:latest
-        run_status=$?
-        echo "Run status: $run_status"
         
-        # Verify the mount
-        echo "*** Step 6: Verifying mounts ***"
-        echo "Docker mounts:"
-        docker inspect portal-service | grep -A 10 Mounts || echo "Failed to inspect container"
-        
-        # Check if files are visible inside the container
-        echo "*** Step 7: Checking files inside container ***"
-        echo "Listing all files in /app/config:"
-        docker exec portal-service ls -la /app/config/ || echo "Failed to list files in container"
-        
-        # Check if the specific file is visible inside the container
-        echo "*** Step 8: Checking for portal-prod.properties ***"
-        echo "Looking for portal-prod.properties:"
-        docker exec portal-service ls -la /app/config/portal-prod.properties || echo "portal-prod.properties not found in container"
+        # Verify the container is running
+        echo "*** Verifying deployment ***"
+        docker ps | grep portal-service
         
         echo "======== DEPLOYMENT COMPLETED ======="
