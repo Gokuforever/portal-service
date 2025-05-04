@@ -8,9 +8,8 @@ on:
     types: [published]
 
 jobs:
-  deploy:
-    runs-on: self-hosted
-    environment: production
+  build:
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -37,35 +36,6 @@ jobs:
       run: mvn clean install -Dmaven.test.skip=true
       env:
         GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Install Docker
-      run: |
-        # Update packages
-        sudo apt-get update
-        
-        # Install dependencies
-        sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-        
-        # Add Docker's official GPG key
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-        
-        # Add Docker repository
-        sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-        
-        # Update packages again
-        sudo apt-get update
-        
-        # Install Docker
-        sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-        
-        # Add current user to docker group
-        sudo usermod -aG docker $USER
-        
-        # Fix Docker socket permissions
-        sudo chmod 666 /var/run/docker.sock
-        
-        # Verify Docker installation
-        docker --version
     
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v3
@@ -98,7 +68,13 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        
+
+  deploy:
+    needs: build
+    runs-on: self-hosted
+    environment: production
+    
+    steps:
     - name: Deploy to Production Server
       run: |
         echo "======== DEPLOYMENT STARTED ========"
