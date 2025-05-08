@@ -1,5 +1,6 @@
 package com.sorted.portal.bl_services;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.phonepe.sdk.pg.common.models.response.OrderStatusResponse;
 import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayResponse;
 import com.sorted.commons.beans.AddressDTO;
@@ -25,6 +26,7 @@ import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.razorpay.RazorpayUtility;
 import com.sorted.portal.request.beans.PayNowBean;
 import com.sorted.portal.response.beans.PGResponseBean;
+import com.sorted.portal.response.beans.PayNowResponse;
 import com.sorted.portal.service.OrderService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -67,7 +69,6 @@ public class ManageTransaction_BLService {
     public OrderStatusResponse status(@RequestParam("orderId") String orderId) {
         return phonePeUtility.checkStatus(orderId);
     }
-
 
 
     @PostMapping("/pay")
@@ -208,7 +209,7 @@ public class ManageTransaction_BLService {
 				                        .build())
 				                .build();
 						// @formatter:on
-            GetQuoteResponse quote = porterUtility.getQuote(quoteRequest, usersBean.getId());
+//            GetQuoteResponse quote = porterUtility.getQuote(quoteRequest, usersBean.getId());
 
             Order_Details order = new Order_Details();
 
@@ -249,7 +250,7 @@ public class ManageTransaction_BLService {
 			pickup_address.setLng(sellerAddress.getLng());
 			order.setPickup_address(pickup_address);
 			order.setDelivery_address(del_address);
-            order.setEstimated_quote(GsonUtils.getGson().toJson(quote));
+//            order.setEstimated_quote(GsonUtils.getGson().toJson(quote));
 			// @formatter:on
 
             orderService.reduceProductQuantity(mapP.values().stream().toList(), mapPQ);
@@ -273,8 +274,12 @@ public class ManageTransaction_BLService {
             order_Details_Service.update(order_Details.getId(), order_Details, usersBean.getId());
 
 //            CheckoutReqbean checkoutPayload = razorpayUtility.createCheckoutPayload(rzrp_order);
+            String redirectUrl = checkoutPayResponse.getRedirectUrl();
+            String orderId = order_Details.getId();
+
+            PayNowResponse payNowResponse = PayNowResponse.builder().redirectUrl(redirectUrl).orderId(orderId).build();
             orderDumpService.markSuccess(orderDump, order_Details.getId(), this.getClass().getSimpleName());
-            return SEResponse.getBasicSuccessResponseObject(pgOrderId, ResponseCode.SUCCESSFUL);
+            return SEResponse.getBasicSuccessResponseObject(payNowResponse, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             orderDumpService.markFailed(orderDump, ex.getResponseCode().getErrorMessage(), ex.getResponseCode().getCode(), this.getClass().getSimpleName());
             throw ex;
@@ -285,6 +290,7 @@ public class ManageTransaction_BLService {
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
+
 
     @NotNull
     private static Order_Item getOrderItem(Item item, Products product, LocalDateTime return_date) {
