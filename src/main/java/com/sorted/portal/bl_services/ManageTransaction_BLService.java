@@ -1,6 +1,5 @@
 package com.sorted.portal.bl_services;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.phonepe.sdk.pg.common.models.response.OrderStatusResponse;
 import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayResponse;
 import com.sorted.commons.beans.AddressDTO;
@@ -18,7 +17,6 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.req.beans.GetQuoteRequest;
-import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.GsonUtils;
 import com.sorted.commons.utils.PorterUtility;
@@ -72,7 +70,7 @@ public class ManageTransaction_BLService {
 
 
     @PostMapping("/pay")
-    public SEResponse pay(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+    public PayNowResponse pay(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         Order_Dump orderDump = new Order_Dump(GsonUtils.getGson().toJson(request.getRequestData()));
         orderDumpService.create(orderDump, this.getClass().getSimpleName());
         try {
@@ -279,7 +277,7 @@ public class ManageTransaction_BLService {
 
             PayNowResponse payNowResponse = PayNowResponse.builder().redirectUrl(redirectUrl).orderId(orderId).build();
             orderDumpService.markSuccess(orderDump, order_Details.getId(), this.getClass().getSimpleName());
-            return SEResponse.getBasicSuccessResponseObject(payNowResponse, ResponseCode.SUCCESSFUL);
+            return payNowResponse;
         } catch (CustomIllegalArgumentsException ex) {
             orderDumpService.markFailed(orderDump, ex.getResponseCode().getErrorMessage(), ex.getResponseCode().getCode(), this.getClass().getSimpleName());
             throw ex;
