@@ -1,6 +1,7 @@
 package com.sorted.portal.bl_services;
 
-import com.razorpay.Order;
+import com.phonepe.sdk.pg.common.models.response.OrderStatusResponse;
+import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayResponse;
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Item;
 import com.sorted.commons.beans.Order_Status_History;
@@ -20,21 +21,18 @@ import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.GsonUtils;
 import com.sorted.commons.utils.PorterUtility;
-import com.sorted.portal.razorpay.CheckoutReqbean;
+import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.razorpay.RazorpayUtility;
 import com.sorted.portal.request.beans.PayNowBean;
 import com.sorted.portal.response.beans.PGResponseBean;
 import com.sorted.portal.service.OrderService;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.json.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -44,6 +42,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
+@RequiredArgsConstructor
 public class ManageTransaction_BLService {
 
     private final Users_Service users_Service;
@@ -57,24 +56,18 @@ public class ManageTransaction_BLService {
     private final PorterUtility porterUtility;
     private final Order_Dump_Service orderDumpService;
     private final OrderService orderService;
+    private final PhonePeUtility phonePeUtility;
 
-    @Autowired
-    public ManageTransaction_BLService(Users_Service users_Service, Cart_Service cart_Service, ProductService productService,
-                                       Address_Service address_Service, Order_Details_Service order_Details_Service, Order_Item_Service order_Item_Service,
-                                       RazorpayUtility razorpayUtility, Seller_Service seller_Service, PorterUtility porterUtility,
-                                       Order_Dump_Service orderDumpService, OrderService orderService) {
-        this.users_Service = users_Service;
-        this.cart_Service = cart_Service;
-        this.productService = productService;
-        this.address_Service = address_Service;
-        this.order_Details_Service = order_Details_Service;
-        this.order_Item_Service = order_Item_Service;
-        this.razorpayUtility = razorpayUtility;
-        this.seller_Service = seller_Service;
-        this.porterUtility = porterUtility;
-        this.orderDumpService = orderDumpService;
-        this.orderService = orderService;
+    @PostMapping("/test/pay")
+    public StandardCheckoutPayResponse testPay() {
+        return phonePeUtility.createOrder(UUID.randomUUID().toString(), 100);
     }
+
+    @GetMapping("/status")
+    public OrderStatusResponse status(@RequestParam("orderId") String orderId) {
+        return phonePeUtility.checkStatus(orderId);
+    }
+
 
 
     @PostMapping("/pay")
@@ -268,18 +261,20 @@ public class ManageTransaction_BLService {
 
             orderService.createOrderItems(listOI, order_Details.getId(), order_Details.getCode(), usersBean.getId());
 
-            Order rzrp_order = razorpayUtility.createOrder(totalSum, order_Details.getId());
-            if (rzrp_order == null) {
-                throw new CustomIllegalArgumentsException(ResponseCode.PG_ORDER_GEN_FAILED);
-            }
-            JSONObject json = rzrp_order.toJson();
-            String pg_order_id = json.get("id").toString();
-            order_Details.setPg_order_id(pg_order_id);
+            StandardCheckoutPayResponse checkoutPayResponse = phonePeUtility.createOrder(order_Details.getId(), totalSum);
+//            Order rzrp_order = razorpayUtility.createOrder(totalSum, order_Details.getId());
+//            if (rzrp_order == null) {
+//                throw new CustomIllegalArgumentsException(ResponseCode.PG_ORDER_GEN_FAILED);
+//            }
+//            JSONObject json = rzrp_order.toJson();
+//            String pg_order_id = json.get("id").toString();
+            String pgOrderId = checkoutPayResponse.getOrderId();
+            order_Details.setPg_order_id(pgOrderId);
             order_Details_Service.update(order_Details.getId(), order_Details, usersBean.getId());
 
-            CheckoutReqbean checkoutPayload = razorpayUtility.createCheckoutPayload(rzrp_order);
+//            CheckoutReqbean checkoutPayload = razorpayUtility.createCheckoutPayload(rzrp_order);
             orderDumpService.markSuccess(orderDump, order_Details.getId(), this.getClass().getSimpleName());
-            return SEResponse.getBasicSuccessResponseObject(checkoutPayload, ResponseCode.SUCCESSFUL);
+            return SEResponse.getBasicSuccessResponseObject(pgOrderId, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             orderDumpService.markFailed(orderDump, ex.getResponseCode().getErrorMessage(), ex.getResponseCode().getCode(), this.getClass().getSimpleName());
             throw ex;

@@ -1,26 +1,19 @@
 package com.sorted.portal.razorpay;
 
 import com.razorpay.*;
-import com.sorted.commons.entity.mongo.Order_Details;
 import com.sorted.commons.entity.mongo.Third_Party_Api;
-import com.sorted.commons.enums.ResponseCode;
-import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.portal.enums.RequestType;
 import com.sorted.portal.service.ThirdPartyRequestResponseService;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.json.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.sorted.commons.constants.Defaults;
-import com.sorted.commons.entity.mongo.Transaction_Req_Response;
-import com.sorted.commons.entity.service.Transaction_Req_Response_Service;
-
-import lombok.NonNull;
-
 @RestController
 @RequestMapping("/razorpay/order")
+@RequiredArgsConstructor
 public class RazorpayUtility {
 
     @Value("${se.razorpay.key}")
@@ -29,13 +22,8 @@ public class RazorpayUtility {
     @Value("${se.razorpay.secret}")
     private String rzr_secret;
 
-    private final Transaction_Req_Response_Service transaction_Req_Response_Service;
     private final ThirdPartyRequestResponseService thirdPartyRequestResponseService;
 
-    public RazorpayUtility(Transaction_Req_Response_Service transactionReqResponseService, ThirdPartyRequestResponseService thirdPartyRequestResponseService) {
-        transaction_Req_Response_Service = transactionReqResponseService;
-        this.thirdPartyRequestResponseService = thirdPartyRequestResponseService;
-    }
 
     public Order createOrder(@NonNull Long amount, @NonNull String order_id) throws RazorpayException {
 
