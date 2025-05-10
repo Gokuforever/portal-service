@@ -1,6 +1,7 @@
 package com.sorted.portal.bl_services;
 
 // Java standard imports
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -114,6 +115,7 @@ public class ManageOrder_BLService {
     //---------------------------------------------------------------------
     // Constructor
     //---------------------------------------------------------------------
+
     /**
      * Constructor for ManageOrder_BLService with all required dependencies.
      *
@@ -128,12 +130,12 @@ public class ManageOrder_BLService {
      */
     public ManageOrder_BLService(
             Order_Details_Service order_Details_Service,
-            Order_Item_Service order_Item_Service, 
+            Order_Item_Service order_Item_Service,
             ProductService productService,
             Users_Service users_Service,
             PorterUtility porterUtility,
             @Value("${se.default.page}") int defaultPage,
-            @Value("${se.default.size}") int defaultSize, 
+            @Value("${se.default.size}") int defaultSize,
             RazorpayUtility razorpayUtility) {
         this.order_Details_Service = order_Details_Service;
         this.order_Item_Service = order_Item_Service;
@@ -148,7 +150,7 @@ public class ManageOrder_BLService {
     //---------------------------------------------------------------------
     // Order Status Management Endpoints
     //---------------------------------------------------------------------
-    
+
     /**
      * Sets an order to "Ready for Pickup" status and creates a delivery order with Porter.
      * Only accessible to users with SELLER privileges.
@@ -329,7 +331,7 @@ public class ManageOrder_BLService {
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
-    
+
     /**
      * Accepts or rejects an order.
      * Only accessible to users with SELLER privileges.
@@ -417,7 +419,7 @@ public class ManageOrder_BLService {
     //---------------------------------------------------------------------
     // Order Search and Reporting Endpoints
     //---------------------------------------------------------------------
-    
+
     /**
      * Searches and retrieves orders based on various criteria for internal use.
      * Filters orders based on user permissions and provided search parameters.
@@ -555,7 +557,7 @@ public class ManageOrder_BLService {
      * @param httpServletRequest The HTTP servlet request
      * @return A response containing a list of matching orders
      */
-    @PostMapping("/order/find")
+    @PostMapping("/order/store/find")
     public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("find:: API started for order search");
         log.debug("find:: Request: {}", request);
@@ -584,6 +586,9 @@ public class ManageOrder_BLService {
             filterOD.addClause(WhereClause.eq(Order_Details.Fields.user_id, usersBean.getId()));
             if (StringUtils.hasText(req.getOrder_status())) {
                 List<OrderStatus> orderStatuses = getByCustomerStatus(req.getOrder_status());
+                if (orderStatuses.isEmpty()) {
+                    throw new CustomIllegalArgumentsException(ResponseCode.INVALID_ORDER_STATUS);
+                }
                 log.debug("find:: Applying status filter: {}", orderStatuses);
                 filterOD.addClause(WhereClause.in(Order_Details.Fields.status_id, orderStatuses.stream().map(OrderStatus::getId).toList()));
             }
@@ -775,7 +780,7 @@ public class ManageOrder_BLService {
     //---------------------------------------------------------------------
     // Utility Methods
     //---------------------------------------------------------------------
-    
+
     /**
      * Creates a Porter delivery request object from order details.
      *
@@ -850,7 +855,7 @@ public class ManageOrder_BLService {
                 .drop_details(dropDetails)
                 .build();
     }
-    
+
     /**
      * Creates sheet configuration for Excel report generation.
      *
