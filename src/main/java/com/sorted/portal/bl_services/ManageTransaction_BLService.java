@@ -77,13 +77,8 @@ public class ManageTransaction_BLService {
         String req_user_id = httpServletRequest.getHeader("req_user_id");
 
         UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.PURCHASE);
-        switch (usersBean.getRole().getUser_type()) {
-            case CUSTOMER:
-                break;
-            case GUEST:
-                throw new CustomIllegalArgumentsException(ResponseCode.PROMT_SIGNUP);
-            default:
-                throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+        if (!(Objects.requireNonNull(usersBean.getRole().getUser_type()) == UserType.CUSTOMER)) {
+            throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
         }
 
         log.info("status:: Checking status for order ID: {}", orderId);
@@ -445,12 +440,12 @@ public class ManageTransaction_BLService {
             orderService.createOrderItems(listOI, order_Details.getId(), order_Details.getCode(), usersBean.getId());
 
             Optional<StandardCheckoutPayResponse> checkoutPayResponseOptional = phonePeUtility.createOrder(order_Details.getId(), totalSum);
-            
+
             if (checkoutPayResponseOptional.isEmpty()) {
                 log.error("pay-now:: Failed to create PhonePe order for order ID: {}", order_Details.getId());
                 throw new CustomIllegalArgumentsException(ResponseCode.PG_ORDER_GEN_FAILED);
             }
-            
+
             StandardCheckoutPayResponse checkoutPayResponse = checkoutPayResponseOptional.get();
             String pgOrderId = checkoutPayResponse.getOrderId();
             order_Details.setPg_order_id(pgOrderId);
