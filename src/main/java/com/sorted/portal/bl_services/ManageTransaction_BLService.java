@@ -68,15 +68,28 @@ public class ManageTransaction_BLService {
     }
 
     @GetMapping("/status")
-    public FindOneOrder status(@RequestParam("orderId") String orderId) {
+    public FindOneOrder status(@RequestParam("orderId") String orderId, HttpServletRequest httpServletRequest) {
         if (!StringUtils.hasText(orderId)) {
             log.error("status:: Order ID is empty or null");
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_ORDER_ID);
         }
 
+        String req_user_id = httpServletRequest.getHeader("req_user_id");
+
+        UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.PURCHASE);
+        switch (usersBean.getRole().getUser_type()) {
+            case CUSTOMER:
+                break;
+            case GUEST:
+                throw new CustomIllegalArgumentsException(ResponseCode.PROMT_SIGNUP);
+            default:
+                throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+        }
+
         log.info("status:: Checking status for order ID: {}", orderId);
 
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
+        filterOD.addClause(WhereClause.eq(Order_Details.Fields.user_id, usersBean.getId()));
         filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, orderId));
         filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
