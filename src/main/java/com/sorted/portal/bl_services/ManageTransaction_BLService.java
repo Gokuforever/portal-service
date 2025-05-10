@@ -1,6 +1,8 @@
 package com.sorted.portal.bl_services;
 
+import com.phonepe.sdk.pg.common.models.PgV2InstrumentType;
 import com.phonepe.sdk.pg.common.models.response.OrderStatusResponse;
+import com.phonepe.sdk.pg.common.models.response.PaymentDetail;
 import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayResponse;
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Item;
@@ -23,8 +25,7 @@ import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.razorpay.RazorpayUtility;
 import com.sorted.portal.request.beans.PayNowBean;
-import com.sorted.portal.response.beans.PGResponseBean;
-import com.sorted.portal.response.beans.PayNowResponse;
+import com.sorted.portal.response.beans.*;
 import com.sorted.portal.service.OrderService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import javax.ws.rs.NotFoundException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -57,15 +59,184 @@ public class ManageTransaction_BLService {
     private final Order_Dump_Service orderDumpService;
     private final OrderService orderService;
     private final PhonePeUtility phonePeUtility;
+    private final File_Upload_Details_Service file_Upload_Details_Service;
 
     @PostMapping("/test/pay")
     public StandardCheckoutPayResponse testPay() {
-        return phonePeUtility.createOrder(UUID.randomUUID().toString(), 100);
+        return phonePeUtility.createOrder(UUID.randomUUID().toString(), 100)
+                .orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.PG_ORDER_GEN_FAILED));
     }
 
     @GetMapping("/status")
-    public OrderStatusResponse status(@RequestParam("orderId") String orderId) {
-        return phonePeUtility.checkStatus(orderId);
+    public FindOneOrder status(@RequestParam("orderId") String orderId) {
+        if (!StringUtils.hasText(orderId)) {
+            log.error("status:: Order ID is empty or null");
+            throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_ORDER_ID);
+        }
+
+        log.info("status:: Checking status for order ID: {}", orderId);
+
+        SEFilter filterOD = new SEFilter(SEFilterType.AND);
+        filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, orderId));
+        filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        Order_Details order_Details = order_Details_Service.repoFindOne(filterOD);
+        if (order_Details == null) {
+            log.error("status:: Order not found with ID: {}", orderId);
+            throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+        }
+
+        try {
+            // Only check payment status if not already completed
+            if (!(StringUtils.hasText(order_Details.getPayment_status()) && order_Details.getPayment_status().equals("COMPLETED"))) {
+                log.info("status:: Payment not completed, checking with PhonePe for order ID: {}", orderId);
+                Optional<OrderStatusResponse> orderStatusResponseOptional = phonePeUtility.checkStatus(orderId);
+
+                if (orderStatusResponseOptional.isEmpty()) {
+                    log.error("status:: Empty response from PhonePe for order ID: {}", orderId);
+                    throw new CustomIllegalArgumentsException(ResponseCode.PG_BAD_REQ);
+                }
+
+                OrderStatusResponse orderStatusResponse = orderStatusResponseOptional.get();
+                if (CollectionUtils.isEmpty(orderStatusResponse.getPaymentDetails())) {
+                    log.error("status:: Invalid response from PhonePe payment status check for order ID: {}", orderId);
+                    throw new CustomIllegalArgumentsException(ResponseCode.PG_BAD_REQ);
+                }
+
+                List<PaymentDetail> paymentDetails = orderStatusResponse.getPaymentDetails();
+                PaymentDetail paymentDetail = paymentDetails.get(paymentDetails.size() - 1);
+                String state = paymentDetail.getState();
+                PgV2InstrumentType paymentMode = paymentDetail.getPaymentMode();
+                String transactionId = paymentDetail.getTransactionId();
+
+                log.info("status:: Payment details - state: {}, mode: {}, transactionId: {}",
+                        state, paymentMode, transactionId);
+
+                order_Details.setPayment_status(state);
+                order_Details.setPayment_mode(paymentMode != null ? paymentMode.name() : null);
+                order_Details.setTransaction_id(transactionId);
+
+                // Update order status only if payment is successful
+                OrderStatus status = switch (state) {
+                    case "COMPLETED" -> OrderStatus.TRANSACTION_PROCESSED;
+                    case "FAILED" -> OrderStatus.TRANSACTION_FAILED;
+                    default -> OrderStatus.TRANSACTION_PENDING;
+                };
+                order_Details.setStatus(status, Defaults.SYSTEM_ADMIN);
+                log.info("status:: Order status updated to TRANSACTION_PROCESSED for order ID: {}", orderId);
+
+                order_Details_Service.update(order_Details.getId(), order_Details, Defaults.SYSTEM_ADMIN);
+            }
+
+            List<OrderItemResponse> orderItemResponseList = new ArrayList<>();
+
+            SEFilter filterOI = new SEFilter(SEFilterType.AND);
+            filterOI.addClause(WhereClause.eq(Order_Item.Fields.order_id, order_Details.getId()));
+            filterOI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+            List<Order_Item> orderItems = order_Item_Service.repoFind(filterOI);
+            if (!CollectionUtils.isEmpty(orderItems)) {
+                List<String> productIds = orderItems.stream()
+                        .map(Order_Item::getProduct_id)
+                        .filter(StringUtils::hasText)
+                        .distinct()
+                        .toList();
+
+                if (!CollectionUtils.isEmpty(productIds)) {
+                    SEFilter filterP = new SEFilter(SEFilterType.AND);
+                    filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productIds));
+                    filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+                    List<Products> products = productService.repoFind(filterP);
+                    Map<String, Products> mapP = !CollectionUtils.isEmpty(products) ?
+                            products.stream().collect(Collectors.toMap(Products::getId, product -> product, (p1, p2) -> p1)) :
+                            new HashMap<>();
+
+                    Map<String, String> mapFUD = new HashMap<>();
+
+                    // Only search for documents if we have products
+                    if (!mapP.isEmpty()) {
+                        SEFilter filterFUD = new SEFilter(SEFilterType.AND);
+                        filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(mapP.keySet())));
+                        filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+                        List<File_Upload_Details> listFUD = file_Upload_Details_Service.repoFind(filterFUD);
+                        if (!CollectionUtils.isEmpty(listFUD)) {
+                            listFUD.forEach(fud -> {
+                                if (StringUtils.hasText(fud.getId()) && StringUtils.hasText(fud.getDocument_id())) {
+                                    mapFUD.putIfAbsent(fud.getId(), fud.getDocument_id());
+                                }
+                            });
+                        }
+                    }
+
+                    for (Order_Item item : orderItems) {
+                        OrderItemResponse response = convertToResponse(mapP, item, mapFUD);
+                        if (response != null) {
+                            orderItemResponseList.add(response);
+                        }
+                    }
+                }
+            }
+            AddressDTO deliveryAddress = order_Details.getDelivery_address();
+            AddressResponse addressResponse = AddressResponse.builder().addressType(deliveryAddress.getAddress_type())
+                    .city(deliveryAddress.getCity())
+                    .pincode(deliveryAddress.getPincode())
+                    .state(deliveryAddress.getState())
+                    .street_1(deliveryAddress.getStreet_1())
+                    .street_2(deliveryAddress.getStreet_2())
+                    .landmark(deliveryAddress.getLandmark())
+                    .addressTypeDesc(deliveryAddress.getAddress_type_desc())
+                    .phone_no(deliveryAddress.getPhone_no())
+                    .build();
+
+            log.info("status:: Successfully retrieved status for order ID: {}, with {} items",
+                    orderId, orderItemResponseList.size());
+
+            // Build the complete response with code field included
+            return FindOneOrder.builder()
+                    .id(orderId)
+                    .code(order_Details.getCode())
+                    .paymentStatus(order_Details.getPayment_status())
+                    .paymentMode(order_Details.getPayment_mode())
+                    .totalAmount(order_Details.getTotal_amount())
+                    .status(order_Details.getStatus() != null ? order_Details.getStatus().getCustomer_status() : null)
+                    .transactionId(order_Details.getTransaction_id())
+                    .orderItems(orderItemResponseList)
+                    .deliveryAddress(addressResponse)
+                    .build();
+        } catch (NotFoundException e) {
+            log.error("status:: Order not found: {}", e.getMessage());
+            throw e;
+        } catch (CustomIllegalArgumentsException e) {
+            log.error("status:: Custom exception: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("status:: Unexpected error occurred for order ID {}: {}", orderId, e.getMessage(), e);
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+    }
+
+    private OrderItemResponse convertToResponse(Map<String, Products> mapP, Order_Item orderItem, Map<String, String> mapFUD) {
+        if (orderItem == null || !StringUtils.hasText(orderItem.getProduct_id())) {
+            log.warn("convertToResponse:: Invalid order item or missing product ID");
+            return null;
+        }
+
+        Products product = mapP.getOrDefault(orderItem.getProduct_id(), null);
+        String img = mapFUD.getOrDefault(orderItem.getProduct_id(), null);
+        String productName = (product == null) ? "" : product.getName();
+
+        return OrderItemResponse.builder()
+                .productCode(orderItem.getProduct_code())
+                .productId(orderItem.getProduct_id())
+                .productName(productName)
+                .documentId(img)
+                .purchaseType(orderItem.getType() != null ? orderItem.getType().name() : "")
+                .quantity(orderItem.getQuantity())
+                .sellingPrice(orderItem.getSelling_price())
+                .totalCost(orderItem.getTotal_cost())
+                .build();
     }
 
 
@@ -260,13 +431,14 @@ public class ManageTransaction_BLService {
 
             orderService.createOrderItems(listOI, order_Details.getId(), order_Details.getCode(), usersBean.getId());
 
-            StandardCheckoutPayResponse checkoutPayResponse = phonePeUtility.createOrder(order_Details.getId(), totalSum);
-//            Order rzrp_order = razorpayUtility.createOrder(totalSum, order_Details.getId());
-//            if (rzrp_order == null) {
-//                throw new CustomIllegalArgumentsException(ResponseCode.PG_ORDER_GEN_FAILED);
-//            }
-//            JSONObject json = rzrp_order.toJson();
-//            String pg_order_id = json.get("id").toString();
+            Optional<StandardCheckoutPayResponse> checkoutPayResponseOptional = phonePeUtility.createOrder(order_Details.getId(), totalSum);
+            
+            if (checkoutPayResponseOptional.isEmpty()) {
+                log.error("pay-now:: Failed to create PhonePe order for order ID: {}", order_Details.getId());
+                throw new CustomIllegalArgumentsException(ResponseCode.PG_ORDER_GEN_FAILED);
+            }
+            
+            StandardCheckoutPayResponse checkoutPayResponse = checkoutPayResponseOptional.get();
             String pgOrderId = checkoutPayResponse.getOrderId();
             order_Details.setPg_order_id(pgOrderId);
             order_Details_Service.update(order_Details.getId(), order_Details, usersBean.getId());
