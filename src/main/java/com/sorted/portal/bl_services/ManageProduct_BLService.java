@@ -44,9 +44,9 @@ import java.math.BigDecimal;
 import java.security.GeneralSecurityException;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @RestController
@@ -161,31 +161,31 @@ public class ManageProduct_BLService {
             }
 
             List<Products> listP = products.parallelStream()
-                .map(productReqBean -> {
-                    List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(productReqBean, mapSC);
-                    this.validateMandatorySubCategories(category_Master, listSC);
-                    BigDecimal mrp = new BigDecimal(productReqBean.getMrp());
-                    BigDecimal sp = new BigDecimal(productReqBean.getSelling_price());
-                    Products product = new Products();
-                    product.setName(productReqBean.getName());
-                    product.setMrp(CommonUtils.rupeeToPaise(mrp));
-                    product.setSelling_price(CommonUtils.rupeeToPaise(sp));
-                    product.setSelected_sub_catagories(listSC);
-                    product.setSeller_id(seller.getId());
-                    product.setSeller_code(seller.getCode());
-                    product.setCategory_id(category_Master.getId());
-                    product.setQuantity(Long.valueOf(productReqBean.getQuantity()));
-                    product.setDescription(
-                            StringUtils.hasText(productReqBean.getDescription()) ? productReqBean.getDescription() : null);
+                    .map(productReqBean -> {
+                        List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(productReqBean, mapSC);
+                        this.validateMandatorySubCategories(category_Master, listSC);
+                        BigDecimal mrp = new BigDecimal(productReqBean.getMrp());
+                        BigDecimal sp = new BigDecimal(productReqBean.getSelling_price());
+                        Products product = new Products();
+                        product.setName(productReqBean.getName());
+                        product.setMrp(CommonUtils.rupeeToPaise(mrp));
+                        product.setSelling_price(CommonUtils.rupeeToPaise(sp));
+                        product.setSelected_sub_catagories(listSC);
+                        product.setSeller_id(seller.getId());
+                        product.setSeller_code(seller.getCode());
+                        product.setCategory_id(category_Master.getId());
+                        product.setQuantity(Long.valueOf(productReqBean.getQuantity()));
+                        product.setDescription(
+                                StringUtils.hasText(productReqBean.getDescription()) ? productReqBean.getDescription() : null);
 
-                    if (!CollectionUtils.isEmpty(productReqBean.getMedia())) {
-                        List<Media> listMedia = productReqBean.getMedia().stream()
-                                .filter(e -> StringUtils.hasText(e.getDocument_id())).toList();
-                        product.setMedia(listMedia);
-                    }
-                    return product;
-                })
-                .collect(Collectors.toList());
+                        if (!CollectionUtils.isEmpty(productReqBean.getMedia())) {
+                            List<Media> listMedia = productReqBean.getMedia().stream()
+                                    .filter(e -> StringUtils.hasText(e.getDocument_id())).toList();
+                            product.setMedia(listMedia);
+                        }
+                        return product;
+                    })
+                    .collect(Collectors.toList());
 
             productService.bulkCreate(listP, usersBean.getId());
 
@@ -714,11 +714,11 @@ public class ManageProduct_BLService {
         // Batch process file upload details
         int batchSize = 100; // Process in batches of 100
         Map<String, String> mapFUD = new HashMap<>();
-        
+
         List<String> imageIdList = new ArrayList<>(imageIds);
         for (int i = 0; i < imageIdList.size(); i += batchSize) {
             List<String> batch = imageIdList.subList(i, Math.min(i + batchSize, imageIdList.size()));
-            
+
             SEFilter filterFUD = new SEFilter(SEFilterType.AND);
             filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, batch));
             filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));

@@ -11,7 +11,7 @@ public class OrderReportDTO {
     private String status;
     private String creation_date;
 
-    public OrderReportDTO(Order_Details orderDetails){
+    public OrderReportDTO(Order_Details orderDetails) {
         this.code = orderDetails.getCode();
         this.status = orderDetails.getStatus().getInternal_status();
         this.creation_date = orderDetails.getCreation_date_str();

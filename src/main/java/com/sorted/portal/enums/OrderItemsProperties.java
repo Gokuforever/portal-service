@@ -4,10 +4,10 @@ import com.sorted.portal.response.beans.OrderItemReportsDTO;
 import com.sorted.portal.service.ExportFieldMapping;
 
 public enum OrderItemsProperties implements ExportFieldMapping<OrderItemReportsDTO> {
-   ORDER_CODE("Order Id","order_code"),
-   PRODUCT_CODE("Product Id","product_code"),
-   QUANTITY("Quantity","quantity"),
-   STATUS("Status","status");
+    ORDER_CODE("Order Id", "order_code"),
+    PRODUCT_CODE("Product Id", "product_code"),
+    QUANTITY("Quantity", "quantity"),
+    STATUS("Status", "status");
 
     private final String headerName;
     private final String propertyName;

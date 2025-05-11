@@ -5,17 +5,20 @@ This repository uses GitHub Actions for Continuous Integration and Continuous De
 ## Workflows
 
 ### 1. Build and Test
+
 - Triggered on push to `main` and `develop` branches, and on pull requests to these branches
 - Builds the project and runs tests
 
 ### 2. Build and Package
+
 - Triggered on push to `main` branch (ignores documentation changes)
 - Builds the project, creates a Docker image, and pushes it to GitHub Container Registry
 - The image is tagged with the branch name and short commit SHA
 
 ### 3. Deploy to Production
+
 - Triggered manually or when a release is published
-- Builds and packages the application 
+- Builds and packages the application
 - Deploys to production server
 
 ## Required Secrets

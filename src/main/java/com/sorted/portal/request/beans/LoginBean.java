@@ -5,6 +5,6 @@ import lombok.Data;
 @Data
 public class LoginBean {
 
-	private String mobile_no;
-	private String password;
+    private String mobile_no;
+    private String password;
 }

@@ -5,6 +5,6 @@ import lombok.Builder;
 
 @Builder
 public record PayNowResponse(@JsonProperty("redirect_url") String redirectUrl,
-                          @JsonProperty("order_id") String orderId) {
+                             @JsonProperty("order_id") String orderId) {
 
 }

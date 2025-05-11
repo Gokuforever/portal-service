@@ -11,7 +11,7 @@ public class OrderItemReportsDTO {
     private Long quantity;
     private String status;
 
-    public OrderItemReportsDTO(Order_Item orderItem){
+    public OrderItemReportsDTO(Order_Item orderItem) {
         this.order_code = orderItem.getOrder_code();
         this.product_code = orderItem.getProduct_code();
         this.quantity = orderItem.getQuantity();

@@ -19,7 +19,9 @@ import java.util.stream.Collectors;
  */
 public interface ExportFieldMapping<T> {
 
-    /** Logger instance for this class */
+    /**
+     * Logger instance for this class
+     */
     Logger LOGGER = LoggerFactory.getLogger(ExportFieldMapping.class);
 
     /**
@@ -40,7 +42,7 @@ public interface ExportFieldMapping<T> {
     /**
      * Utility to extract all headers from a given enum class.
      *
-     * @param <E> The enum type implementing ExportFieldMapping
+     * @param <E>       The enum type implementing ExportFieldMapping
      * @param enumClass The class object of the enum
      * @return List of header names in the order defined in the enum
      */
@@ -54,7 +56,7 @@ public interface ExportFieldMapping<T> {
     /**
      * Utility to extract all fields/properties from a given enum class.
      *
-     * @param <E> The enum type implementing ExportFieldMapping
+     * @param <E>       The enum type implementing ExportFieldMapping
      * @param enumClass The class object of the enum
      * @return List of property names in the order defined in the enum
      */

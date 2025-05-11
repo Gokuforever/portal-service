@@ -5,7 +5,7 @@ import lombok.Data;
 @Data
 public class CartItemsBean {
 
-	private String product_id;
-	private Long quantity;
-	private boolean secure_item;
+    private String product_id;
+    private Long quantity;
+    private boolean secure_item;
 }

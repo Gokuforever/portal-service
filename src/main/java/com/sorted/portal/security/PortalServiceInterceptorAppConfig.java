@@ -7,11 +7,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Component
 public class PortalServiceInterceptorAppConfig implements WebMvcConfigurer {
-	@Autowired
-	PortalServiceInterceptor portalServiceInterceptor;
+    @Autowired
+    PortalServiceInterceptor portalServiceInterceptor;
 
-	@Override
-	public void addInterceptors(InterceptorRegistry registry) {
-		registry.addInterceptor(portalServiceInterceptor).excludePathPatterns("/**");
-	}
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(portalServiceInterceptor).excludePathPatterns("/**");
+    }
 }

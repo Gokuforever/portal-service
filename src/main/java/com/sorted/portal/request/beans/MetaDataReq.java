@@ -1,11 +1,11 @@
 package com.sorted.portal.request.beans;
 
-import java.util.List;
-
 import lombok.Data;
+
+import java.util.List;
 
 @Data
 public class MetaDataReq {
 
-	private List<String> ids;
+    private List<String> ids;
 }

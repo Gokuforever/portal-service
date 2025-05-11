@@ -27,8 +27,8 @@ public class RateLimiterAspect {
             return joinPoint.proceed();
         } else {
             throw new ResponseStatusException(
-                HttpStatus.TOO_MANY_REQUESTS,
-                "Rate limit exceeded. Please try again later."
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "Rate limit exceeded. Please try again later."
             );
         }
     }

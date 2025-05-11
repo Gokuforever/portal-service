@@ -1,6 +1,5 @@
 package com.sorted.portal.bl_services;
 
-import com.sorted.commons.beans.FeeResult;
 import com.sorted.commons.beans.SettlementDetails;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
@@ -9,7 +8,10 @@ import com.sorted.commons.entity.mongo.Order_Details;
 import com.sorted.commons.entity.service.File_Upload_Details_Service;
 import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Users_Service;
-import com.sorted.commons.enums.*;
+import com.sorted.commons.enums.Activity;
+import com.sorted.commons.enums.Permission;
+import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.AccessDeniedException;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter;
@@ -37,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.sorted.commons.enums.OrderStatus.*;
 

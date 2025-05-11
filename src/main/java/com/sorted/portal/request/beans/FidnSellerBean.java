@@ -1,7 +1,6 @@
 package com.sorted.portal.request.beans;
 
 import com.sorted.commons.helper.ReqBaseBean;
-
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -9,6 +8,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 public class FidnSellerBean extends ReqBaseBean {
 
-	private String name;
-	private String id;
+    private String name;
+    private String id;
 }

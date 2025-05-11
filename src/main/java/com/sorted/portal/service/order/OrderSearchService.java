@@ -1,0 +1,267 @@
+package com.sorted.portal.service.order;
+
+import com.sorted.commons.beans.UsersBean;
+import com.sorted.commons.entity.mongo.BaseMongoEntity;
+import com.sorted.commons.entity.mongo.Order_Details;
+import com.sorted.commons.entity.mongo.Order_Item;
+import com.sorted.commons.entity.mongo.Products;
+import com.sorted.commons.entity.service.Order_Details_Service;
+import com.sorted.commons.entity.service.Order_Item_Service;
+import com.sorted.commons.entity.service.ProductService;
+import com.sorted.commons.entity.service.Users_Service;
+import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.helper.AggregationFilter.SEFilter;
+import com.sorted.commons.helper.SEResponse;
+import com.sorted.commons.utils.CommonUtils;
+import com.sorted.portal.request.beans.FindOrderReqBean;
+import com.sorted.portal.response.beans.FindOrderResBean;
+import com.sorted.portal.response.beans.OrderItemReportsDTO;
+import com.sorted.portal.response.beans.OrderReportDTO;
+import com.sorted.portal.service.ExcelGenerationUtility;
+import com.sorted.portal.service.FileGeneratorUtil;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Service for searching and retrieving orders
+ */
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class OrderSearchService {
+
+    private final Order_Details_Service orderDetailsService;
+    private final Order_Item_Service orderItemService;
+    private final ProductService productService;
+    private final Users_Service usersService;
+    private final OrderFilterBuilder filterBuilder;
+    private final OrderResponseMapper responseMapper;
+
+    /**
+     * Search for orders for internal users
+     *
+     * @param req                The request object
+     * @param httpServletRequest HTTP servlet request
+     * @return SEResponse containing order results
+     */
+    public SEResponse findOrdersInternal(FindOrderReqBean req, HttpServletRequest httpServletRequest) {
+        log.info("Searching orders for internal user: {}", req.getReq_user_id());
+
+        try {
+            // Extract headers
+            CommonUtils.extractHeaders(httpServletRequest, req);
+
+            // Validate user permissions
+            UsersBean usersBean = usersService.validateUserForActivity(
+                    req.getReq_user_id(), null, null);
+
+            // Build filter
+            SEFilter orderFilter = filterBuilder.buildOrderFilter(req, usersBean);
+
+            // Fetch orders
+            List<Order_Details> ordersList = orderDetailsService.repoFind(orderFilter);
+            if (CollectionUtils.isEmpty(ordersList)) {
+                log.info("No orders found matching criteria");
+                return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+            }
+
+            log.debug("Found {} orders matching criteria", ordersList.size());
+
+            // Fetch related data
+            Map<String, Object> relatedData = fetchRelatedData(ordersList);
+
+            @SuppressWarnings("unchecked")
+            Map<String, List<Order_Item>> orderItemsMap =
+                    (Map<String, List<Order_Item>>) relatedData.get("orderItemsMap");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Products> productsMap =
+                    (Map<String, Products>) relatedData.get("productsMap");
+
+            // Map to response beans
+            List<FindOrderResBean> resList = ordersList.stream()
+                    .map(order -> responseMapper.mapToInternalResponse(order, orderItemsMap, productsMap))
+                    .toList();
+
+            log.info("Returning {} orders to internal user", resList.size());
+            return SEResponse.getBasicSuccessResponseList(resList, ResponseCode.SUCCESSFUL);
+
+        } catch (CustomIllegalArgumentsException ex) {
+            log.error("Validation error searching orders: {}", ex.getMessage());
+            throw ex;
+        } catch (Exception e) {
+            log.error("Unexpected error searching orders", e);
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+    }
+
+    /**
+     * Search for orders for customers
+     *
+     * @param req                The request object
+     * @param httpServletRequest HTTP servlet request
+     * @return SEResponse containing order results
+     */
+    public SEResponse findOrdersForCustomer(FindOrderReqBean req, HttpServletRequest httpServletRequest) {
+        log.info("Searching orders for customer: {}", req.getReq_user_id());
+
+        try {
+            // Extract headers
+            CommonUtils.extractHeaders(httpServletRequest, req);
+
+            // Validate user permissions
+            UsersBean usersBean = usersService.validateUserForActivity(
+                    req.getReq_user_id(), null, null);
+
+            // Build filter
+            SEFilter orderFilter = filterBuilder.buildOrderFilter(req, usersBean);
+
+            // Fetch orders
+            List<Order_Details> ordersList = orderDetailsService.repoFind(orderFilter);
+            if (CollectionUtils.isEmpty(ordersList)) {
+                log.info("No orders found for customer");
+                return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+            }
+
+            log.debug("Found {} orders for customer", ordersList.size());
+
+            // Fetch related data
+            Map<String, Object> relatedData = fetchRelatedData(ordersList);
+
+            @SuppressWarnings("unchecked")
+            Map<String, List<Order_Item>> orderItemsMap =
+                    (Map<String, List<Order_Item>>) relatedData.get("orderItemsMap");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Products> productsMap =
+                    (Map<String, Products>) relatedData.get("productsMap");
+
+            // Map to response beans
+            List<FindOrderResBean> resList = ordersList.stream()
+                    .map(order -> responseMapper.mapToCustomerResponse(order, orderItemsMap, productsMap))
+                    .toList();
+
+            log.info("Returning {} orders to customer", resList.size());
+            return SEResponse.getBasicSuccessResponseList(resList, ResponseCode.SUCCESSFUL);
+
+        } catch (CustomIllegalArgumentsException ex) {
+            log.error("Validation error searching customer orders: {}", ex.getMessage());
+            throw ex;
+        } catch (Exception e) {
+            log.error("Unexpected error searching customer orders", e);
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+    }
+
+    /**
+     * Generate order report as Excel
+     *
+     * @param req                The request object
+     * @param httpServletRequest HTTP servlet request
+     * @return SEResponse containing Excel file bytes
+     */
+    public SEResponse generateOrderReport(FindOrderReqBean req, HttpServletRequest httpServletRequest) {
+        log.info("Generating order report for user: {}", req.getReq_user_id());
+
+        try {
+            // Extract headers
+            CommonUtils.extractHeaders(httpServletRequest, req);
+
+            // Validate user permissions
+            UsersBean usersBean = usersService.validateUserForActivity(
+                    req.getReq_user_id(), null, null);
+
+            // Build filter
+            SEFilter orderFilter = filterBuilder.buildOrderFilter(req, usersBean);
+
+            // Fetch orders
+            List<Order_Details> ordersList = orderDetailsService.repoFind(orderFilter);
+            if (CollectionUtils.isEmpty(ordersList)) {
+                log.info("No orders found for report");
+                return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+            }
+
+            log.debug("Found {} orders for report", ordersList.size());
+
+            // Fetch order items
+            List<String> orderIds = ordersList.stream()
+                    .map(BaseMongoEntity::getId)
+                    .toList();
+
+            SEFilter orderItemsFilter = filterBuilder.buildOrderItemsFilter(orderIds);
+            List<Order_Item> orderItems = orderItemService.repoFind(orderItemsFilter);
+
+            log.debug("Found {} order items for report", orderItems.size());
+
+            // Create report DTOs
+            @SuppressWarnings("unchecked")
+            List<OrderReportDTO> orders = (List<OrderReportDTO>)
+                    responseMapper.createReportDTOs(ordersList, orderItems).get("orders");
+
+            @SuppressWarnings("unchecked")
+            List<OrderItemReportsDTO> orderItemDTOs = (List<OrderItemReportsDTO>)
+                    responseMapper.createReportDTOs(ordersList, orderItems).get("orderItems");
+
+            // Generate Excel
+            Map<String, FileGeneratorUtil.SheetConfig<?, ?>> sheetConfig =
+                    responseMapper.createReportSheetConfig(orders, orderItemDTOs);
+
+            byte[] excelBytes = ExcelGenerationUtility.createExcelFileInMemory(sheetConfig);
+
+            log.info("Successfully generated order report with {} bytes", excelBytes.length);
+            return SEResponse.getBasicSuccessResponseObject(excelBytes, ResponseCode.SUCCESSFUL);
+
+        } catch (CustomIllegalArgumentsException ex) {
+            log.error("Validation error generating report: {}", ex.getMessage());
+            throw ex;
+        } catch (Exception e) {
+            log.error("Unexpected error generating report", e);
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+    }
+
+    /**
+     * Fetch related data for orders
+     *
+     * @param ordersList List of orders
+     * @return Map containing related data
+     */
+    private Map<String, Object> fetchRelatedData(List<Order_Details> ordersList) {
+        // Get order IDs
+        List<String> orderIds = ordersList.stream()
+                .map(BaseMongoEntity::getId)
+                .toList();
+
+        // Fetch order items
+        SEFilter orderItemsFilter = filterBuilder.buildOrderItemsFilter(orderIds);
+        List<Order_Item> orderItems = orderItemService.repoFind(orderItemsFilter);
+
+        // Group order items by order ID
+        Map<String, List<Order_Item>> orderItemsMap =
+                responseMapper.groupOrderItemsByOrderId(orderItems);
+
+        // Get product IDs
+        List<String> productIds = orderItems.stream()
+                .map(Order_Item::getProduct_id)
+                .toList();
+
+        // Fetch products
+        SEFilter productsFilter = filterBuilder.buildProductFilter(productIds);
+        List<Products> products = productService.repoFind(productsFilter);
+
+        // Group products by ID
+        Map<String, Products> productsMap = responseMapper.groupProductsById(products);
+
+        return Map.of(
+                "orderItemsMap", orderItemsMap,
+                "productsMap", productsMap
+        );
+    }
+} 

@@ -14,12 +14,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableAsync
 @ComponentScan(basePackages = "com.sorted")
-@EnableAutoConfiguration(exclude = { DataSourceAutoConfiguration.class,
-		DataSourceTransactionManagerAutoConfiguration.class, HibernateJpaAutoConfiguration.class })
+@EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class,
+        DataSourceTransactionManagerAutoConfiguration.class, HibernateJpaAutoConfiguration.class})
 public class SePortalApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(SePortalApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(SePortalApplication.class, args);
+    }
 
 }

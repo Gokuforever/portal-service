@@ -9,11 +9,11 @@ import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayRespons
 import com.sorted.commons.entity.mongo.Third_Party_Api;
 import com.sorted.portal.enums.RequestType;
 import com.sorted.portal.service.ThirdPartyRequestResponseService;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import java.util.Map;
 import java.util.Optional;
@@ -34,7 +34,7 @@ public class PhonePeUtility {
 
     StandardCheckoutClient client = StandardCheckoutClient.getInstance(clientId, clientSecret,
             clientVersion, env);
-            
+
     private final ThirdPartyRequestResponseService thirdPartyRequestResponseService;
 
     public Optional<StandardCheckoutPayResponse> createOrder(String orderId, long amount) {
@@ -43,9 +43,9 @@ public class PhonePeUtility {
                 .amount(amount)
                 .redirectUrl(baseUrl + orderId)
                 .build();
-                
+
         Third_Party_Api register = thirdPartyRequestResponseService.register(standardCheckoutPayRequest, RequestType.PP_CREATE_ORDER);
-        
+
         try {
             StandardCheckoutPayResponse response = client.pay(standardCheckoutPayRequest);
             thirdPartyRequestResponseService.updateResponse(register, response);
@@ -55,10 +55,10 @@ public class PhonePeUtility {
             String message = phonePeException.getMessage();
             Map<String, Object> data = phonePeException.getData();
             String code = phonePeException.getCode();
-            
-            logger.error("PhonePe order creation failed - Code: {}, Message: {}, Status: {}, OrderId: {}", 
+
+            logger.error("PhonePe order creation failed - Code: {}, Message: {}, Status: {}, OrderId: {}",
                     code, message, httpStatusCode, orderId);
-            
+
             thirdPartyRequestResponseService.registerException(register, message);
             return Optional.empty();
         }
@@ -66,7 +66,7 @@ public class PhonePeUtility {
 
     public Optional<OrderStatusResponse> checkStatus(String orderId) {
         Third_Party_Api register = thirdPartyRequestResponseService.register(orderId, RequestType.PP_CHECK_STATUS);
-        
+
         try {
             OrderStatusResponse response = client.getOrderStatus(orderId);
             thirdPartyRequestResponseService.updateResponse(register, response);
@@ -76,10 +76,10 @@ public class PhonePeUtility {
             String message = phonePeException.getMessage();
             Map<String, Object> data = phonePeException.getData();
             String code = phonePeException.getCode();
-            
-            logger.error("PhonePe status check failed - Code: {}, Message: {}, Status: {}, OrderId: {}", 
+
+            logger.error("PhonePe status check failed - Code: {}, Message: {}, Status: {}, OrderId: {}",
                     code, message, httpStatusCode, orderId);
-            
+
             thirdPartyRequestResponseService.registerException(register, message);
             return Optional.empty();
         }
