@@ -170,7 +170,7 @@ public class ManageSeller_BLService {
             user.setPassword(encode);
 
             List<Role> roles = plan.getRoles();
-            roles.stream().forEach(e -> {
+            roles.forEach(e -> {
                 e.setSeller_code(seller_record.getCode());
                 e.setSeller_id(seller_record.getId());
                 e.setUser_type(UserType.SELLER);
@@ -414,6 +414,7 @@ public class ManageSeller_BLService {
     @PostMapping("/resend")
     public SEResponse resend(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
+            log.info("/seller/resend API started.");
             FidnSellerBean req = request.getGenericRequestDataObject(FidnSellerBean.class);
             CommonUtils.extractHeaders(httpServletRequest, req);
             UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(),
@@ -432,8 +433,8 @@ public class ManageSeller_BLService {
             if (seller == null) {
                 throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
             }
-            Optional<Spoc_Details> optional = seller.getSpoc_details().stream().filter(e -> e.isPrimary()).findFirst();
-            if (!optional.isPresent()) {
+            Optional<Spoc_Details> optional = seller.getSpoc_details().stream().filter(Spoc_Details::isPrimary).findFirst();
+            if (optional.isEmpty()) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRIMARY_SPOC);
             }
             Spoc_Details spoc_Details = optional.get();
@@ -470,8 +471,8 @@ public class ManageSeller_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("/seller/create:: exception occurred");
-            log.error("/seller/create:: {}", e.getMessage());
+            log.error("/seller/resend:: exception occurred");
+            log.error("/seller/resend:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -540,7 +541,7 @@ public class ManageSeller_BLService {
             }
 
             List<String> primary_contacts = listS.stream().flatMap(e -> e.getSpoc_details().stream())
-                    .filter(s -> s.isPrimary()).map(p -> p.getMobile_no()).filter(Objects::nonNull).distinct().toList();
+                    .filter(Spoc_Details::isPrimary).map(Spoc_Details::getMobile_no).filter(Objects::nonNull).distinct().toList();
 
             SEFilter filterU = new SEFilter(SEFilterType.AND);
             filterU.addClause(WhereClause.in(Users.Fields.mobile_no, primary_contacts));
@@ -594,8 +595,8 @@ public class ManageSeller_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("/seller/create:: exception occurred");
-            log.error("/seller/create:: {}", e.getMessage());
+            log.error("/seller/find:: exception occurred");
+            log.error("/seller/find:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }

@@ -61,12 +61,6 @@ public class ManageTransaction_BLService {
     private final PhonePeUtility phonePeUtility;
     private final File_Upload_Details_Service file_Upload_Details_Service;
 
-    @PostMapping("/test/pay")
-    public StandardCheckoutPayResponse testPay() {
-        return phonePeUtility.createOrder(UUID.randomUUID().toString(), 100)
-                .orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.PG_ORDER_GEN_FAILED));
-    }
-
     @GetMapping("/status")
     public FindOneOrder status(@RequestParam("orderId") String orderId, HttpServletRequest httpServletRequest) {
         if (!StringUtils.hasText(orderId)) {

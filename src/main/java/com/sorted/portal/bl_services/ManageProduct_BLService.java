@@ -241,7 +241,7 @@ public class ManageProduct_BLService {
 
             this.validateMandatorySubCategories(category_Master, listSC);
 
-            String varient_mapping_id = this.upsertAndGetVarientMappingId(req, usersBean, role);
+            String varient_mapping_id = this.upsertAndGetVariantMappingId(req, usersBean, role);
 
             BigDecimal mrp = new BigDecimal(req.getMrp());
             BigDecimal sp = new BigDecimal(req.getSelling_price());
@@ -354,7 +354,7 @@ public class ManageProduct_BLService {
 
             this.validateMandatorySubCategories(category_Master, listSC);
 
-            String varient_mapping_id = this.upsertAndGetVarientMappingId(req, usersBean, role);
+            String varient_mapping_id = this.upsertAndGetVariantMappingId(req, usersBean, role);
 
             BigDecimal mrp = new BigDecimal(req.getMrp());
             BigDecimal sp = new BigDecimal(req.getSelling_price());
@@ -438,7 +438,7 @@ public class ManageProduct_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+            log.error("getFind:: error occurred:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -452,7 +452,7 @@ public class ManageProduct_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+            log.error("find:: error occurred:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -544,7 +544,7 @@ public class ManageProduct_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+            log.error("delete:: error occurred:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -571,7 +571,7 @@ public class ManageProduct_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+            log.error("findForEdit:: error occurred:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -632,7 +632,7 @@ public class ManageProduct_BLService {
 
             List<Products> listRI = productService.repoFind(filterRI);
 
-            Map<String, List<Products>> mapV = this.getVarients(product);
+            Map<String, List<Products>> mapV = this.getVariants(product);
 //			Set<String> seller_ids = this.getSellerByPincode(req.getPincode());
             Map<String, String> mapImg = this.filterAndFetchImgMap(List.of(product));
 
@@ -673,7 +673,7 @@ public class ManageProduct_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("validateUserForLogin:: error occerred:: {}", e.getMessage());
+            log.error("findOne:: error occurred:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -948,33 +948,33 @@ public class ManageProduct_BLService {
         return bean;
     }
 
-    private Map<String, List<Products>> getVarients(Products... products) {
+    private Map<String, List<Products>> getVariants(Products... products) {
         List<Products> listP = Arrays.asList(products);
-        return this.getVarients(listP);
+        return this.getVariants(listP);
     }
 
-    private Map<String, List<Products>> getVarients(List<Products> listP) {
-        Set<String> varientMappingIds = listP.stream().map(Products::getVarient_mapping_id).collect(Collectors.toSet());
-        varientMappingIds.remove(null);
-        if (CollectionUtils.isEmpty(varientMappingIds)) {
+    private Map<String, List<Products>> getVariants(List<Products> listP) {
+        Set<String> variantMappingIds = listP.stream().map(Products::getVarient_mapping_id).collect(Collectors.toSet());
+        variantMappingIds.remove(null);
+        if (CollectionUtils.isEmpty(variantMappingIds)) {
             return new HashMap<>();
         }
         List<String> product_ids = listP.stream().map(Products::getId).toList();
         SEFilter filterVM = new SEFilter(SEFilterType.AND);
-        filterVM.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(varientMappingIds)));
+        filterVM.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(variantMappingIds)));
         filterVM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         List<Varient_Mapping> listVM = varient_Mapping_Service.repoFind(filterVM);
         if (CollectionUtils.isEmpty(listVM)) {
             return new HashMap<>();
         }
-        List<String> varient_ids = listVM.stream().map(Varient_Mapping::getId).toList();
-        SEFilter filterVarients = new SEFilter(SEFilterType.AND);
-        filterVarients.addClause(WhereClause.in(Products.Fields.varient_mapping_id, varient_ids));
-        filterVarients.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        filterVarients.addClause(WhereClause.nin(BaseMongoEntity.Fields.id, product_ids));
+        List<String> variant_ids = listVM.stream().map(Varient_Mapping::getId).toList();
+        SEFilter filterVariants = new SEFilter(SEFilterType.AND);
+        filterVariants.addClause(WhereClause.in(Products.Fields.varient_mapping_id, variant_ids));
+        filterVariants.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterVariants.addClause(WhereClause.nin(BaseMongoEntity.Fields.id, product_ids));
 
-        List<Products> varients = productService.repoFind(filterVarients);
+        List<Products> varients = productService.repoFind(filterVariants);
         if (CollectionUtils.isEmpty(varients)) {
             return new HashMap<>();
         }
@@ -1066,12 +1066,12 @@ public class ManageProduct_BLService {
         if (CollectionUtils.isEmpty(categoryMaster.getGroups())) {
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
-        List<SubCategory> sub_catagories = categoryMaster.getSub_categories();
-        if (CollectionUtils.isEmpty(sub_catagories)) {
+        List<SubCategory> sub_categories = categoryMaster.getSub_categories();
+        if (CollectionUtils.isEmpty(sub_categories)) {
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
 
-        return sub_catagories.stream().collect(Collectors.toMap(SubCategory::getName,
+        return sub_categories.stream().collect(Collectors.toMap(SubCategory::getName,
                 e -> CollectionUtils.isEmpty(e.getAttributes()) ? new ArrayList<>() : e.getAttributes()));
     }
 
@@ -1097,10 +1097,10 @@ public class ManageProduct_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY);
             }
 
-            SelectedSubCatagories subCatagories = new SelectedSubCatagories();
-            subCatagories.setSub_category(key);
-            subCatagories.setSelected_attributes(val);
-            listSC.add(subCatagories);
+            SelectedSubCatagories subCategories = new SelectedSubCatagories();
+            subCategories.setSub_category(key);
+            subCategories.setSelected_attributes(val);
+            listSC.add(subCategories);
         });
         return listSC;
     }
@@ -1119,7 +1119,7 @@ public class ManageProduct_BLService {
         });
     }
 
-    private String upsertAndGetVarientMappingId(ProductReqBean req, UsersBean usersBean, Role role) {
+    private String upsertAndGetVariantMappingId(ProductReqBean req, UsersBean usersBean, Role role) {
         if (StringUtils.hasText(req.getVarient_mapping_id())) {
             SEFilter filterV = new SEFilter(SEFilterType.AND);
             filterV.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -1135,11 +1135,11 @@ public class ManageProduct_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_VARIENT_NAME);
             }
 
-            String varient_name = CommonUtils.toTitleCase(req.getVarient_name());
+            String variant_name = CommonUtils.toTitleCase(req.getVarient_name());
 
             SEFilter filterV = new SEFilter(SEFilterType.AND);
             filterV.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-            filterV.addClause(WhereClause.eq(Varient_Mapping.Fields.name, varient_name));
+            filterV.addClause(WhereClause.eq(Varient_Mapping.Fields.name, variant_name));
             if (role.getUser_type() == UserType.SELLER) {
                 filterV.addClause(WhereClause.eq(Varient_Mapping.Fields.seller_id, usersBean.getRole().getSeller_id()));
             }
@@ -1148,15 +1148,15 @@ public class ManageProduct_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.DUPLICATE_VARIENT);
             }
 
-            Varient_Mapping varient = new Varient_Mapping();
-            varient.setName(varient_name);
+            Varient_Mapping variant = new Varient_Mapping();
+            variant.setName(variant_name);
             if (role.getUser_type() == UserType.SELLER) {
-                varient.setSeller_id(role.getSeller_id());
-                varient.setSeller_code(role.getSeller_code());
+                variant.setSeller_id(role.getSeller_id());
+                variant.setSeller_code(role.getSeller_code());
             }
 
-            varient = varient_Mapping_Service.create(varient, usersBean.getId());
-            return varient.getId();
+            variant = varient_Mapping_Service.create(variant, usersBean.getId());
+            return variant.getId();
         }
         return null;
     }

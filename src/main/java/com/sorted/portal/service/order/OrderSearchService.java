@@ -9,6 +9,8 @@ import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Order_Item_Service;
 import com.sorted.commons.entity.service.ProductService;
 import com.sorted.commons.entity.service.Users_Service;
+import com.sorted.commons.enums.Activity;
+import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
@@ -60,7 +62,7 @@ public class OrderSearchService {
 
             // Validate user permissions
             UsersBean usersBean = usersService.validateUserForActivity(
-                    req.getReq_user_id(), null, null);
+                    req.getReq_user_id(), Permission.VIEW, Activity.ORDER_MANAGEMENT);
 
             // Build filter
             SEFilter orderFilter = filterBuilder.buildOrderFilter(req, usersBean);
@@ -118,7 +120,7 @@ public class OrderSearchService {
 
             // Validate user permissions
             UsersBean usersBean = usersService.validateUserForActivity(
-                    req.getReq_user_id(), null, null);
+                    req.getReq_user_id(), Permission.VIEW, Activity.ORDER_MANAGEMENT);
 
             // Build filter
             SEFilter orderFilter = filterBuilder.buildOrderFilter(req, usersBean);
