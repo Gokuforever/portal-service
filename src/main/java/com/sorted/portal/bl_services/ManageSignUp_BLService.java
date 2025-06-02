@@ -217,9 +217,17 @@ public class ManageSignUp_BLService {
             UsersBean usersBean = users_Service.validateAndGetUserInfo(users.getId());
 
             String guest_user_id = httpServletRequest.getHeader("req_user_id");
-            if (guest_user_id != null) {
-                signUpService.migrateCart(guest_user_id, users.getId());
-                signUpService.migrateAddressForCustomer(guest_user_id, users.getId());
+            if (StringUtils.hasText(guest_user_id)) {
+                SEFilter filterGU = new SEFilter(SEFilterType.AND);
+                filterGU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, guest_user_id));
+                filterGU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+                Users guestUser = users_Service.repoFindOne(filterGU);
+                if (guestUser != null) {
+                    users.setProperties(guestUser.getProperties());
+                    users_Service.update(guest_user_id, users, users.getId());
+                    signUpService.migrateCart(guest_user_id, users.getId());
+                    signUpService.migrateAddressForCustomer(guest_user_id, users.getId());
+                }
             }
 
             return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
