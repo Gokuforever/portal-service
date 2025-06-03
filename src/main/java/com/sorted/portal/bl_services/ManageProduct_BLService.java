@@ -13,10 +13,7 @@ import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
-import com.sorted.commons.utils.CommonUtils;
-import com.sorted.commons.utils.GoogleDriveService;
-import com.sorted.commons.utils.PorterUtility;
-import com.sorted.commons.utils.SERegExpUtils;
+import com.sorted.commons.utils.*;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDetailsBuilder;
@@ -62,19 +59,18 @@ public class ManageProduct_BLService {
     private final File_Upload_Details_Service file_Upload_Details_Service;
     private final SearchHistoryAsyncHelper searchHistoryAsyncHelper;
     private final PorterUtility porterUtility;
-    private final GoogleDriveService googleDriveService;
+    private final AwsS3Service awsS3Service;
     private final int defaultPage;
     private final int defaultSize;
     private final Map<String, Category_Master> categoryMasterCache = new ConcurrentHashMap<>();
     private static final long CACHE_EXPIRY_TIME = 30 * 60 * 1000; // 30 minutes
     private long lastCacheClearTime = System.currentTimeMillis();
 
-    public ManageProduct_BLService(GoogleDriveService googleDriveService, ProductService productService, Cart_Service cart_Service,
+    public ManageProduct_BLService(ProductService productService, Cart_Service cart_Service,
                                    Varient_Mapping_Service varient_Mapping_Service, Category_MasterService category_MasterService,
                                    Users_Service users_Service, Seller_Service seller_Service, File_Upload_Details_Service file_Upload_Details_Service,
-                                   SearchHistoryAsyncHelper searchHistoryAsyncHelper, PorterUtility porterUtility,
+                                   SearchHistoryAsyncHelper searchHistoryAsyncHelper, PorterUtility porterUtility, AwsS3Service awsS3Service,
                                    @Value("${se.default.page}") int defaultPage, @Value("${se.default.size}") int defaultSize) {
-        this.googleDriveService = googleDriveService;
         this.productService = productService;
         this.cart_Service = cart_Service;
         this.varient_Mapping_Service = varient_Mapping_Service;
@@ -84,6 +80,7 @@ public class ManageProduct_BLService {
         this.file_Upload_Details_Service = file_Upload_Details_Service;
         this.searchHistoryAsyncHelper = searchHistoryAsyncHelper;
         this.porterUtility = porterUtility;
+        this.awsS3Service = awsS3Service;
         this.defaultPage = defaultPage;
         this.defaultSize = defaultSize;
     }
@@ -687,13 +684,13 @@ public class ManageProduct_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
             }
             UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.INVENTORY_MANAGEMENT);
-            File_Upload_Details file_Upload_Details = googleDriveService.uploadPhoto(file, usersBean,
+            File_Upload_Details file_Upload_Details = awsS3Service.uploadPhoto(file, usersBean,
                     DocumentType.PRODUCT_IMAGE);
             Media media = new Media();
             media.setKey(file_Upload_Details.getDocument_id());
             media.setDocument_id(file_Upload_Details.getId());
             return SEResponse.getBasicSuccessResponseObject(media, ResponseCode.SUCCESSFUL);
-        } catch (IOException | GeneralSecurityException e) {
+        } catch (IOException e) {
             log.error("Exception occurred: message: {}", e.getMessage(), e);
             return SEResponse.getBadRequestFailureResponse(ResponseCode.ERR_0001);
         }
