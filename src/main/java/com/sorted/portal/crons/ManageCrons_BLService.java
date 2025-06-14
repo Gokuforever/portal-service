@@ -1,40 +1,51 @@
 package com.sorted.portal.crons;
 
+import com.sorted.commons.beans.TableConfig;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Order_Details;
 import com.sorted.commons.entity.mongo.Order_Item;
+import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Order_Item_Service;
+import com.sorted.commons.entity.service.Users_Service;
+import com.sorted.commons.enums.ColumnType;
+import com.sorted.commons.enums.MailTemplate;
 import com.sorted.commons.enums.OrderStatus;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
+import com.sorted.commons.helper.MailBuilder;
+import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.porter.res.beans.FetchOrderRes;
 import com.sorted.commons.utils.PorterUtility;
+import com.sorted.commons.utils.TemplateProcessorUtil;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class ManageCrons_BLService {
 
-    @Autowired
-    private Order_Details_Service order_Details_Service;
 
-    @Autowired
-    private PorterUtility porterUtility;
-
-    @Autowired
-    private Order_Item_Service order_Item_Service;
+    private final Order_Details_Service order_Details_Service;
+    private final PorterUtility porterUtility;
+    private final Order_Item_Service order_Item_Service;
+    private final Users_Service usersService;
+    private final EmailSenderImpl emailSenderImpl;
 
     //	@Scheduled(fixedRate = 5000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
@@ -110,6 +121,53 @@ public class ManageCrons_BLService {
                 break;
             case ended:
                 currentOrderStatus = OrderStatus.DELIVERED;
+
+                SEFilter filterU = new SEFilter(SEFilterType.AND);
+                filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+                filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, details.getUser_id()));
+
+                Users user = usersService.repoFindOne(filterU);
+                if(user == null) {
+                    throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+                }
+                String userName = user.getFirst_name() + " " + user.getLast_name();
+                String orderCode = details.getCode();
+                String orderDate = details.getCreation_date_str();
+
+                StringBuilder productDetails = new StringBuilder();
+                List<Order_Item> listOI = getOrderItems(details);
+                for (Order_Item orderItem : listOI) {
+                    productDetails.append(orderItem.getProduct_name()).append("|").append(orderItem.getQuantity()).append("|");
+                }
+
+                String productDetailsString = productDetails.toString();
+
+                TableConfig orderConfig = TemplateProcessorUtil.createTableConfig(2)
+                        .withTableCssClass("order-table")
+                        .withNoDataMessage("No order data available")
+                        .addInfoSection("Order Number", 0, "order-info")
+                        .addInfoSection("Order Date", 1, "order-info")
+                        .addColumn("Sr. No.", ColumnType.SERIAL_NUMBER)
+                        .addColumn("Product Name", ColumnType.DATA)
+                        .addColumn("Quantity", ColumnType.DATA)
+                        .build();
+
+                // Create config map
+                Map<String, TableConfig> tableConfigs = new HashMap<>();
+                tableConfigs.put("orderDetails", orderConfig);
+
+                // Usage
+                String template = "<div>{{orderDetails}}</div>";
+                String content = orderCode + "|" + orderDate + "|" + productDetailsString;
+                String result = TemplateProcessorUtil.replacePlaceholders(template, content, tableConfigs);
+
+                String mailContent = userName + "|" + result;
+
+                MailBuilder builder = new MailBuilder();
+                builder.setTo(user.getEmail_id());
+                builder.setContent(mailContent);
+                builder.setTemplate(MailTemplate.ORDER_ARRIVED);
+                emailSenderImpl.sendEmailHtmlTemplate(builder);
                 break;
             case live:
                 currentOrderStatus = OrderStatus.OUT_FOR_DELIVERY;
@@ -118,17 +176,10 @@ public class ManageCrons_BLService {
                 break;
         }
         if (currentOrderStatus != null && details.getStatus() != currentOrderStatus) {
-            SEFilter filterOI = new SEFilter(SEFilterType.AND);
-            filterOI.addClause(WhereClause.eq(Order_Item.Fields.order_id, details.getId()));
-            filterOI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-            List<Order_Item> listOI = order_Item_Service.repoFind(filterOI);
-            if (CollectionUtils.isEmpty(listOI)) {
-                throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
-            }
+            List<Order_Item> listOI = getOrderItems(details);
             final OrderStatus finalOrderStatus = currentOrderStatus;
 
-            listOI.stream().forEach(e -> {
+            listOI.forEach(e -> {
                 e.setStatus(finalOrderStatus, Defaults.PORTER_STCHK_CRON);
                 order_Item_Service.update(e.getId(), e, Defaults.PORTER_STCHK_CRON);
             });
@@ -136,5 +187,18 @@ public class ManageCrons_BLService {
             details.setStatus(finalOrderStatus, Defaults.PORTER_STCHK_CRON);
             order_Details_Service.update(details.getId(), details, Defaults.PORTER_STCHK_CRON);
         }
+    }
+
+    @NotNull
+    private List<Order_Item> getOrderItems(Order_Details details) {
+        SEFilter filterOI = new SEFilter(SEFilterType.AND);
+        filterOI.addClause(WhereClause.eq(Order_Item.Fields.order_id, details.getId()));
+        filterOI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Order_Item> listOI = order_Item_Service.repoFind(filterOI);
+        if (CollectionUtils.isEmpty(listOI)) {
+            throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+        }
+        return listOI;
     }
 }

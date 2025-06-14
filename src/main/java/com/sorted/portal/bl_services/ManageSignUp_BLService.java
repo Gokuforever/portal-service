@@ -8,17 +8,16 @@ import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Users_Service;
-import com.sorted.commons.enums.EntityDetails;
-import com.sorted.commons.enums.ProcessType;
-import com.sorted.commons.enums.ResponseCode;
-import com.sorted.commons.enums.Semester;
+import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
+import com.sorted.commons.helper.MailBuilder;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.manage.otp.ManageOtp;
+import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.utils.PasswordValidatorUtils;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.request.beans.SignUpRequest;
@@ -44,14 +43,16 @@ public class ManageSignUp_BLService {
     private final PasswordEncoder passwordEncoder;
     private final String customer_signup_role;
     private final SignUpService signUpService;
+    private final EmailSenderImpl emailSenderImpl;
 
     // Constructor Injection
     public ManageSignUp_BLService(ManageOtp manageOtp, Users_Service users_Service, RoleService roleService,
-                                  @Value("${se.portal.customer.signup.role}") String customer_signup_role, SignUpService signUpService) {
+                                  @Value("${se.portal.customer.signup.role}") String customer_signup_role, SignUpService signUpService, EmailSenderImpl emailSenderImpl) {
         this.manageOtp = manageOtp;
         this.users_Service = users_Service;
         this.roleService = roleService;
         this.signUpService = signUpService;
+        this.emailSenderImpl = emailSenderImpl;
         this.passwordEncoder = new BCryptPasswordEncoder();
         this.customer_signup_role = customer_signup_role;
     }
@@ -212,9 +213,7 @@ public class ManageSignUp_BLService {
             }
             users.setIs_verified(true);
             users.setRole_id(customer_signup_role);
-            users_Service.update(users.getId(), users, Defaults.SIGN_UP);
 
-            UsersBean usersBean = users_Service.validateAndGetUserInfo(users.getId());
 
             String guest_user_id = httpServletRequest.getHeader("req_user_id");
             if (StringUtils.hasText(guest_user_id)) {
@@ -229,6 +228,15 @@ public class ManageSignUp_BLService {
                     signUpService.migrateAddressForCustomer(guest_user_id, users.getId());
                 }
             }
+            users_Service.update(users.getId(), users, Defaults.SIGN_UP);
+            UsersBean usersBean = users_Service.validateAndGetUserInfo(users.getId());
+
+            String cont = users.getFirst_name() + " " + users.getLast_name();
+            MailBuilder builder = new MailBuilder();
+            builder.setTo(users.getEmail_id());
+            builder.setContent(cont);
+            builder.setTemplate(MailTemplate.SIGN_UP_COMPLETED);
+            emailSenderImpl.sendEmailHtmlTemplate(builder);
 
             return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
@@ -239,6 +247,5 @@ public class ManageSignUp_BLService {
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
-
 
 }
