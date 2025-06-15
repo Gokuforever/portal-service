@@ -708,6 +708,7 @@ public class ManageProduct_BLService {
             Media media = new Media();
             media.setKey(file_Upload_Details.getDocument_id());
             media.setDocument_id(file_Upload_Details.getId());
+            media.setCdn_url(file_Upload_Details.getFile_url());
             return SEResponse.getBasicSuccessResponseObject(media, ResponseCode.SUCCESSFUL);
         } catch (IOException e) {
             log.error("Exception occurred: message: {}", e.getMessage(), e);
