@@ -22,6 +22,8 @@ import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.porter.res.beans.FetchOrderRes;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.TemplateProcessorUtil;
+import com.sorted.portal.service.order.OrderStatusCheckService;
+import com.sorted.portal.service.order.OrderTemplateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -46,6 +48,8 @@ public class ManageCrons_BLService {
     private final Order_Item_Service order_Item_Service;
     private final Users_Service usersService;
     private final EmailSenderImpl emailSenderImpl;
+    private final OrderTemplateService orderTemplateService;
+    private final OrderStatusCheckService orderStatusCheckService;
 
     //	@Scheduled(fixedRate = 5000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
@@ -131,37 +135,9 @@ public class ManageCrons_BLService {
                     throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
                 }
                 String userName = user.getFirst_name() + " " + user.getLast_name();
-                String orderCode = details.getCode();
-                String orderDate = details.getCreation_date_str();
+                String orderTemplateTable = orderTemplateService.getOrderTemplateTable(details);
 
-                StringBuilder productDetails = new StringBuilder();
-                List<Order_Item> listOI = getOrderItems(details);
-                for (Order_Item orderItem : listOI) {
-                    productDetails.append(orderItem.getProduct_name()).append("|").append(orderItem.getQuantity()).append("|");
-                }
-
-                String productDetailsString = productDetails.toString();
-
-                TableConfig orderConfig = TemplateProcessorUtil.createTableConfig(2)
-                        .withTableCssClass("order-table")
-                        .withNoDataMessage("No order data available")
-                        .addInfoSection("Order Number", 0, "order-info")
-                        .addInfoSection("Order Date", 1, "order-info")
-                        .addColumn("Sr. No.", ColumnType.SERIAL_NUMBER)
-                        .addColumn("Product Name", ColumnType.DATA)
-                        .addColumn("Quantity", ColumnType.DATA)
-                        .build();
-
-                // Create config map
-                Map<String, TableConfig> tableConfigs = new HashMap<>();
-                tableConfigs.put("orderDetails", orderConfig);
-
-                // Usage
-                String template = "<div>{{orderDetails}}</div>";
-                String content = orderCode + "|" + orderDate + "|" + productDetailsString;
-                String result = TemplateProcessorUtil.replacePlaceholders(template, content, tableConfigs);
-
-                String mailContent = userName + "|" + result;
+                String mailContent = userName + "|" + orderTemplateTable;
 
                 MailBuilder builder = new MailBuilder();
                 builder.setTo(user.getEmail_id());
@@ -201,4 +177,23 @@ public class ManageCrons_BLService {
         }
         return listOI;
     }
+
+    //	@Scheduled(fixedRate = 5000) // Executes every 5000ms (5 seconds)
+    public void phonePeStatusCheckForPendingTransactions() {
+        SEFilter filterOD = new SEFilter(SEFilterType.AND);
+        filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
+        filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterOD.addClause(
+                WhereClause.lte(BaseMongoEntity.Fields.modification_date, LocalDateTime.now().minusMinutes(5)));
+        filterOD.addClause(
+                WhereClause.in(Order_Details.Fields.status_id, Arrays.asList(OrderStatus.TRANSACTION_PENDING.getId(),
+                        OrderStatus.ORDER_PLACED.getId())));
+
+        List<Order_Details> listOD = order_Details_Service.repoFind(filterOD);
+        if (CollectionUtils.isEmpty(listOD)) {
+            return;
+        }
+        listOD.parallelStream().forEach(orderStatusCheckService::checkOrderStatus);
+    }
 }
+

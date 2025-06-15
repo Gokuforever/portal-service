@@ -1,5 +1,6 @@
 package com.sorted.portal.service.order;
 
+import com.phonepe.sdk.pg.common.models.response.RefundResponse;
 import com.razorpay.RazorpayException;
 import com.razorpay.Refund;
 import com.sorted.commons.beans.AddressDTO;
@@ -17,6 +18,8 @@ import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.res.beans.CreateOrderResBean;
 import com.sorted.commons.porter.res.beans.FetchOrderRes.FareDetails;
+import com.sorted.commons.utils.CommonUtils;
+import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.razorpay.RazorpayUtility;
 import com.sorted.portal.request.beans.CreateDeliveryBean;
 import com.sorted.portal.request.beans.OrderAcceptRejectRequest;
@@ -25,7 +28,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.Year;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Service for processing order operations
@@ -40,6 +46,7 @@ public class OrderProcessingService {
     private final OrderValidationService validationService;
     private final OrderDeliveryService deliveryService;
     private final RazorpayUtility razorpayUtility;
+    private final PhonePeUtility phonePeUtility;
 
     /**
      * Process ready for pickup operation
@@ -148,16 +155,43 @@ public class OrderProcessingService {
         orderDetails.setRejection_remarks(remarks);
         orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
 
-        // Process refund
-        Refund refund = razorpayUtility.refund(
-                orderDetails.getTransaction_id(),
-                orderDetails.getTotal_amount());
+        long nanoseconds = CommonUtils.getNanoseconds();
+        String refundTxnId = "REF-" +
+                LocalDate.now().getMonth() +
+                Year.now() +
+                nanoseconds;
 
-        if (refund == null) {
-            return handleFailedRefundInitiation(orderDetails, userId);
+        orderDetails.setRefund_transaction_id(refundTxnId);
+        orderDetails.setStatus(OrderStatus.REFUND_REQUESTED, userId);
+        orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
+        // Process refund
+        Optional<RefundResponse> refundResponse = phonePeUtility.refund(refundTxnId, orderDetails.getId(), orderDetails.getTotal_amount());
+        if (refundResponse.isEmpty()) {
+            return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
         }
 
-        return handleRefundResponse(orderDetails, refund, userId);
+        RefundResponse response = refundResponse.get();
+        String state = response.getState();
+        OrderStatus orderStatus = switch (state) {
+            case "COMPLETED" -> OrderStatus.FULLY_REFUNDED;
+            case "FAILED" -> OrderStatus.REFUND_FAILED;
+            default -> OrderStatus.PENDING_REFUND;
+        };
+
+        orderDetails.setStatus(orderStatus, userId);
+        orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
+
+        if (orderStatus == OrderStatus.FULLY_REFUNDED) {
+            // TODO: amount refunded
+        } else if (orderStatus == OrderStatus.REFUND_FAILED) {
+            // TODO: refund initiated
+            // TODO: trigger internal mail for refund failure
+            // TODO: create cron job for retry
+        } else {
+            // TODO: refund initiated
+        }
+
+        return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
     }
 
     /**

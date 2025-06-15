@@ -1,8 +1,5 @@
 package com.sorted.portal.bl_services;
 
-import com.phonepe.sdk.pg.common.models.PgV2InstrumentType;
-import com.phonepe.sdk.pg.common.models.response.OrderStatusResponse;
-import com.phonepe.sdk.pg.common.models.response.PaymentDetail;
 import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayResponse;
 import com.razorpay.RazorpayException;
 import com.sorted.commons.beans.AddressDTO;
@@ -27,6 +24,7 @@ import com.sorted.portal.razorpay.RazorpayUtility;
 import com.sorted.portal.request.beans.PayNowBean;
 import com.sorted.portal.response.beans.*;
 import com.sorted.portal.service.OrderService;
+import com.sorted.portal.service.order.OrderStatusCheckService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,7 +57,7 @@ public class ManageTransaction_BLService {
     private final Order_Dump_Service orderDumpService;
     private final OrderService orderService;
     private final PhonePeUtility phonePeUtility;
-    private final File_Upload_Details_Service file_Upload_Details_Service;
+    private final OrderStatusCheckService orderStatusCheckService;
 
     @GetMapping("/status")
     public FindOneOrder status(@RequestParam("orderId") String orderId, HttpServletRequest httpServletRequest) {
@@ -79,29 +77,19 @@ public class ManageTransaction_BLService {
 
         Order_Details order_Details = findOrderDetails(orderId, usersBean.getId());
 
-        OrderStatus status = order_Details.getStatus();
-        boolean cartAndProductUpdated = status.equals(OrderStatus.TRANSACTION_PENDING) || status.equals(OrderStatus.TRANSACTION_PROCESSED);
 
         try {
-            // Process payment status if needed
-            processPaymentStatus(order_Details);
-
-            List<OrderItemResponse> orderItemResponseList = getOrderItemResponses(order_Details, cartAndProductUpdated);
-
-            AddressDTO deliveryAddress = order_Details.getDelivery_address();
-            AddressResponse addressResponse = buildAddressResponse(deliveryAddress);
-
-            log.info("status:: Successfully retrieved status for order ID: {}, with {} items",
-                    orderId, orderItemResponseList.size());
+            List<OrderItemResponse> orderItemResponseList = orderStatusCheckService.checkOrderStatus(order_Details);
 
             // Build the complete response with code field included
+            AddressResponse addressResponse = buildAddressResponse(order_Details.getDelivery_address());
             return FindOneOrder.builder()
                     .id(orderId)
                     .code(order_Details.getCode())
                     .paymentStatus(order_Details.getPayment_status())
                     .paymentMode(order_Details.getPayment_mode())
                     .totalAmount(order_Details.getTotal_amount())
-                    .status(status.getCustomer_status())
+                    .status(order_Details.getStatus().getCustomer_status())
                     .transactionId(order_Details.getTransaction_id())
                     .orderItems(orderItemResponseList)
                     .deliveryAddress(addressResponse)
@@ -132,189 +120,6 @@ public class ManageTransaction_BLService {
         return order_Details;
     }
 
-    private void processPaymentStatus(Order_Details order_Details) {
-        // Only check payment status if not already completed
-        if (!(StringUtils.hasText(order_Details.getPayment_status()) && order_Details.getPayment_status().equals("COMPLETED"))) {
-            log.info("status:: Payment not completed, checking with PhonePe for order ID: {}", order_Details.getId());
-            Optional<OrderStatusResponse> orderStatusResponseOptional = phonePeUtility.checkStatus(order_Details.getId());
-
-            if (orderStatusResponseOptional.isEmpty()) {
-                log.error("status:: Empty response from PhonePe for order ID: {}", order_Details.getId());
-                throw new CustomIllegalArgumentsException(ResponseCode.PG_BAD_REQ);
-            }
-
-            OrderStatusResponse orderStatusResponse = orderStatusResponseOptional.get();
-            if (CollectionUtils.isEmpty(orderStatusResponse.getPaymentDetails())) {
-                log.error("status:: Invalid response from PhonePe payment status check for order ID: {}", order_Details.getId());
-                throw new CustomIllegalArgumentsException(ResponseCode.PG_BAD_REQ);
-            }
-
-            List<PaymentDetail> paymentDetails = orderStatusResponse.getPaymentDetails();
-            PaymentDetail paymentDetail = paymentDetails.get(paymentDetails.size() - 1);
-            String state = paymentDetail.getState();
-            PgV2InstrumentType paymentMode = paymentDetail.getPaymentMode();
-            String transactionId = paymentDetail.getTransactionId();
-
-            log.info("status:: Payment details - state: {}, mode: {}, transactionId: {}",
-                    state, paymentMode, transactionId);
-
-            order_Details.setPayment_status(state);
-            order_Details.setPayment_mode(paymentMode != null ? paymentMode.name() : null);
-            order_Details.setTransaction_id(transactionId);
-
-            // Update order status only if payment is successful
-            OrderStatus status = switch (state) {
-                case "COMPLETED" -> OrderStatus.TRANSACTION_PROCESSED;
-                case "FAILED" -> OrderStatus.TRANSACTION_FAILED;
-                default -> OrderStatus.TRANSACTION_PENDING;
-            };
-            order_Details.setStatus(status, Defaults.SYSTEM_ADMIN);
-            log.info("status:: Order status updated to {} for order ID: {}", status, order_Details.getId());
-
-            order_Details_Service.update(order_Details.getId(), order_Details, Defaults.SYSTEM_ADMIN);
-        }
-    }
-
-    private List<OrderItemResponse> getOrderItemResponses(Order_Details order_Details, boolean cartAndProductUpdated) {
-        List<OrderItemResponse> orderItemResponseList = new ArrayList<>();
-
-        SEFilter filterOI = new SEFilter(SEFilterType.AND);
-        filterOI.addClause(WhereClause.eq(Order_Item.Fields.order_id, order_Details.getId()));
-        filterOI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-        List<Order_Item> orderItems = order_Item_Service.repoFind(filterOI);
-        if (!CollectionUtils.isEmpty(orderItems)) {
-            List<String> productIds = orderItems.stream()
-                    .map(Order_Item::getProduct_id)
-                    .filter(StringUtils::hasText)
-                    .distinct()
-                    .toList();
-
-            if (!CollectionUtils.isEmpty(productIds)) {
-                // Handle cart updates based on transaction status
-                if (!cartAndProductUpdated && (order_Details.getStatus().equals(OrderStatus.TRANSACTION_PROCESSED) || order_Details.getStatus().equals(OrderStatus.TRANSACTION_PENDING))) {
-                    updateCartAfterTransaction(order_Details.getUser_id(), productIds);
-                }
-
-                Map<String, Products> mapP = getProductsMap(productIds);
-
-                // Update product quantities if needed
-                if (!cartAndProductUpdated && (order_Details.getStatus().equals(OrderStatus.TRANSACTION_PROCESSED) || order_Details.getStatus().equals(OrderStatus.TRANSACTION_PENDING))) {
-                    updateProductQuantities(orderItems, mapP);
-                }
-
-                Map<String, String> mapFUD = getFileUploadDetailsMap(mapP.keySet());
-
-                for (Order_Item item : orderItems) {
-                    OrderItemResponse response = convertToResponse(mapP, item, mapFUD);
-                    if (response != null) {
-                        orderItemResponseList.add(response);
-                    }
-                }
-            }
-        }
-        return orderItemResponseList;
-    }
-
-    /**
-     * Updates the user's cart by removing products that are part of this transaction
-     *
-     * @param userId     User ID of the cart owner
-     * @param productIds List of product IDs to remove from cart
-     */
-    private void updateCartAfterTransaction(String userId, List<String> productIds) {
-        SEFilter filterC = new SEFilter(SEFilterType.AND);
-        filterC.addClause(WhereClause.eq(Cart.Fields.user_id, userId));
-        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        Cart cart = cart_Service.repoFindOne(filterC);
-
-        if (cart == null) {
-            throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
-        }
-
-        List<Item> filteredItems = cart.getCart_items().stream()
-                .filter(e -> !productIds.contains(e.getProduct_id()))
-                .toList();
-
-        if (!filteredItems.isEmpty()) {
-            cart.setCart_items(filteredItems);
-        } else {
-            cart.setCart_items(null);
-        }
-
-        cart_Service.update(cart.getId(), cart, Defaults.SYSTEM_ADMIN);
-    }
-
-    /**
-     * Retrieves a map of products by their IDs
-     *
-     * @param productIds List of product IDs to look up
-     * @return Map of product IDs to Products
-     */
-    private Map<String, Products> getProductsMap(List<String> productIds) {
-        SEFilter filterP = new SEFilter(SEFilterType.AND);
-        filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productIds));
-        filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-        List<Products> products = productService.repoFind(filterP);
-        return !CollectionUtils.isEmpty(products) ?
-                products.stream().collect(Collectors.toMap(Products::getId, product -> product, (p1, p2) -> p1)) :
-                new HashMap<>();
-    }
-
-    /**
-     * Updates product quantities after a successful transaction
-     *
-     * @param orderItems  List of order items that were purchased
-     * @param productsMap Map of product IDs to Products
-     */
-    private void updateProductQuantities(List<Order_Item> orderItems, Map<String, Products> productsMap) {
-        for (Order_Item orderItem : orderItems) {
-            Products product = productsMap.getOrDefault(orderItem.getProduct_id(), null);
-            if (product == null) {
-                continue;
-            }
-
-            Long currentQuantity = product.getQuantity();
-            Long orderedQuantity = orderItem.getQuantity();
-            long updatedQuantity = currentQuantity - orderedQuantity;
-
-            if (updatedQuantity < 0) {
-                updatedQuantity = 0L;
-            }
-
-            product.setQuantity(updatedQuantity);
-            productService.update(product.getId(), product, Defaults.SYSTEM_ADMIN);
-        }
-    }
-
-    /**
-     * Retrieves file upload details for products
-     *
-     * @param productIds Set of product IDs to find file upload details for
-     * @return Map of product IDs to file document IDs
-     */
-    private Map<String, String> getFileUploadDetailsMap(Set<String> productIds) {
-        Map<String, String> mapFUD = new HashMap<>();
-
-        if (!productIds.isEmpty()) {
-            SEFilter filterFUD = new SEFilter(SEFilterType.AND);
-            filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(productIds)));
-            filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-            List<File_Upload_Details> listFUD = file_Upload_Details_Service.repoFind(filterFUD);
-            if (!CollectionUtils.isEmpty(listFUD)) {
-                listFUD.forEach(fud -> {
-                    if (StringUtils.hasText(fud.getId()) && StringUtils.hasText(fud.getDocument_id())) {
-                        mapFUD.putIfAbsent(fud.getId(), fud.getDocument_id());
-                    }
-                });
-            }
-        }
-
-        return mapFUD;
-    }
-
     private AddressResponse buildAddressResponse(AddressDTO deliveryAddress) {
         return AddressResponse.builder()
                 .addressType(deliveryAddress.getAddress_type())
@@ -326,29 +131,6 @@ public class ManageTransaction_BLService {
                 .landmark(deliveryAddress.getLandmark())
                 .addressTypeDesc(deliveryAddress.getAddress_type_desc())
                 .phone_no(deliveryAddress.getPhone_no())
-                .build();
-    }
-
-    private OrderItemResponse convertToResponse(Map<String, Products> mapP, Order_Item orderItem, Map<String, String> mapFUD) {
-        if (orderItem == null || !StringUtils.hasText(orderItem.getProduct_id())) {
-            log.warn("convertToResponse:: Invalid order item or missing product ID");
-            return null;
-        }
-
-        Products product = mapP.getOrDefault(orderItem.getProduct_id(), null);
-        String productName = (product != null) ? product.getName() : "";
-        String documentId = mapFUD.getOrDefault(orderItem.getProduct_id(), null);
-        String purchaseType = (orderItem.getType() != null) ? orderItem.getType().name() : "";
-
-        return OrderItemResponse.builder()
-                .productCode(orderItem.getProduct_code())
-                .productId(orderItem.getProduct_id())
-                .productName(productName)
-                .documentId(documentId)
-                .purchaseType(purchaseType)
-                .quantity(orderItem.getQuantity())
-                .sellingPrice(orderItem.getSelling_price())
-                .totalCost(orderItem.getTotal_cost())
                 .build();
     }
 
@@ -420,6 +202,7 @@ public class ManageTransaction_BLService {
             String pgOrderId = checkoutPayResponse.getOrderId();
             order_Details.setPg_order_id(pgOrderId);
             order_Details_Service.update(order_Details.getId(), order_Details, usersBean.getId());
+
 
             // Build response
             String redirectUrl = checkoutPayResponse.getRedirectUrl();
@@ -626,6 +409,7 @@ public class ManageTransaction_BLService {
         Order_Item order_Item = new Order_Item();
         order_Item.setProduct_id(product.getId());
         order_Item.setProduct_code(product.getProduct_code());
+        order_Item.setProduct_name(product.getName());
         order_Item.setQuantity(item.getQuantity());
         order_Item.setSelling_price(product.getSelling_price());
         order_Item.setSeller_id(product.getSeller_id());

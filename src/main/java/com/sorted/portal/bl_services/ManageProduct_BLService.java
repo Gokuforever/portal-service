@@ -13,7 +13,10 @@ import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
-import com.sorted.commons.utils.*;
+import com.sorted.commons.utils.AwsS3Service;
+import com.sorted.commons.utils.CommonUtils;
+import com.sorted.commons.utils.PorterUtility;
+import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDetailsBuilder;
@@ -38,7 +41,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.security.GeneralSecurityException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -130,6 +132,8 @@ public class ManageProduct_BLService {
             Map<String, Media> mapMedia = products.stream().flatMap(e -> e.getMedia().stream())
                     .filter(a -> StringUtils.hasText(a.getDocument_id()))
                     .collect(Collectors.toMap(Media::getDocument_id, e -> e));
+
+            Map<String, String> mapFUD;
             if (!CollectionUtils.isEmpty(mapMedia)) {
                 Set<String> document_ids = mapMedia.keySet();
                 document_ids.remove(null);
@@ -155,6 +159,10 @@ public class ManageProduct_BLService {
                 if (!db_document_ids.containsAll(document_ids)) {
                     throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
                 }
+                mapFUD = repoFind.stream().collect(Collectors.toMap(File_Upload_Details::getId, File_Upload_Details::getFile_url));
+
+            } else {
+                mapFUD = null;
             }
 
             List<Products> listP = products.parallelStream()
@@ -176,9 +184,7 @@ public class ManageProduct_BLService {
                                 StringUtils.hasText(productReqBean.getDescription()) ? productReqBean.getDescription() : null);
 
                         if (!CollectionUtils.isEmpty(productReqBean.getMedia())) {
-                            List<Media> listMedia = productReqBean.getMedia().stream()
-                                    .filter(e -> StringUtils.hasText(e.getDocument_id())).toList();
-                            product.setMedia(listMedia);
+                            product.setMedia(getMediaList(productReqBean.getMedia(), mapFUD));
                         }
                         return product;
                     })
@@ -279,9 +285,9 @@ public class ManageProduct_BLService {
                 if (!db_document_ids.containsAll(document_ids)) {
                     throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
                 }
-                List<Media> listMedia = req.getMedia().stream().filter(e -> StringUtils.hasText(e.getDocument_id()))
-                        .toList();
-                product.setMedia(listMedia);
+
+                List<Media> mediaList = getMedia(repoFind, req.getMedia());
+                product.setMedia(mediaList);
             }
 
             Products create = productService.create(product, usersBean.getId());
@@ -292,6 +298,22 @@ public class ManageProduct_BLService {
             log.error("/product/create:: error occurred:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
+    }
+
+    @NotNull
+    private static List<Media> getMedia(List<File_Upload_Details> repoFind, List<Media> media) {
+        Map<String, String> mapFUD = repoFind.stream().collect(Collectors.toMap(File_Upload_Details::getId, File_Upload_Details::getFile_url));
+
+        return getMediaList(media, mapFUD);
+    }
+
+    @NotNull
+    private static List<Media> getMediaList(List<Media> media, Map<String, String> mapFUD) {
+        return media.stream().map(e -> Media.builder()
+                .document_id(e.getDocument_id())
+                .src_url(mapFUD.get(e.getDocument_id()))
+                .order(e.getOrder())
+                .build()).toList();
     }
 
     @PostMapping("/edit")
@@ -504,9 +526,7 @@ public class ManageProduct_BLService {
             return Collections.emptyList();
         }
 
-        Map<String, String> mapImg = this.filterAndFetchImgMap(listP);
-
-        return this.convertToBean(null, listP, mapImg);
+        return this.convertToBean(null, listP);
     }
 
     @PostMapping("/delete")
@@ -561,9 +581,8 @@ public class ManageProduct_BLService {
             if (product == null) {
                 return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
             }
-            Map<String, String> mapImg = this.filterAndFetchImgMap(List.of(product));
             Category_Master category_Master = this.getCategoryMaster(product.getCategory_id());
-            ProductDetailsBean productToBean = this.convertProductToBean(product, mapImg, category_Master);
+            ProductDetailsBean productToBean = this.convertProductToBean(product, category_Master);
             return SEResponse.getBasicSuccessResponseObject(productToBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
@@ -722,7 +741,7 @@ public class ManageProduct_BLService {
 
             List<File_Upload_Details> listFUD = file_Upload_Details_Service.repoFind(filterFUD);
             if (!CollectionUtils.isEmpty(listFUD)) {
-                listFUD.forEach(fud -> mapFUD.put(fud.getId(), fud.getDocument_id()));
+                listFUD.forEach(fud -> mapFUD.put(fud.getId(), fud.getFile_url()));
             }
         }
 
@@ -739,7 +758,7 @@ public class ManageProduct_BLService {
         switch (usersBean.getRole().getUser_type()) {
             case SELLER:
                 filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, usersBean.getRole().getSeller_id()));
-                filterSE.addClause(WhereClause.eq(Products.Fields.seller_code, usersBean.getRole().getSeller_code()));
+//                filterSE.addClause(WhereClause.eq(Products.Fields.seller_code, usersBean.getRole().getSeller_code()));
                 break;
             case CUSTOMER:
                 String nearest_seller_id;
@@ -846,14 +865,14 @@ public class ManageProduct_BLService {
 
     private ProductDetailsBean productToBean(List<Products> relatedProducts, Map<String, List<Products>> variantMap,
                                              Products product, Map<String, String> mapImg) {
-        ProductDetailsBean mainProductDetails = this.convertToBean(variantMap, Collections.singletonList(product), mapImg).get(0);
+        ProductDetailsBean mainProductDetails = this.convertToBean(variantMap, Collections.singletonList(product)).get(0);
         if (!CollectionUtils.isEmpty(relatedProducts)) {
             List<String> category_ids = new ArrayList<>();
             List<ProductDetailsBean> relatedProductDetailsList = new ArrayList<>();
             Map<String, Category_Master> mapCM = this.getCategoryMaster(relatedProducts, category_ids);
             for (Products temp : relatedProducts) {
                 Category_Master category_Master = mapCM.get(temp.getCategory_id());
-                relatedProductDetailsList.add(this.convertProductToBean(temp, mapImg, category_Master));
+                relatedProductDetailsList.add(this.convertProductToBean(temp, category_Master));
             }
             mainProductDetails.setRelated_products(relatedProductDetailsList);
         }
@@ -861,8 +880,7 @@ public class ManageProduct_BLService {
         return mainProductDetails;
     }
 
-    private List<ProductDetailsBean> convertToBean(Map<String, List<Products>> variantMap, List<Products> products,
-                                                   Map<String, String> mapImg) {
+    private List<ProductDetailsBean> convertToBean(Map<String, List<Products>> variantMap, List<Products> products) {
 
         List<ProductDetailsBean> productDetailsList = new ArrayList<>();
         List<String> category_ids = new ArrayList<>();
@@ -873,14 +891,14 @@ public class ManageProduct_BLService {
         Map<String, Category_Master> mapCM = this.getCategoryMaster(products, category_ids);
         for (Products product : products) {
             Category_Master category_Master = mapCM.get(product.getCategory_id());
-            ProductDetailsBean productDetailsBean = this.convertProductToBean(product, mapImg, category_Master);
+            ProductDetailsBean productDetailsBean = this.convertProductToBean(product, category_Master);
             if (StringUtils.hasText(product.getVarient_mapping_id()) && !CollectionUtils.isEmpty(variantMap)
                     && variantMap.containsKey(product.getVarient_mapping_id())) {
                 List<Products> variants = variantMap.get(product.getVarient_mapping_id());
                 for (Products variant : variants) {
                     if (!variant.getId().equals(product.getId())) {
                         Category_Master cm = mapCM.get(product.getCategory_id());
-                        ProductDetailsBean variantBean = this.convertProductToBean(variant, mapImg, cm);
+                        ProductDetailsBean variantBean = this.convertProductToBean(variant, cm);
                         if (CollectionUtils.isEmpty(productDetailsBean.getVarients())) {
                             productDetailsBean.setVarients(new ArrayList<>());
                         }
@@ -910,7 +928,7 @@ public class ManageProduct_BLService {
         return mapCM;
     }
 
-    private ProductDetailsBean convertProductToBean(Products product, Map<String, String> mapImg,
+    private ProductDetailsBean convertProductToBean(Products product,
                                                     Category_Master category_Master) {
         ProductDetailsBean bean = new ProductDetailsBean();
         bean.setName(product.getName());
@@ -924,24 +942,7 @@ public class ManageProduct_BLService {
         bean.setCategory_id(category_Master.getId());
         bean.setCategory_name(category_Master.getName());
         bean.setSecure(category_Master.isSecure_item());
-        if (!CollectionUtils.isEmpty(product.getMedia())) {
-            List<Media> listMedia = new ArrayList<>();
-            List<Media> list = product.getMedia().stream()
-                    .sorted(Comparator.comparing(Media::getOrder))
-                    .toList();
-            int order = 1;
-            for (Media media : list) {
-                if (!mapImg.containsKey(media.getDocument_id())) {
-                    continue;
-                }
-                String key = mapImg.get(media.getDocument_id());
-                media.setKey(key);
-                media.setOrder(order);
-                listMedia.add(media);
-                order++;
-            }
-            bean.setMedia(listMedia);
-        }
+        bean.setMedia(product.getMedia());
         return bean;
     }
 

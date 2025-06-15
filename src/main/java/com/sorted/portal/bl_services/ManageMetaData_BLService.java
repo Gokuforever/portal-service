@@ -9,6 +9,7 @@ import com.sorted.commons.entity.service.Product_Master_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
@@ -81,6 +82,8 @@ public class ManageMetaData_BLService {
     private List<Product_Master> getProductMasters() {
         SEFilter filterPM = new SEFilter(SEFilterType.AND);
         filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterPM.setOrderBy(new AggregationFilter.OrderBy(BaseMongoEntity.Fields.id, AggregationFilter.SortOrder.DESC) );
+        filterPM.addProjection(Product_Master.Fields.name, Product_Master.Fields.catagory_id, Product_Master.Fields.sub_categories, Product_Master.Fields.cdn_url);
         return productMasterService.repoFind(filterPM);
     }
 

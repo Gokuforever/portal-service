@@ -2,7 +2,9 @@ package com.sorted.portal.PhonePe;
 
 import com.phonepe.sdk.pg.Env;
 import com.phonepe.sdk.pg.common.exception.PhonePeException;
+import com.phonepe.sdk.pg.common.models.request.RefundRequest;
 import com.phonepe.sdk.pg.common.models.response.OrderStatusResponse;
+import com.phonepe.sdk.pg.common.models.response.RefundResponse;
 import com.phonepe.sdk.pg.payments.v2.StandardCheckoutClient;
 import com.phonepe.sdk.pg.payments.v2.models.request.StandardCheckoutPayRequest;
 import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayResponse;
@@ -56,8 +58,33 @@ public class PhonePeUtility {
             Map<String, Object> data = phonePeException.getData();
             String code = phonePeException.getCode();
 
-            logger.error("PhonePe order creation failed - Code: {}, Message: {}, Status: {}, OrderId: {}",
-                    code, message, httpStatusCode, orderId);
+            logger.error("PhonePe order creation failed - Code: {}, Message: {}, Status: {}, OrderId: {}, Data: {}",
+                    code, message, httpStatusCode, orderId, data);
+
+            thirdPartyRequestResponseService.registerException(register, message);
+            return Optional.empty();
+        }
+    }
+
+    public Optional<RefundResponse> refund(String merchantRefundId, String originalMerchantOrderId, long amount) {
+        RefundRequest refundRequest = RefundRequest.builder()
+                .merchantRefundId(merchantRefundId)
+                .originalMerchantOrderId(originalMerchantOrderId)
+                .amount(amount)
+                .build();
+        Third_Party_Api register = thirdPartyRequestResponseService.register(refundRequest, RequestType.PP_REFUND);
+        try {
+            RefundResponse refundResponse = client.refund(refundRequest);
+            thirdPartyRequestResponseService.updateResponse(register, refundResponse);
+            return Optional.of(refundResponse);
+        } catch (PhonePeException phonePeException) {
+            Integer httpStatusCode = phonePeException.getHttpStatusCode();
+            String message = phonePeException.getMessage();
+            Map<String, Object> data = phonePeException.getData();
+            String code = phonePeException.getCode();
+
+            logger.error("PhonePe refund failed - Code: {}, Message: {}, Status: {}, OrderId: {}, Data: {}",
+                    code, message, httpStatusCode, originalMerchantOrderId, data);
 
             thirdPartyRequestResponseService.registerException(register, message);
             return Optional.empty();
