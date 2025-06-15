@@ -41,14 +41,11 @@ public class ManageFileUpload_BLService {
     }
 
     @PostMapping("/upload/cloudinary/url")
-    public SEResponse uploadToCloudinaryUrl(@RequestParam("file") MultipartFile file) {
+    public String uploadToCloudinaryUrl(@RequestParam("file") MultipartFile file) {
         try {
-            String url = cloudinaryService.uploadImageAndGetUrl(file);
-            Map<String, String> result = new HashMap<>();
-            result.put("url", url);
-            return SEResponse.getBasicSuccessResponseObject(result, ResponseCode.SUCCESSFUL);
+            return cloudinaryService.uploadImageAndGetUrl(file);
         } catch (Exception e) {
-            return SEResponse.getBadRequestFailureResponse(ResponseCode.ERR_0001);
+            return null;
         }
     }
 }
