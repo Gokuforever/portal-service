@@ -129,19 +129,16 @@ public class ManageProduct_BLService {
 
             Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master);
 
-            Map<String, Media> mapMedia = products.stream().flatMap(e -> e.getMedia().stream())
-                    .filter(a -> StringUtils.hasText(a.getDocument_id()))
-                    .collect(Collectors.toMap(Media::getDocument_id, e -> e));
+            Set<String> mediaSet = products.stream().flatMap(e -> e.getMedia().stream())
+                    .map(Media::getDocument_id)
+                    .filter(StringUtils::hasText)
+                    .collect(Collectors.toSet());
 
             Map<String, String> mapFUD;
-            if (!CollectionUtils.isEmpty(mapMedia)) {
-                Set<String> document_ids = mapMedia.keySet();
-                document_ids.remove(null);
-                if (CollectionUtils.isEmpty(document_ids)) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.DOC_IDS_MISSING);
-                }
+            mediaSet.remove(null);
+            if (!CollectionUtils.isEmpty(mediaSet)) {
                 SEFilter filterFUD = new SEFilter(SEFilterType.AND);
-                filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(document_ids)));
+                filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(mediaSet)));
                 filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
                 filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.document_type_id,
                         DocumentType.PRODUCT_IMAGE.getId()));
@@ -156,7 +153,7 @@ public class ManageProduct_BLService {
                     throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
                 }
                 Set<String> db_document_ids = repoFind.stream().map(BaseMongoEntity::getId).collect(Collectors.toSet());
-                if (!db_document_ids.containsAll(document_ids)) {
+                if (!db_document_ids.containsAll(mediaSet)) {
                     throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
                 }
                 mapFUD = repoFind.stream().collect(Collectors.toMap(File_Upload_Details::getId, File_Upload_Details::getFile_url));
@@ -262,28 +259,28 @@ public class ManageProduct_BLService {
             if (!CollectionUtils.isEmpty(req.getMedia())) {
                 Set<String> document_ids = req.getMedia().stream().map(Media::getDocument_id)
                         .filter(StringUtils::hasText).collect(Collectors.toSet());
-                if (CollectionUtils.isEmpty(document_ids)) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.DOC_IDS_MISSING);
-                }
                 document_ids.remove(null);
-                SEFilter filterFUD = new SEFilter(SEFilterType.AND);
-                filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(document_ids)));
-                filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-                filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.document_type_id,
-                        DocumentType.PRODUCT_IMAGE.getId()));
-                if (user_type == UserType.SELLER) {
-                    filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.user_type, user_type.name()));
-                    filterFUD.addClause(
-                            WhereClause.eq(File_Upload_Details.Fields.entity_id, usersBean.getSeller().getId()));
-                }
+                List<File_Upload_Details> repoFind = null;
+                if(!CollectionUtils.isEmpty(document_ids)) {
+                    SEFilter filterFUD = new SEFilter(SEFilterType.AND);
+                    filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(document_ids)));
+                    filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+                    filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.document_type_id,
+                            DocumentType.PRODUCT_IMAGE.getId()));
+                    if (user_type == UserType.SELLER) {
+                        filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.user_type, user_type.name()));
+                        filterFUD.addClause(
+                                WhereClause.eq(File_Upload_Details.Fields.entity_id, usersBean.getSeller().getId()));
+                    }
 
-                List<File_Upload_Details> repoFind = file_Upload_Details_Service.repoFind(filterFUD);
-                if (CollectionUtils.isEmpty(repoFind)) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
-                }
-                Set<String> db_document_ids = repoFind.stream().map(BaseMongoEntity::getId).collect(Collectors.toSet());
-                if (!db_document_ids.containsAll(document_ids)) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
+                     repoFind = file_Upload_Details_Service.repoFind(filterFUD);
+                    if (CollectionUtils.isEmpty(repoFind)) {
+                        throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
+                    }
+                    Set<String> db_document_ids = repoFind.stream().map(BaseMongoEntity::getId).collect(Collectors.toSet());
+                    if (!db_document_ids.containsAll(document_ids)) {
+                        throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
+                    }
                 }
 
                 List<Media> mediaList = getMedia(repoFind, req.getMedia());
@@ -302,8 +299,11 @@ public class ManageProduct_BLService {
 
     @NotNull
     private static List<Media> getMedia(List<File_Upload_Details> repoFind, List<Media> media) {
-        Map<String, String> mapFUD = repoFind.stream().collect(Collectors.toMap(File_Upload_Details::getId, File_Upload_Details::getFile_url));
+        if(CollectionUtils.isEmpty(media)) {
+            return Collections.emptyList();
+        }
 
+        Map<String, String> mapFUD = repoFind == null ? new HashMap<>() : repoFind.stream().collect(Collectors.toMap(File_Upload_Details::getId, File_Upload_Details::getFile_url));
         return getMediaList(media, mapFUD);
     }
 
@@ -311,7 +311,7 @@ public class ManageProduct_BLService {
     private static List<Media> getMediaList(List<Media> media, Map<String, String> mapFUD) {
         return media.stream().map(e -> Media.builder()
                 .document_id(e.getDocument_id())
-                .src_url(mapFUD.get(e.getDocument_id()))
+                .cdn_url(StringUtils.hasText(e.getCdn_url()) ? e.getCdn_url() : mapFUD.get(e.getDocument_id()))
                 .order(e.getOrder())
                 .build()).toList();
     }
@@ -857,7 +857,7 @@ public class ManageProduct_BLService {
 //	}
 
     private void makeValuesUnique(Map<String, List<String>> map) {
-        for (Map.Entry<String, List<String>> entry : map.entrySet()) {
+        for (Entry<String, List<String>> entry : map.entrySet()) {
             List<String> uniqueList = new ArrayList<>(new HashSet<>(entry.getValue()));
             entry.setValue(uniqueList);
         }
