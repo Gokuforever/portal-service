@@ -53,6 +53,8 @@ public class OrderStatusCheckService {
         log.info("status:: Successfully retrieved status for order ID: {}, with {} items",
                 order_Details.getId(), orderItemResponseList.size());
         if (isPaid) {
+            // TODO: send mail and sms to seller to accept or reject the order
+
             AggregationFilter.SEFilter filterU = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
             filterU.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
             filterU.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getUser_id()));

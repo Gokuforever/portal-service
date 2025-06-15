@@ -111,7 +111,8 @@ public class ManageCrons_BLService {
             // TODO:: send mail to Studeaze team
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
-
+        MailTemplate mailTemplate = null;
+        Map<String, String> mapFUD = new HashMap<>();
         OrderStatus currentOrderStatus = null;
         switch (fetchOrderRes.getStatus()) {
             case open:
@@ -119,31 +120,14 @@ public class ManageCrons_BLService {
                 break;
             case accepted:
                 currentOrderStatus = OrderStatus.RIDER_ASSIGNED;
+                mailTemplate = MailTemplate.ORDER_DISPATCHED;
                 break;
             case cancelled:
                 currentOrderStatus = OrderStatus.ORDER_CANCELLED;
                 break;
             case ended:
                 currentOrderStatus = OrderStatus.DELIVERED;
-
-                SEFilter filterU = new SEFilter(SEFilterType.AND);
-                filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-                filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, details.getUser_id()));
-
-                Users user = usersService.repoFindOne(filterU);
-                if(user == null) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-                }
-                String userName = user.getFirst_name() + " " + user.getLast_name();
-                String orderTemplateTable = orderTemplateService.getOrderTemplateTable(details);
-
-                String mailContent = userName + "|" + orderTemplateTable;
-
-                MailBuilder builder = new MailBuilder();
-                builder.setTo(user.getEmail_id());
-                builder.setContent(mailContent);
-                builder.setTemplate(MailTemplate.ORDER_ARRIVED);
-                emailSenderImpl.sendEmailHtmlTemplate(builder);
+                mailTemplate = MailTemplate.ORDER_ARRIVED;
                 break;
             case live:
                 currentOrderStatus = OrderStatus.OUT_FOR_DELIVERY;
@@ -151,6 +135,29 @@ public class ManageCrons_BLService {
             default:
                 break;
         }
+
+        if(mailTemplate != null) {
+
+            SEFilter filterU = new SEFilter(SEFilterType.AND);
+            filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, details.getUser_id()));
+
+            Users user = usersService.repoFindOne(filterU);
+            if(user == null) {
+                throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+            }
+            String userName = user.getFirst_name() + " " + user.getLast_name();
+            String orderTemplateTable = orderTemplateService.getOrderTemplateTable(details);
+
+            String mailContent = userName + "|" + orderTemplateTable;
+
+            MailBuilder builder = new MailBuilder();
+            builder.setTo(user.getEmail_id());
+            builder.setContent(mailContent);
+            builder.setTemplate(mailTemplate);
+            emailSenderImpl.sendEmailHtmlTemplate(builder);
+        }
+
         if (currentOrderStatus != null && details.getStatus() != currentOrderStatus) {
             List<Order_Item> listOI = getOrderItems(details);
             final OrderStatus finalOrderStatus = currentOrderStatus;
