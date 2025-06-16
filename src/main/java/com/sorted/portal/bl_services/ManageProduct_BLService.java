@@ -761,7 +761,7 @@ public class ManageProduct_BLService {
                 filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, usersBean.getRole().getSeller_id()));
 //                filterSE.addClause(WhereClause.eq(Products.Fields.seller_code, usersBean.getRole().getSeller_code()));
                 break;
-            case CUSTOMER:
+            case CUSTOMER, GUEST:
                 String nearest_seller_id;
                 Map<String, String> properties = usersBean.getProperties();
                 if (CollectionUtils.isEmpty(properties) || !properties.containsKey("nearest_pincode")) {
