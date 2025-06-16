@@ -250,30 +250,6 @@ public class ManageCart_BLService {
             List<Products> listP = productService.repoFind(filterP);
             if (!CollectionUtils.isEmpty(listP)) {
                 Map<String, Products> mapP = listP.stream().collect(Collectors.toMap(BaseMongoEntity::getId, p -> p));
-                List<String> imageIds = listP.stream().filter(e -> !CollectionUtils.isEmpty(e.getMedia()))
-                        .flatMap(p -> p.getMedia().stream()).map(Media::getDocument_id).distinct().toList();
-                if (!CollectionUtils.isEmpty(imageIds)) {
-                    // Create a filter to retrieve file upload details based on image IDs
-                    SEFilter filterFUD = new SEFilter(SEFilterType.AND);
-                    filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, imageIds));
-                    filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-                    // Retrieve file upload details
-                    List<File_Upload_Details> listFUD = file_Upload_Details_Service.repoFind(filterFUD);
-
-                    Map<String, String> mapFUD = new HashMap<>();
-
-                    // Populate mapFUD if file upload details list is not empty
-                    if (!CollectionUtils.isEmpty(listFUD)) {
-                        mapFUD = listFUD.stream().collect(
-                                Collectors.toMap(File_Upload_Details::getId, File_Upload_Details::getDocument_id));
-                    }
-
-                    // Map the image IDs that have corresponding entries in mapFUD
-                    mapImg.putAll(imageIds.stream().filter(mapFUD::containsKey) // Only consider IDs present in mapFUD
-                            .collect(Collectors.toMap(id -> id, mapFUD::get))); // Map image ID to corresponding
-                    // document ID
-                }
 
                 cart_items.forEach(e -> {
                     if (mapP.containsKey(e.getProduct_id())) {
@@ -299,10 +275,8 @@ public class ManageCart_BLService {
                         if (!CollectionUtils.isEmpty(media)) {
                             Optional<Media> findFirst = media.stream().filter(m -> m.getOrder() == 1).findFirst();
                             if (findFirst.isPresent()) {
-                                Media media2 = findFirst.get();
-                                if (mapImg.containsKey(media2.getKey())) {
-                                    items.setDocument_id(mapImg.get(media2.getKey()));
-                                }
+                                items.setDocument_id(findFirst.get().getDocument_id());
+                                items.setCdn_url(findFirst.get().getCdn_url());
                             }
                         }
                         cartItems.add(items);

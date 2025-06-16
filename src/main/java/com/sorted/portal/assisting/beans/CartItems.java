@@ -15,4 +15,5 @@ public class CartItems {
     private boolean secure_item;
     private Integer current_status;
     private String document_id;
+    private String cdn_url;
 }
