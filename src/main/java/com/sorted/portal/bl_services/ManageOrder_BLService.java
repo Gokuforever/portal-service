@@ -132,6 +132,7 @@ public class ManageOrder_BLService {
     public SEResponse createOrder(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("createOrder (readyForPickup):: API started!");
         CreateDeliveryBean req = request.getGenericRequestDataObject(CreateDeliveryBean.class);
+        CommonUtils.extractHeaders(httpServletRequest, req);
         return orderProcessingService.processReadyForPickup(req);
     }
 
