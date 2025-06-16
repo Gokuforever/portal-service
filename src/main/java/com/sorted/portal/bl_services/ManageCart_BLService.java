@@ -273,7 +273,7 @@ public class ManageCart_BLService {
                         }
                         List<Media> media = products.getMedia();
                         if (!CollectionUtils.isEmpty(media)) {
-                            Optional<Media> findFirst = media.stream().filter(m -> m.getOrder() == 1).findFirst();
+                            Optional<Media> findFirst = media.stream().filter(m -> m.getOrder() == 0).findFirst();
                             if (findFirst.isPresent()) {
                                 items.setDocument_id(findFirst.get().getDocument_id());
                                 items.setCdn_url(findFirst.get().getCdn_url());
