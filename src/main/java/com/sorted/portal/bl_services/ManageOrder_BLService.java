@@ -364,7 +364,7 @@ public class ManageOrder_BLService {
     private OrderItemDTO entToBean(Order_Item orderItem, Map<String, Products> mapP) {
         Products products = mapP.getOrDefault(orderItem.getProduct_id(), null);
         return OrderItemDTO.builder().id(orderItem.getId()).product_id(orderItem.getProduct_id())
-                .product_name(products == null ? "" : products.getName()).product_image(products == null || products.getMedia() == null ? "" : products.getMedia().get(0).getKey())
+                .product_name(products == null ? "" : products.getName()).cdn_url(products == null || products.getMedia() == null ? "" : products.getMedia().get(0).getCdn_url())
                 .product_code(orderItem.getProduct_code()).quantity(orderItem.getQuantity()).total_cost(orderItem.getTotal_cost())
                 .selling_price(orderItem.getSelling_price()).type(orderItem.getType()).status(orderItem.getStatus())
                 .status_id(orderItem.getStatus_id())

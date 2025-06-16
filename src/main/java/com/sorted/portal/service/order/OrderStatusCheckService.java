@@ -15,7 +15,6 @@ import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.MailBuilder;
 import com.sorted.commons.notifications.EmailSenderImpl;
-import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.response.beans.OrderItemResponse;
 import lombok.NonNull;
@@ -172,10 +171,9 @@ public class OrderStatusCheckService {
                     updateProductQuantities(orderItems, mapP);
                 }
 
-                Map<String, String> mapFUD = getFileUploadDetailsMap(mapP.keySet());
 
                 for (Order_Item item : orderItems) {
-                    OrderItemResponse response = convertToResponse(mapP, item, mapFUD);
+                    OrderItemResponse response = convertToResponse(mapP, item);
                     if (response != null) {
                         orderItemResponseList.add(response);
                     }
@@ -257,34 +255,8 @@ public class OrderStatusCheckService {
         }
     }
 
-    /**
-     * Retrieves file upload details for products
-     *
-     * @param productIds Set of product IDs to find file upload details for
-     * @return Map of product IDs to file document IDs
-     */
-    private Map<String, String> getFileUploadDetailsMap(Set<String> productIds) {
-        Map<String, String> mapFUD = new HashMap<>();
 
-        if (!productIds.isEmpty()) {
-            AggregationFilter.SEFilter filterFUD = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-            filterFUD.addClause(AggregationFilter.WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(productIds)));
-            filterFUD.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-            List<File_Upload_Details> listFUD = file_Upload_Details_Service.repoFind(filterFUD);
-            if (!CollectionUtils.isEmpty(listFUD)) {
-                listFUD.forEach(fud -> {
-                    if (StringUtils.hasText(fud.getId()) && StringUtils.hasText(fud.getDocument_id())) {
-                        mapFUD.putIfAbsent(fud.getId(), fud.getDocument_id());
-                    }
-                });
-            }
-        }
-
-        return mapFUD;
-    }
-
-    private OrderItemResponse convertToResponse(Map<String, Products> mapP, Order_Item orderItem, Map<String, String> mapFUD) {
+    private OrderItemResponse convertToResponse(Map<String, Products> mapP, Order_Item orderItem) {
         if (orderItem == null || !StringUtils.hasText(orderItem.getProduct_id())) {
             log.warn("convertToResponse:: Invalid order item or missing product ID");
             return null;
@@ -292,14 +264,14 @@ public class OrderStatusCheckService {
 
         Products product = mapP.getOrDefault(orderItem.getProduct_id(), null);
         String productName = (product != null) ? product.getName() : "";
-        String documentId = mapFUD.getOrDefault(orderItem.getProduct_id(), null);
+        String cdnUrl = (product != null) ? CollectionUtils.isEmpty(product.getMedia()) ? "" : product.getMedia().stream().filter(e -> e.getOrder() == 0).findFirst().get().getCdn_url() : "";
         String purchaseType = (orderItem.getType() != null) ? orderItem.getType().name() : "";
 
         return OrderItemResponse.builder()
                 .productCode(orderItem.getProduct_code())
                 .productId(orderItem.getProduct_id())
                 .productName(productName)
-                .documentId(documentId)
+                .cdnUrl(cdnUrl)
                 .purchaseType(purchaseType)
                 .quantity(orderItem.getQuantity())
                 .sellingPrice(orderItem.getSelling_price())

@@ -6,7 +6,7 @@ import lombok.Builder;
 @Builder
 public record OrderItemResponse(@JsonProperty("product_id") String productId,
                                 @JsonProperty("product_name") String productName,
-                                @JsonProperty("document_id") String documentId,
+                                @JsonProperty("cdn_url") String cdnUrl,
                                 @JsonProperty("product_code") String productCode, Long quantity,
                                 @JsonProperty("selling_price") Long sellingPrice,
                                 @JsonProperty("total_cost") Long totalCost,

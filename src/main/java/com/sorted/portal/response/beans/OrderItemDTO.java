@@ -13,7 +13,6 @@ public class OrderItemDTO {
     private String product_id;
     private String product_code;
     private String product_name;
-    private String product_image;
     private String cdn_url;
     private Long quantity;
     private Long selling_price;
