@@ -18,6 +18,7 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.req.beans.CreateOrderBean;
 import com.sorted.commons.porter.req.beans.CreateOrderBean.*;
+import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
@@ -161,6 +162,7 @@ public class ManageOrder_BLService {
     public SEResponse acceptOrReject(@RequestBody SERequest request, HttpServletRequest httpServletRequest) throws RazorpayException {
         log.info("acceptOrReject:: API started!");
         OrderAcceptRejectRequest req = request.getGenericRequestDataObject(OrderAcceptRejectRequest.class);
+        CommonUtils.extractHeaders(httpServletRequest, req);
         return orderProcessingService.processAcceptReject(req);
     }
 
