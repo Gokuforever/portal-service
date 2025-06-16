@@ -112,8 +112,8 @@ public class OrderResponseMapper {
                 .id(orderItem.getId())
                 .product_id(orderItem.getProduct_id())
                 .product_name(product == null ? "" : product.getName())
-                .product_image(product == null || product.getMedia() == null ? ""
-                        : product.getMedia().get(0).getKey())
+                .cdn_url(product == null || product.getMedia() == null ? ""
+                        : product.getMedia().stream().filter(m -> m.getOrder()==0).findFirst().get().getCdn_url())
                 .product_code(orderItem.getProduct_code())
                 .quantity(orderItem.getQuantity())
                 .total_cost(orderItem.getTotal_cost())
