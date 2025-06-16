@@ -4,6 +4,7 @@ import com.phonepe.sdk.pg.common.models.PgV2InstrumentType;
 import com.phonepe.sdk.pg.common.models.response.OrderStatusResponse;
 import com.phonepe.sdk.pg.common.models.response.PaymentDetail;
 import com.sorted.commons.beans.Item;
+import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
@@ -41,6 +42,7 @@ public class OrderStatusCheckService {
     private final EmailSenderImpl emailSenderImpl;
     private final OrderTemplateService orderTemplateService;
     private final Users_Service usersService;
+    private final Seller_Service seller_Service;
 
     public List<OrderItemResponse> checkOrderStatus(@NonNull Order_Details order_Details) {
         OrderStatus status = order_Details.getStatus();
@@ -72,6 +74,26 @@ public class OrderStatusCheckService {
             builder.setContent(mailContent);
             builder.setTemplate(MailTemplate.DIRECT_ORDER_CONFIRMATION);
             emailSenderImpl.sendEmailHtmlTemplate(builder);
+
+            AggregationFilter.SEFilter filterS = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
+            filterS.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getSeller_id()));
+            filterS.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+            Seller seller = seller_Service.repoFindOne(filterS);
+            if (seller != null) {
+                Optional<Spoc_Details> first = seller.getSpoc_details().stream().filter(e -> e.isPrimary()).findFirst();
+                if (first.isPresent()) {
+                    Spoc_Details spocDetails = first.get();
+                    String mailId = spocDetails.getEmail_id();
+                    String firstName = spocDetails.getFirst_name();
+                    mailContent = firstName + "|" + orderTemplateTable;
+                    MailBuilder mailBuilder = new MailBuilder();
+                    mailBuilder.setTo(mailId);
+                    mailBuilder.setContent(mailContent);
+                    mailBuilder.setTemplate(MailTemplate.NEW_ORDER_ARRIVED);
+                    emailSenderImpl.sendEmailHtmlTemplate(mailBuilder);
+                }
+            }
         }
 
         return orderItemResponseList;
