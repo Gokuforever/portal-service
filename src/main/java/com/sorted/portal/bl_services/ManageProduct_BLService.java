@@ -385,53 +385,7 @@ public class ManageProduct_BLService {
             product.setQuantity(Long.valueOf(req.getQuantity()));
             product.setVarient_mapping_id(varient_mapping_id);
             product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
-            if (CollectionUtils.isEmpty(req.getMedia())) {
-//				SEFilter filterFUD = new SEFilter(SEFilterType.AND);
-//				filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-//				filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.document_type_id,
-//						DocumentType.PRODUCT_IMAGE.getId()));
-//				if (user_type == UserType.SELLER) {
-//					filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.user_type, user_type.name()));
-//					filterFUD.addClause(
-//							WhereClause.eq(File_Upload_Details.Fields.entity_id, usersBean.getSeller().getId()));
-//				}
-//
-//				List<File_Upload_Details> repoFind = file_Upload_Details_Service.repoFind(filterFUD);
-//				if (!CollectionUtils.isEmpty(repoFind)) {
-//					for (File_Upload_Details file_Upload_Details : repoFind) {
-//						file_Upload_Details_Service.deleteOne(file_Upload_Details.getId(), usersBean.getId());
-//					}
-//				}
-                product.setMedia(new ArrayList<>());
-            } else {
-                Set<String> document_ids = req.getMedia().stream().map(Media::getDocument_id)
-                        .filter(StringUtils::hasText).collect(Collectors.toSet());
-                if (CollectionUtils.isEmpty(document_ids)) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.DOC_IDS_MISSING);
-                }
-                SEFilter filterFUD = new SEFilter(SEFilterType.AND);
-                filterFUD.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(document_ids)));
-                filterFUD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-                filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.document_type_id,
-                        DocumentType.PRODUCT_IMAGE.getId()));
-                if (user_type == UserType.SELLER) {
-                    filterFUD.addClause(WhereClause.eq(File_Upload_Details.Fields.user_type, user_type.name()));
-                    filterFUD.addClause(
-                            WhereClause.eq(File_Upload_Details.Fields.entity_id, usersBean.getSeller().getId()));
-                }
-
-                List<File_Upload_Details> repoFind = file_Upload_Details_Service.repoFind(filterFUD);
-                if (CollectionUtils.isEmpty(repoFind)) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
-                }
-                Set<String> db_document_ids = repoFind.stream().map(BaseMongoEntity::getId).collect(Collectors.toSet());
-                if (!db_document_ids.containsAll(document_ids)) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.IMAGES_NOT_FOUND);
-                }
-                List<Media> listMedia = req.getMedia().stream().filter(e -> StringUtils.hasText(e.getDocument_id()))
-                        .toList();
-                product.setMedia(listMedia);
-            }
+            product.setMedia(req.getMedia());
 
             product = productService.update(product.getId(), product, usersBean.getId());
             return SEResponse.getBasicSuccessResponseObject(product, ResponseCode.SUCCESSFUL);
