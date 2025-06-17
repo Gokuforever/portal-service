@@ -122,7 +122,7 @@ public class OrderFilterBuilder {
                 applySellerStatusFilter(filterOD, req);
                 break;
 
-            case CUSTOMER:
+            case CUSTOMER, GUEST:
                 log.debug("Applying customer-specific filter for customer ID: {}", usersBean.getId());
                 filterOD.addClause(WhereClause.eq(Order_Details.Fields.user_id, usersBean.getId()));
                 applyCustomerStatusFilter(filterOD, req);
