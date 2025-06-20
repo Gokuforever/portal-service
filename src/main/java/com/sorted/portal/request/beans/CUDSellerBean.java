@@ -18,6 +18,7 @@ public class CUDSellerBean extends ReqBaseBean {
     private int status_id;
     private AddressDTO address;
     private String pan_no;
+    private String gstin;
     private String primary_mobile_no;
     private String primary_email_id;
     private List<Spoc_Details> spoc_details;

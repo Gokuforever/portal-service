@@ -138,11 +138,15 @@ public class ManageSeller_BLService {
             }
             String name = CommonUtils.toTitleCase(req.getName());
             String pan_no = req.getPan_no();
+            String gstin = req.getGstin();
             seller.setBusiness_name(name);
             seller.setSpoc_details(spoc_details);
             seller.setServiceable_pincodes(serviceable_pincodes);
             if (StringUtils.hasText(pan_no)) {
                 seller.setCompany_pan(pan_no);
+            }
+            if (StringUtils.hasText(gstin)) {
+                seller.setGstin(gstin);
             }
             if (bank_details != null) {
                 seller.setBank_details(bank_details);
@@ -667,6 +671,11 @@ public class ManageSeller_BLService {
 //		}
         if (StringUtils.hasText(req.getPan_no()) && !SERegExpUtils.isPan(req.getPan_no())) {
             throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PAN_NO);
+        }
+        if (StringUtils.hasText(req.getGstin())) {
+            if (!SERegExpUtils.isValidGSTIN(req.getGstin())) {
+                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_GST_NO);
+            }
         }
         if (CollectionUtils.isEmpty(req.getSpoc_details())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SPOC);

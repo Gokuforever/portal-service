@@ -16,6 +16,7 @@
         <java.version>17</java.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
+        <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
     </properties>
     <dependencies>
         <dependency>
@@ -30,7 +31,7 @@
         <dependency>
             <groupId>com.sorted</groupId>
             <artifactId>se-commons</artifactId>
-            <version>25.06.10-SNAPSHOT</version>
+            <version>25.06.12-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -71,6 +72,26 @@
             <groupId>com.phonepe</groupId>
             <artifactId>pg-sdk-java</artifactId>
             <version>2.1.0</version>
+        </dependency>
+        
+        <!-- Logstash JSON Encoder -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>${logstash-logback-encoder.version}</version>
+        </dependency>
+        
+        <!-- Logback Core -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+        </dependency>
+        
+        <!-- For async logging -->
+        <dependency>
+            <groupId>com.lmax</groupId>
+            <artifactId>disruptor</artifactId>
+            <version>3.4.4</version>
         </dependency>
     </dependencies>
 
