@@ -37,11 +37,11 @@ public class OrderStatusCheckService {
     private final Order_Details_Service order_Details_Service;
     private final Order_Item_Service order_Item_Service;
     private final PhonePeUtility phonePeUtility;
-    private final File_Upload_Details_Service file_Upload_Details_Service;
     private final EmailSenderImpl emailSenderImpl;
     private final OrderTemplateService orderTemplateService;
     private final Users_Service usersService;
     private final Seller_Service seller_Service;
+    private final StoreActivityService storeActivityService;
 
     public List<OrderItemResponse> checkOrderStatus(@NonNull Order_Details order_Details) {
         OrderStatus status = order_Details.getStatus();
@@ -134,11 +134,25 @@ public class OrderStatusCheckService {
                 case "FAILED" -> OrderStatus.TRANSACTION_FAILED;
                 default -> OrderStatus.TRANSACTION_PENDING;
             };
+            boolean isPaid = status.equals(OrderStatus.TRANSACTION_PROCESSED);
+            if (isPaid) {
+                boolean storeOperational = storeActivityService.isStoreOperational(order_Details.getSeller_id());
+                if (!storeOperational) {
+                    status = OrderStatus.STORE_NOT_OPERATIONAL;
+                }
+            }
             order_Details.setStatus(status, Defaults.SYSTEM_ADMIN);
             log.info("status:: Order status updated to {} for order ID: {}", status, order_Details.getId());
 
             order_Details_Service.update(order_Details.getId(), order_Details, Defaults.SYSTEM_ADMIN);
-            return status.equals(OrderStatus.TRANSACTION_PROCESSED);
+            return isPaid;
+        } else if (order_Details.getStatus().equals(OrderStatus.STORE_NOT_OPERATIONAL)) {
+            boolean storeOperational = storeActivityService.isStoreOperational(order_Details.getSeller_id());
+            if (storeOperational) {
+                order_Details.setStatus(OrderStatus.TRANSACTION_PROCESSED, Defaults.SYSTEM_ADMIN);
+                order_Details_Service.update(order_Details.getId(), order_Details, Defaults.SYSTEM_ADMIN);
+                return true;
+            }
         }
         return false;
     }

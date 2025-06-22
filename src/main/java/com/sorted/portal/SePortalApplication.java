@@ -1,5 +1,6 @@
 package com.sorted.portal;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -20,6 +21,11 @@ public class SePortalApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(SePortalApplication.class, args);
+    }
+
+    @PostConstruct
+    public void init() {
+        System.out.println("✅ App started successfully!");
     }
 
 }

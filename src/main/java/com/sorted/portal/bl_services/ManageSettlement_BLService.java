@@ -26,6 +26,7 @@ import com.sorted.portal.request.beans.SettlementReqBean;
 import com.sorted.portal.response.beans.FindSettlementResponse;
 import com.sorted.portal.response.beans.SettlementAnalyticsResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -44,6 +45,7 @@ import static com.sorted.commons.enums.OrderStatus.*;
 
 @Slf4j
 @RestController
+@RequiredArgsConstructor
 public class ManageSettlement_BLService {
 
     private final Users_Service usersService;
@@ -51,13 +53,6 @@ public class ManageSettlement_BLService {
     private final Order_Details_Service orderDetailsService;
     private final static int fee_percentage = 10;
 
-    public ManageSettlement_BLService(Users_Service usersService,
-                                      File_Upload_Details_Service fileUploadDetailsService,
-                                      Order_Details_Service orderDetailsService) {
-        this.usersService = usersService;
-        this.fileUploadDetailsService = fileUploadDetailsService;
-        this.orderDetailsService = orderDetailsService;
-    }
 
     @PostMapping("/settlement/analytics")
     public SEResponse analytics(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {

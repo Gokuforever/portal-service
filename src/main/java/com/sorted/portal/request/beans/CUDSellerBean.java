@@ -2,6 +2,7 @@ package com.sorted.portal.request.beans;
 
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Bank_Details;
+import com.sorted.commons.beans.BusinessHours;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.helper.ReqBaseBean;
 import lombok.Data;
@@ -26,4 +27,5 @@ public class CUDSellerBean extends ReqBaseBean {
     private List<String> serviceable_pincodes;
     private Integer status;
     private boolean resend;
+    private BusinessHours business_hours;
 }

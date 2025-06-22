@@ -18,6 +18,7 @@ import com.sorted.commons.helper.SEResponse;
 import com.sorted.portal.request.beans.MetaDataReq;
 import com.sorted.portal.response.beans.MetaData;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @RestController
+@RequiredArgsConstructor
 public class ManageMetaData_BLService {
 
     private final Category_MasterService categoryMasterService;
@@ -42,13 +44,6 @@ public class ManageMetaData_BLService {
     private static final String CM_CACHE_KEY = "CM_DATA";
     private static final String PM_CACHE_KEY = "PM_DATA";
 
-    public ManageMetaData_BLService(Category_MasterService categoryMasterService,
-                                    Users_Service usersService,
-                                    Product_Master_Service productMasterService) {
-        this.categoryMasterService = categoryMasterService;
-        this.usersService = usersService;
-        this.productMasterService = productMasterService;
-    }
 
     @PostMapping("/cache/clear")
     public void clearCache() {
@@ -82,7 +77,7 @@ public class ManageMetaData_BLService {
     private List<Product_Master> getProductMasters() {
         SEFilter filterPM = new SEFilter(SEFilterType.AND);
         filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        filterPM.setOrderBy(new AggregationFilter.OrderBy(BaseMongoEntity.Fields.id, AggregationFilter.SortOrder.DESC) );
+        filterPM.setOrderBy(new AggregationFilter.OrderBy(BaseMongoEntity.Fields.id, AggregationFilter.SortOrder.DESC));
         filterPM.addProjection(Product_Master.Fields.name, Product_Master.Fields.catagory_id, Product_Master.Fields.sub_categories, Product_Master.Fields.cdn_url);
         return productMasterService.repoFind(filterPM);
     }

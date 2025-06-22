@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property name="LOGS" value="./logs"/>
+
+    <!-- Enable async logging for better performance -->
+    <conversionRule conversionWord="clr" converterClass="org.springframework.boot.logging.logback.ColorConverter"/>
+    <conversionRule conversionWord="wex" converterClass="org.springframework.boot.logging.logback.WhitespaceThrowableProxyConverter"/>
+    <conversionRule conversionWord="wEx" converterClass="org.springframework.boot.logging.logback.ExtendedWhitespaceThrowableProxyConverter"/>
+
+    <!-- Console Appender -->
+    <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <fieldName>timestamp</fieldName>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+                <loggerName>
+                    <fieldName>logger</fieldName>
+                </loggerName>
+                <logLevel>
+                    <fieldName>level</fieldName>
+                </logLevel>
+                <threadName>
+                    <fieldName>thread</fieldName>
+                </threadName>
+                <nestedField>
+                    <fieldName>mdc</fieldName>
+                    <providers>
+                        <mdc>
+                            <includeMdcKeyName>trace_id</includeMdcKeyName>
+                            <includeMdcKeyName>span_id</includeMdcKeyName>
+                        </mdc>
+                    </providers>
+                </nestedField>
+                <mdcJsonFieldName>mdc</mdcJsonFieldName>
+                <context>
+                    <fieldName>context</fieldName>
+                </context>
+                <message>
+                    <fieldName>message</fieldName>
+                </message>
+                <stackTrace>
+                    <fieldName>stack_trace</fieldName>
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                        <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                        <maxLength>10000</maxLength>
+                        <shortenedClassNameLength>20</shortenedClassNameLength>
+                        <exclude>sun\.reflect\..*\.invoke.*</exclude>
+                        <exclude>net\.sf\.cglib\.proxy\.MethodProxy\.invoke</exclude>
+                        <rootCauseFirst>true</rootCauseFirst>
+                    </throwableConverter>
+                </stackTrace>
+                <logstashMarkers/>
+                <arguments>
+                    <includeNonStructuredArguments>false</includeNonStructuredArguments>
+                    <nonStructuredMessageField>
+                        <fieldName>message</fieldName>
+                    </nonStructuredMessageField>
+                </arguments>
+                <callerData>
+                    <classFieldName>caller_class_name</classFieldName>
+                    <methodFieldName>caller_method_name</methodFieldName>
+                    <fileFieldName>caller_file_name</fileFieldName>
+                    <lineFieldName>caller_line_number</lineFieldName>
+                </callerData>
+            </providers>
+            <customFields>{"service":"portal-service"}</customFields>
+        </encoder>
+    </appender>
+
+    <!-- File Appenders -->
+    <appender name="FileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS}/portal-service.log</file>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <fieldName>timestamp</fieldName>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+                <loggerName>
+                    <fieldName>logger</fieldName>
+                </loggerName>
+                <logLevel>
+                    <fieldName>level</fieldName>
+                </logLevel>
+                <threadName>
+                    <fieldName>thread</fieldName>
+                </threadName>
+                <nestedField>
+                    <fieldName>mdc</fieldName>
+                    <providers>
+                        <mdc>
+                            <includeMdcKeyName>trace_id</includeMdcKeyName>
+                            <includeMdcKeyName>span_id</includeMdcKeyName>
+                        </mdc>
+                    </providers>
+                </nestedField>
+                <mdcJsonFieldName>mdc</mdcJsonFieldName>
+                <context>
+                    <fieldName>context</fieldName>
+                </context>
+                <message>
+                    <fieldName>message</fieldName>
+                </message>
+                <stackTrace>
+                    <fieldName>stack_trace</fieldName>
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                        <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                        <maxLength>10000</maxLength>
+                        <shortenedClassNameLength>20</shortenedClassNameLength>
+                        <exclude>sun\.reflect\..*\.invoke.*</exclude>
+                        <exclude>net\.sf\.cglib\.proxy\.MethodProxy\.invoke</exclude>
+                        <rootCauseFirst>true</rootCauseFirst>
+                    </throwableConverter>
+                </stackTrace>
+                <logstashMarkers/>
+                <arguments>
+                    <includeNonStructuredArguments>false</includeNonStructuredArguments>
+                    <nonStructuredMessageField>
+                        <fieldName>message</fieldName>
+                    </nonStructuredMessageField>
+                </arguments>
+                <callerData>
+                    <classFieldName>caller_class_name</classFieldName>
+                    <methodFieldName>caller_method_name</methodFieldName>
+                    <fileFieldName>caller_file_name</fileFieldName>
+                    <lineFieldName>caller_line_number</lineFieldName>
+                </callerData>
+            </providers>
+            <customFields>{"service":"portal-service"}</customFields>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS}/portal-service-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>10MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Error File Appender -->
+    <appender name="ErrorFileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS}/portal-service-error.log</file>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <fieldName>timestamp</fieldName>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+                <loggerName>
+                    <fieldName>logger</fieldName>
+                </loggerName>
+                <logLevel>
+                    <fieldName>level</fieldName>
+                </logLevel>
+                <threadName>
+                    <fieldName>thread</fieldName>
+                </threadName>
+                <nestedField>
+                    <fieldName>mdc</fieldName>
+                    <providers>
+                        <mdc>
+                            <includeMdcKeyName>trace_id</includeMdcKeyName>
+                            <includeMdcKeyName>span_id</includeMdcKeyName>
+                        </mdc>
+                    </providers>
+                </nestedField>
+                <mdcJsonFieldName>mdc</mdcJsonFieldName>
+                <context>
+                    <fieldName>context</fieldName>
+                </context>
+                <message>
+                    <fieldName>message</fieldName>
+                </message>
+                <stackTrace>
+                    <fieldName>stack_trace</fieldName>
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                        <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                        <maxLength>10000</maxLength>
+                        <shortenedClassNameLength>20</shortenedClassNameLength>
+                        <exclude>sun\.reflect\..*\.invoke.*</exclude>
+                        <exclude>net\.sf\.cglib\.proxy\.MethodProxy\.invoke</exclude>
+                        <rootCauseFirst>true</rootCauseFirst>
+                    </throwableConverter>
+                </stackTrace>
+                <logstashMarkers/>
+                <arguments>
+                    <includeNonStructuredArguments>false</includeNonStructuredArguments>
+                    <nonStructuredMessageField>
+                        <fieldName>message</fieldName>
+                    </nonStructuredMessageField>
+                </arguments>
+                <callerData>
+                    <classFieldName>caller_class_name</classFieldName>
+                    <methodFieldName>caller_method_name</methodFieldName>
+                    <fileFieldName>caller_file_name</fileFieldName>
+                    <lineFieldName>caller_line_number</lineFieldName>
+                </callerData>
+            </providers>
+            <customFields>{"service":"portal-service"}</customFields>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS}/portal-service-error-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>10MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Loggers -->
+    <logger name="com.sorted.portal" level="DEBUG" additivity="false">
+        <appender-ref ref="Console"/>
+        <appender-ref ref="FileAppender"/>
+        <appender-ref ref="ErrorFileAppender"/>
+    </logger>
+
+    <logger name="org.springframework" level="WARN" additivity="false">
+        <appender-ref ref="FileAppender"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="Console"/>
+        <appender-ref ref="FileAppender"/>
+        <appender-ref ref="ErrorFileAppender"/>
+    </root>
+
+    <!-- Enable MDC for trace_id -->
+    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+        <resetJUL>true</resetJUL>
+    </contextListener>
+</configuration>

@@ -21,6 +21,7 @@ import com.sorted.portal.assisting.beans.CartItemsBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
 import com.sorted.portal.response.beans.CartBean;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -36,22 +37,13 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequestMapping("/cart")
 @RestController
+@RequiredArgsConstructor
 public class ManageCart_BLService {
 
     private final Cart_Service cart_Service;
     private final ProductService productService;
     private final Users_Service users_Service;
     private final Category_MasterService category_MasterService;
-    private final File_Upload_Details_Service file_Upload_Details_Service;
-
-    public ManageCart_BLService(Cart_Service cart_Service, ProductService productService, Users_Service users_Service,
-                                Category_MasterService category_MasterService, File_Upload_Details_Service file_Upload_Details_Service) {
-        this.cart_Service = cart_Service;
-        this.productService = productService;
-        this.users_Service = users_Service;
-        this.category_MasterService = category_MasterService;
-        this.file_Upload_Details_Service = file_Upload_Details_Service;
-    }
 
     @PostMapping("/clear")
     public SEResponse clear(HttpServletRequest httpServletRequest) {
@@ -83,8 +75,8 @@ public class ManageCart_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("/signup/verify:: exception occurred");
-            log.error("/signup/verify:: {}", e.getMessage());
+            log.error("/clear:: exception occurred");
+            log.error("/clear:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -117,8 +109,8 @@ public class ManageCart_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("/signup/verify:: exception occurred");
-            log.error("/signup/verify:: {}", e.getMessage());
+            log.error("/fetch:: exception occurred");
+            log.error("/fetch:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -228,8 +220,8 @@ public class ManageCart_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("/signup/verify:: exception occurred");
-            log.error("/signup/verify:: {}", e.getMessage());
+            log.error("/add:: exception occurred");
+            log.error("/add:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -274,9 +266,7 @@ public class ManageCart_BLService {
                         List<Media> media = products.getMedia();
                         if (!CollectionUtils.isEmpty(media)) {
                             Optional<Media> findFirst = media.stream().filter(m -> m.getOrder() == 0).findFirst();
-                            if (findFirst.isPresent()) {
-                                items.setCdn_url(findFirst.get().getCdn_url());
-                            }
+                            findFirst.ifPresent(value -> items.setCdn_url(value.getCdn_url()));
                         }
                         cartItems.add(items);
                     }

@@ -6,7 +6,6 @@ import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.mongo.Category_Master.SubCategory;
 import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.*;
-import com.sorted.commons.enums.All_Status.Seller_Status;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.*;
 import com.sorted.commons.helper.Pagination;
@@ -30,6 +29,7 @@ import com.sorted.portal.service.ExcelGenerationUtility;
 import com.sorted.portal.service.FileGeneratorUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,6 +50,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestController
 @RequestMapping("/product")
+@RequiredArgsConstructor
 public class ManageProduct_BLService {
 
     private final ProductService productService;
@@ -58,34 +59,18 @@ public class ManageProduct_BLService {
     private final Category_MasterService category_MasterService;
     private final Users_Service users_Service;
     private final Seller_Service seller_Service;
-    private final File_Upload_Details_Service file_Upload_Details_Service;
     private final SearchHistoryAsyncHelper searchHistoryAsyncHelper;
     private final PorterUtility porterUtility;
     private final AwsS3Service awsS3Service;
-    private final int defaultPage;
-    private final int defaultSize;
+    @Value("${se.default.page}")
+    private int defaultPage;
+    @Value("${se.default.size}")
+    private int defaultSize;
     private final Map<String, Category_Master> categoryMasterCache = new ConcurrentHashMap<>();
     private static final long CACHE_EXPIRY_TIME = 30 * 60 * 1000; // 30 minutes
     private long lastCacheClearTime = System.currentTimeMillis();
+    private final StoreActivityService storeActivityService;
 
-    public ManageProduct_BLService(ProductService productService, Cart_Service cart_Service,
-                                   Varient_Mapping_Service varient_Mapping_Service, Category_MasterService category_MasterService,
-                                   Users_Service users_Service, Seller_Service seller_Service, File_Upload_Details_Service file_Upload_Details_Service,
-                                   SearchHistoryAsyncHelper searchHistoryAsyncHelper, PorterUtility porterUtility, AwsS3Service awsS3Service,
-                                   @Value("${se.default.page}") int defaultPage, @Value("${se.default.size}") int defaultSize) {
-        this.productService = productService;
-        this.cart_Service = cart_Service;
-        this.varient_Mapping_Service = varient_Mapping_Service;
-        this.category_MasterService = category_MasterService;
-        this.users_Service = users_Service;
-        this.seller_Service = seller_Service;
-        this.file_Upload_Details_Service = file_Upload_Details_Service;
-        this.searchHistoryAsyncHelper = searchHistoryAsyncHelper;
-        this.porterUtility = porterUtility;
-        this.awsS3Service = awsS3Service;
-        this.defaultPage = defaultPage;
-        this.defaultSize = defaultSize;
-    }
 
     @PostMapping("/bulk/create")
     public SEResponse bulkCreate(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
@@ -536,7 +521,6 @@ public class ManageProduct_BLService {
             List<Products> listRI = productService.repoFind(filterRI);
 
             Map<String, List<Products>> mapV = this.getVariants(product);
-//			Set<String> seller_ids = this.getSellerByPincode(req.getPincode());
 
             ProductDetailsBean resBean = this.productToBean(listRI, mapV, product);
             if (usersBean.getRole().getUser_type() == UserType.CUSTOMER
@@ -601,14 +585,15 @@ public class ManageProduct_BLService {
     }
 
 
+    /* <<<<<<<<<<<<<<  ✨ Windsurf Command 🌟 >>>>>>>>>>>>>>>> */
     private SEFilter createFilterForProductList(FindProductBean req, UsersBean usersBean)
             throws JsonProcessingException {
 
+        log.debug("createFilterForProductList:: req: {}", req);
         SEFilter filterSE = new SEFilter(SEFilterType.AND);
         switch (usersBean.getRole().getUser_type()) {
             case SELLER:
                 filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, usersBean.getRole().getSeller_id()));
-//                filterSE.addClause(WhereClause.eq(Products.Fields.seller_code, usersBean.getRole().getSeller_code()));
                 break;
             case CUSTOMER, GUEST:
                 String nearest_seller_id;
@@ -616,45 +601,33 @@ public class ManageProduct_BLService {
                 if (CollectionUtils.isEmpty(properties) || !properties.containsKey("nearest_pincode")) {
                     throw new CustomIllegalArgumentsException(ResponseCode.SELECT_PINCODE);
                 }
+                boolean storeOperational = false;
                 String nearest_seller = properties.getOrDefault("nearest_seller", null);
-                if (nearest_seller == null) {
+                if (StringUtils.hasText(nearest_seller)) {
+                    storeOperational = storeActivityService.isStoreOperational(nearest_seller);
+                }
+                if (!storeOperational || !StringUtils.hasText(nearest_seller)) {
                     NearestSellerRes nearestSeller = porterUtility.getNearestSeller(properties.get("nearest_pincode"), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
                     nearest_seller_id = nearestSeller.getSeller_id();
-                    properties.put("nearest_seller", nearest_seller_id);
-                    String user_id = usersBean.getId();
-                    SEFilter filterU = new SEFilter(SEFilterType.AND);
-                    filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, user_id));
-                    filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+                    if (!nearest_seller_id.equals(nearest_seller)) {
+                        properties.put("nearest_seller", nearest_seller_id);
 
-                    Users users = users_Service.repoFindOne(filterU);
-                    users.setProperties(properties);
+                        String user_id = usersBean.getId();
+                        SEFilter filterU = new SEFilter(SEFilterType.AND);
+                        filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, user_id));
+                        filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
-                    users_Service.update(user_id, users, user_id);
-                } else {
-                    SEFilter filterS = new SEFilter(SEFilterType.AND);
-                    filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-                    filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, nearest_seller));
-                    filterS.addClause(WhereClause.eq(Seller.Fields.status, Seller_Status.ACTIVE.name()));
+                        Users users = users_Service.repoFindOne(filterU);
+                        users.setProperties(properties);
 
-                    Seller seller = seller_Service.repoFindOne(filterS);
-                    if (seller == null) {
-                        NearestSellerRes nearestSeller = porterUtility.getNearestSeller(properties.get("nearest_pincode"), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
-                        nearest_seller_id = nearestSeller.getSeller_id();
-                    } else {
-                        nearest_seller_id = seller.getId();
+                        users_Service.update(user_id, users, user_id);
                     }
+                } else {
+                    nearest_seller_id = nearest_seller;
                 }
                 filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, nearest_seller_id));
                 break;
             default:
-//			SEFilter filterS = new SEFilter(SEFilterType.AND);
-//			filterS.addClause(WhereClause.notEq(Seller.Fields.status, Seller_Status.ACTIVE.name()));
-//			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-//			List<Seller> sellers = seller_Service.repoFind(filterS);
-//			if (!CollectionUtils.isEmpty(sellers)) {
-//				List<String> ids = sellers.parallelStream().map(Seller::getId).toList();
-//				filterSE.addClause(WhereClause.nin(Products.Fields.seller_id, ids));
-//			}
                 break;
         }
         if (StringUtils.hasText(req.getName())) {
@@ -685,26 +658,10 @@ public class ManageProduct_BLService {
         int size = req.getSize() < 1 ? defaultSize : req.getSize();
         Pagination pagination = new Pagination(page, size);
         filterSE.setPagination(pagination);
+        log.debug("createFilterForProductList:: filterSE: {}", filterSE);
         return filterSE;
     }
-
-//	private Set<String> getSellerByPincode(String pincode) {
-//		Set<String> seller_ids = new HashSet<>();
-//		if (StringUtils.hasText(pincode)) {
-//			if (!SERegExpUtils.isPincode(pincode)) {
-//				throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PINCODE);
-//			}
-//			SEFilter filterS = new SEFilter(SEFilterType.AND);
-//			filterS.addClause(WhereClause.eq(Seller.Fields.serviceable_pincodes, pincode));
-//			filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-//
-//			List<Seller> sellers = seller_Service.repoFind(filterS);
-//			if (!CollectionUtils.isEmpty(sellers)) {
-//				seller_ids = sellers.stream().map(e -> e.getId()).collect(Collectors.toSet());
-//			}
-//		}
-//		return seller_ids;
-//	}
+    /* <<<<<<<<<<  5a954e3c-b605-4160-a4be-04fd8c3228dd  >>>>>>>>>>> */
 
     private void makeValuesUnique(Map<String, List<String>> map) {
         for (Entry<String, List<String>> entry : map.entrySet()) {

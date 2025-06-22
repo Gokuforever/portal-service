@@ -2,16 +2,13 @@ package com.sorted.portal.bl_services;
 
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.helper.SEResponse;
-import com.sorted.commons.utils.GoogleDriveService;
 import com.sorted.commons.utils.CloudinaryService;
+import com.sorted.commons.utils.GoogleDriveService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.HashMap;
-import java.util.Map;
 
 @RestController
 public class ManageFileUpload_BLService {
@@ -25,12 +22,14 @@ public class ManageFileUpload_BLService {
     }
 
     @GetMapping("/download")
+    @Deprecated
     public SEResponse fetchPhoto(@RequestParam("fileId") String fileId) throws Exception {
         String fetchPhoto = googleDriveService.fetchPhoto(fileId);
         return SEResponse.getBasicSuccessResponseObject(fetchPhoto, ResponseCode.SUCCESSFUL);
     }
 
     @PostMapping("/upload/cloudinary/full")
+    @Deprecated
     public SEResponse uploadToCloudinaryFull(@RequestParam("file") MultipartFile file) {
         try {
             var result = cloudinaryService.uploadImage(file);

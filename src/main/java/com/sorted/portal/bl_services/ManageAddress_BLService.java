@@ -20,6 +20,7 @@ import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.ValidationUtil;
 import com.sorted.portal.request.beans.AddressBean;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
@@ -36,18 +37,12 @@ import java.util.function.Predicate;
 @Slf4j
 @RequestMapping("/address")
 @RestController
+@RequiredArgsConstructor
 public class ManageAddress_BLService {
 
     private final Users_Service users_Service;
     private final RoleService roleService;
     private final Address_Service address_Service;
-
-    @Autowired
-    public ManageAddress_BLService(Users_Service users_Service, RoleService roleService, Address_Service address_Service) {
-        this.users_Service = users_Service;
-        this.roleService = roleService;
-        this.address_Service = address_Service;
-    }
 
     @PostMapping("/add")
     public SEResponse add(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {

@@ -26,6 +26,7 @@ import com.sorted.portal.request.beans.ChangePassword;
 import com.sorted.portal.request.beans.VerifyOtpBean;
 import com.sorted.portal.response.beans.UserProfileBean;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,19 +41,16 @@ import java.util.UUID;
 @Slf4j
 @RequestMapping("/profile")
 @RestController
+@RequiredArgsConstructor
 public class ManageUserProfile_BLService {
 
     private final Users_Service users_Service;
     private final ManageOtp manageOtp;
-    private final PasswordEncoder passwordEncoder;
-    private final int resetWindow;
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    ;
+    @Value("${se.portal.password.reset.window.in_minutes}")
+    private int resetWindow;
 
-    public ManageUserProfile_BLService(Users_Service users_Service, ManageOtp manageOtp, @Value("${se.portal.password.reset.window.in_minutes}") int resetWindow) {
-        this.users_Service = users_Service;
-        this.manageOtp = manageOtp;
-        this.passwordEncoder = new BCryptPasswordEncoder(); // Manually instantiated
-        this.resetWindow = resetWindow;
-    }
 
     @GetMapping("/fetch")
     public SEResponse fetch(HttpServletRequest servletRequest) {

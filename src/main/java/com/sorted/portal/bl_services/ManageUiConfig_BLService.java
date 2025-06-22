@@ -5,16 +5,16 @@ import com.sorted.commons.entity.service.Ui_Config_Service;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@RequiredArgsConstructor
 public class ManageUiConfig_BLService {
 
-    @Autowired
-    private Ui_Config_Service ui_Config_Service;
+    private final Ui_Config_Service ui_Config_Service;
 
     @GetMapping("/ui_config")
     public Ui_Config getUiConfig(@RequestParam String page) {

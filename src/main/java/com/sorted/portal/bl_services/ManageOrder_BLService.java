@@ -9,20 +9,13 @@ import com.sorted.commons.entity.mongo.Order_Details;
 import com.sorted.commons.entity.mongo.Order_Item;
 import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.mongo.Users;
-import com.sorted.commons.entity.service.Order_Details_Service;
-import com.sorted.commons.entity.service.Order_Item_Service;
-import com.sorted.commons.entity.service.ProductService;
-import com.sorted.commons.entity.service.Users_Service;
-import com.sorted.commons.enums.OrderStatus;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.req.beans.CreateOrderBean;
 import com.sorted.commons.porter.req.beans.CreateOrderBean.*;
 import com.sorted.commons.utils.CommonUtils;
-import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
-import com.sorted.portal.razorpay.RazorpayUtility;
 import com.sorted.portal.request.beans.CreateDeliveryBean;
 import com.sorted.portal.request.beans.FindOrderReqBean;
 import com.sorted.portal.request.beans.OrderAcceptRejectRequest;
@@ -34,9 +27,9 @@ import com.sorted.portal.service.FileGeneratorUtil;
 import com.sorted.portal.service.order.OrderProcessingService;
 import com.sorted.portal.service.order.OrderSearchService;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,8 +38,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.sorted.commons.enums.OrderStatus.*;
 
 /**
  * Controller class that handles order management operations including status changes,
@@ -57,68 +48,12 @@ import static com.sorted.commons.enums.OrderStatus.*;
  */
 @Slf4j
 @RestController
+@RequiredArgsConstructor
 public class ManageOrder_BLService {
 
-    //---------------------------------------------------------------------
-    // Fields
-    //---------------------------------------------------------------------
-    private final Order_Details_Service order_Details_Service;
-    private final Order_Item_Service order_Item_Service;
-    private final ProductService productService;
-    private final Users_Service users_Service;
-    private final PorterUtility porterUtility;
-    private final int defaultPage;
-    private final int defaultSize;
-    private final RazorpayUtility razorpayUtility;
     private final OrderProcessingService orderProcessingService;
     private final OrderSearchService orderSearchService;
 
-    private final List<OrderStatus> sellerAllowedStatus = List.of(TRANSACTION_PROCESSED, ORDER_ACCEPTED, READY_FOR_PICK_UP, RIDER_ASSIGNED, OUT_FOR_DELIVERY, DELIVERED);
-
-    //---------------------------------------------------------------------
-    // Constructor
-    //---------------------------------------------------------------------
-
-    /**
-     * Constructor for ManageOrder_BLService with all required dependencies.
-     *
-     * @param order_Details_Service  Service for order details operations
-     * @param order_Item_Service     Service for order item operations
-     * @param productService         Service for product operations
-     * @param users_Service          Service for user operations
-     * @param porterUtility          Utility for Porter delivery service integration
-     * @param defaultPage            Default page number for pagination
-     * @param defaultSize            Default page size for pagination
-     * @param razorpayUtility        Utility for Razorpay payment processing
-     * @param orderProcessingService Service for processing order operations
-     * @param orderSearchService     Service for searching and retrieving orders
-     */
-    public ManageOrder_BLService(
-            Order_Details_Service order_Details_Service,
-            Order_Item_Service order_Item_Service,
-            ProductService productService,
-            Users_Service users_Service,
-            PorterUtility porterUtility,
-            @Value("${se.default.page}") int defaultPage,
-            @Value("${se.default.size}") int defaultSize,
-            RazorpayUtility razorpayUtility,
-            OrderProcessingService orderProcessingService,
-            OrderSearchService orderSearchService) {
-        this.order_Details_Service = order_Details_Service;
-        this.order_Item_Service = order_Item_Service;
-        this.productService = productService;
-        this.users_Service = users_Service;
-        this.porterUtility = porterUtility;
-        this.defaultPage = defaultPage;
-        this.defaultSize = defaultSize;
-        this.razorpayUtility = razorpayUtility;
-        this.orderProcessingService = orderProcessingService;
-        this.orderSearchService = orderSearchService;
-    }
-
-    //---------------------------------------------------------------------
-    // Order Status Management Endpoints
-    //---------------------------------------------------------------------
 
     /**
      * Sets an order to "Ready for Pickup" status and creates a delivery order with Porter.

@@ -1,9 +1,6 @@
 package com.sorted.portal.bl_services;
 
-import com.sorted.commons.beans.AddressDTO;
-import com.sorted.commons.beans.Bank_Details;
-import com.sorted.commons.beans.Spoc_Details;
-import com.sorted.commons.beans.UsersBean;
+import com.sorted.commons.beans.*;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
@@ -26,8 +23,8 @@ import com.sorted.portal.request.beans.CUDSellerBean;
 import com.sorted.portal.request.beans.FidnSellerBean;
 import com.sorted.portal.response.beans.FindResBean;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -44,27 +41,17 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestController
 @RequestMapping("/seller")
+@RequiredArgsConstructor
 public class ManageSeller_BLService {
 
-    @Autowired
-    private Users_Service users_Service;
 
-    @Autowired
-    private Seller_Service seller_Service;
-
-    @Autowired
-    private Address_Service address_Service;
-
-    @Autowired
-    private Plans_Service plans_Service;
-
-    @Autowired
-    private RoleService roleService;
-
-    private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-
-    @Autowired
-    private EmailSenderImpl emailSenderImpl;
+    private final Users_Service users_Service;
+    private final Seller_Service seller_Service;
+    private final Address_Service address_Service;
+    private final Plans_Service plans_Service;
+    private final RoleService roleService;
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final EmailSenderImpl emailSenderImpl;
 
     @Value("${se.default.page}")
     private int default_page;
@@ -79,8 +66,7 @@ public class ManageSeller_BLService {
             CUDSellerBean req = request.getGenericRequestDataObject(CUDSellerBean.class);
             CommonUtils.extractHeaders(servletRequest, req);
 
-            UsersBean usersBean = users_Service.validateUserForActivity(req, Permission.EDIT,
-                    Activity.SELLER_ONBOARDING);
+            UsersBean usersBean = users_Service.validateUserForActivity(req, Permission.EDIT, Activity.SELLER_ONBOARDING);
             Role role = usersBean.getRole();
             if (!UserType.SUPER_ADMIN.equals(role.getUser_type())) {
                 throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
@@ -91,8 +77,7 @@ public class ManageSeller_BLService {
 
             List<Spoc_Details> spoc_details = req.getSpoc_details();
             Spoc_Details primary_spoc = validateSPOC(spoc_details);
-            List<String> unique_phone = spoc_details.parallelStream().map(Spoc_Details::getMobile_no).distinct()
-                    .toList();
+            List<String> unique_phone = spoc_details.parallelStream().map(Spoc_Details::getMobile_no).distinct().toList();
             Bank_Details bank_details = req.getBank_details();
             if (bank_details != null) {
                 ValidationUtil.validateBankDetails(bank_details);
@@ -139,6 +124,7 @@ public class ManageSeller_BLService {
             String name = CommonUtils.toTitleCase(req.getName());
             String pan_no = req.getPan_no();
             String gstin = req.getGstin();
+            BusinessHours businessHours = req.getBusiness_hours();
             seller.setBusiness_name(name);
             seller.setSpoc_details(spoc_details);
             seller.setServiceable_pincodes(serviceable_pincodes);
@@ -147,6 +133,9 @@ public class ManageSeller_BLService {
             }
             if (StringUtils.hasText(gstin)) {
                 seller.setGstin(gstin);
+            }
+            if (businessHours != null) {
+                seller.setBusiness_hours(businessHours);
             }
             if (bank_details != null) {
                 seller.setBank_details(bank_details);
@@ -222,8 +211,7 @@ public class ManageSeller_BLService {
             CUDSellerBean req = request.getGenericRequestDataObject(CUDSellerBean.class);
             CommonUtils.extractHeaders(servletRequest, req);
 
-            UsersBean usersBean = users_Service.validateUserForActivity(req, Permission.EDIT,
-                    Activity.SELLER_ONBOARDING);
+            UsersBean usersBean = users_Service.validateUserForActivity(req, Permission.EDIT, Activity.SELLER_ONBOARDING);
             if (!UserType.SUPER_ADMIN.equals(usersBean.getRole().getUser_type())) {
                 throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
             }
@@ -239,8 +227,7 @@ public class ManageSeller_BLService {
             if (seller == null) {
                 throw new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND);
             }
-            Optional<Spoc_Details> result = seller.getSpoc_details().stream().filter(Spoc_Details::isPrimary)
-                    .findFirst();
+            Optional<Spoc_Details> result = seller.getSpoc_details().stream().filter(Spoc_Details::isPrimary).findFirst();
             int db_spocHash = getSpocHashCode(result.get());
 
             List<Spoc_Details> spoc_details = req.getSpoc_details();
@@ -249,8 +236,7 @@ public class ManageSeller_BLService {
 
             if (db_spocHash != req_spocHash) {
 
-                List<String> unique_phone = spoc_details.parallelStream().map(Spoc_Details::getMobile_no).distinct()
-                        .toList();
+                List<String> unique_phone = spoc_details.parallelStream().map(Spoc_Details::getMobile_no).distinct().toList();
 
                 SEFilter filterS = new SEFilter(SEFilterType.AND);
                 filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -368,8 +354,7 @@ public class ManageSeller_BLService {
             log.info("/seller/changeStatus:: API started!");
             CUDSellerBean req = request.getGenericRequestDataObject(CUDSellerBean.class);
             CommonUtils.extractHeaders(servletRequest, req);
-            UsersBean usersBean = users_Service.validateUserForActivity(req, Permission.EDIT,
-                    Activity.SELLER_ONBOARDING, Activity.STORE_MANAGEMENT);
+            UsersBean usersBean = users_Service.validateUserForActivity(req, Permission.EDIT, Activity.SELLER_ONBOARDING, Activity.STORE_MANAGEMENT);
             Seller_Status status = Seller_Status.getById(req.getStatus_id());
             if (status == null) {
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SELLER_STATUS);
@@ -421,8 +406,7 @@ public class ManageSeller_BLService {
             log.info("/seller/resend API started.");
             FidnSellerBean req = request.getGenericRequestDataObject(FidnSellerBean.class);
             CommonUtils.extractHeaders(httpServletRequest, req);
-            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(),
-                    Activity.SELLER_MANAGEMENT);
+            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.SELLER_MANAGEMENT);
 
             Role role = usersBean.getRole();
             if (role.getUser_type() != UserType.SUPER_ADMIN) {
@@ -487,15 +471,11 @@ public class ManageSeller_BLService {
             log.info("find seller API started.");
             FidnSellerBean req = request.getGenericRequestDataObject(FidnSellerBean.class);
             CommonUtils.extractHeaders(httpServletRequest, req);
-            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(),
-                    Activity.SELLER_MANAGEMENT);
+            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.SELLER_MANAGEMENT);
 
             Role role = usersBean.getRole();
-            switch (role.getUser_type()) {
-                case SUPER_ADMIN:
-                    break;
-                default:
-                    throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+            if (role.getUser_type() != UserType.SUPER_ADMIN) {
+                throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
             }
 
             FindResBean bean = new FindResBean();
@@ -544,8 +524,7 @@ public class ManageSeller_BLService {
                 mapAdd.putAll(listAdd.stream().collect(Collectors.toMap(Address::getEntity_id, e -> e)));
             }
 
-            List<String> primary_contacts = listS.stream().flatMap(e -> e.getSpoc_details().stream())
-                    .filter(Spoc_Details::isPrimary).map(Spoc_Details::getMobile_no).filter(Objects::nonNull).distinct().toList();
+            List<String> primary_contacts = listS.stream().flatMap(e -> e.getSpoc_details().stream()).filter(Spoc_Details::isPrimary).map(Spoc_Details::getMobile_no).filter(Objects::nonNull).distinct().toList();
 
             SEFilter filterU = new SEFilter(SEFilterType.AND);
             filterU.addClause(WhereClause.in(Users.Fields.mobile_no, primary_contacts));
@@ -557,8 +536,7 @@ public class ManageSeller_BLService {
             Map<String, Boolean> mapIsResend = new HashMap<>();
             if (!CollectionUtils.isEmpty(listPrimary)) {
                 List<String> list = listPrimary.stream().map(Users::getMobile_no).toList();
-                mapIsResend.putAll(listS.stream().collect(Collectors.toMap(e -> e.getId(), e -> e.getSpoc_details()
-                        .stream().anyMatch(s -> s.isPrimary() && list.contains(s.getMobile_no())))));
+                mapIsResend.putAll(listS.stream().collect(Collectors.toMap(BaseMongoEntity::getId, e -> e.getSpoc_details().stream().anyMatch(s -> s.isPrimary() && list.contains(s.getMobile_no())))));
             }
 
             List<CUDSellerBean> resList = new ArrayList<>();
@@ -740,8 +718,7 @@ public class ManageSeller_BLService {
     }
 
     private int getSellerAddresshashCode(Address a) {
-        return Objects.hash(a.getStreet_1(), a.getStreet_2(), a.getLandmark(), a.getCity(), a.getState(),
-                a.getPincode(), a.getAddress_type(), a.getAddress_type_desc());
+        return Objects.hash(a.getStreet_1(), a.getStreet_2(), a.getLandmark(), a.getCity(), a.getState(), a.getPincode(), a.getAddress_type(), a.getAddress_type_desc());
     }
 
 }

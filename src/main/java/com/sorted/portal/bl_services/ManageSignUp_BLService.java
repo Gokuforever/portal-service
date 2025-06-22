@@ -24,9 +24,9 @@ import com.sorted.portal.request.beans.SignUpRequest;
 import com.sorted.portal.request.beans.VerifyOtpBean;
 import com.sorted.portal.service.SignUpService;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,27 +35,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
+@RequiredArgsConstructor
 public class ManageSignUp_BLService {
 
     private final ManageOtp manageOtp;
     private final Users_Service users_Service;
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
-    private final String customer_signup_role;
+    @Value("${se.portal.customer.signup.role}")
+    private String customer_signup_role;
     private final SignUpService signUpService;
     private final EmailSenderImpl emailSenderImpl;
 
-    // Constructor Injection
-    public ManageSignUp_BLService(ManageOtp manageOtp, Users_Service users_Service, RoleService roleService,
-                                  @Value("${se.portal.customer.signup.role}") String customer_signup_role, SignUpService signUpService, EmailSenderImpl emailSenderImpl) {
-        this.manageOtp = manageOtp;
-        this.users_Service = users_Service;
-        this.roleService = roleService;
-        this.signUpService = signUpService;
-        this.emailSenderImpl = emailSenderImpl;
-        this.passwordEncoder = new BCryptPasswordEncoder();
-        this.customer_signup_role = customer_signup_role;
-    }
 
     @PostMapping("/signup")
     public SEResponse signUp(@RequestBody SERequest request) {

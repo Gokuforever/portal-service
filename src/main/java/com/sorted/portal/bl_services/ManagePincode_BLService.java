@@ -20,6 +20,7 @@ import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.request.beans.NearestSellerReq;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,15 +30,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
+@RequiredArgsConstructor
 public class ManagePincode_BLService {
 
     private final PorterUtility porterUtility;
     private final Users_Service users_Service;
 
-    public ManagePincode_BLService(PorterUtility porterUtility, Users_Service users_Service) {
-        this.porterUtility = porterUtility;
-        this.users_Service = users_Service;
-    }
 
     @PostMapping("/delivery/check")
     public SEResponse checkDelivery(@RequestBody SERequest request, HttpServletRequest httpServletRequest)

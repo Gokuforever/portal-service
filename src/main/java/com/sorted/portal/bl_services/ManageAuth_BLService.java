@@ -23,9 +23,9 @@ import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.annotation.RateLimited;
 import com.sorted.portal.request.beans.*;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,22 +39,16 @@ import java.util.UUID;
 @Slf4j
 @RequestMapping("/auth")
 @RestController
+@RequiredArgsConstructor
 public class ManageAuth_BLService {
 
     private final Users_Service users_Service;
     private final ManageOtp manageOtp;
-    private final int reset_window;
     private final PasswordEncoder passwordEncoder;
 
-    public ManageAuth_BLService(
-            Users_Service users_Service,
-            ManageOtp manageOtp,
-            @Value("${se.portal.password.reset.window.in_minutes}") int reset_window) {
-        this.users_Service = users_Service;
-        this.manageOtp = manageOtp;
-        this.reset_window = reset_window;
-        this.passwordEncoder = new BCryptPasswordEncoder();
-    }
+    @Value("${se.portal.password.reset.window.in_minutes}")
+    private int reset_window;
+
 
     @PostMapping("/signin")
     @RateLimited(value = 5.0) // 5 requests per second

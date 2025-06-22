@@ -1,18 +1,10 @@
 package com.sorted.portal.crons;
 
-import com.sorted.commons.beans.TableConfig;
+import com.sorted.commons.beans.BusinessHours;
 import com.sorted.commons.constants.Defaults;
-import com.sorted.commons.entity.mongo.BaseMongoEntity;
-import com.sorted.commons.entity.mongo.Order_Details;
-import com.sorted.commons.entity.mongo.Order_Item;
-import com.sorted.commons.entity.mongo.Users;
-import com.sorted.commons.entity.service.Order_Details_Service;
-import com.sorted.commons.entity.service.Order_Item_Service;
-import com.sorted.commons.entity.service.Users_Service;
-import com.sorted.commons.enums.ColumnType;
-import com.sorted.commons.enums.MailTemplate;
-import com.sorted.commons.enums.OrderStatus;
-import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.entity.mongo.*;
+import com.sorted.commons.entity.service.*;
+import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
@@ -21,17 +13,19 @@ import com.sorted.commons.helper.MailBuilder;
 import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.porter.res.beans.FetchOrderRes;
 import com.sorted.commons.utils.PorterUtility;
-import com.sorted.commons.utils.TemplateProcessorUtil;
 import com.sorted.portal.service.order.OrderStatusCheckService;
 import com.sorted.portal.service.order.OrderTemplateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -50,6 +44,8 @@ public class ManageCrons_BLService {
     private final EmailSenderImpl emailSenderImpl;
     private final OrderTemplateService orderTemplateService;
     private final OrderStatusCheckService orderStatusCheckService;
+    private final Seller_Service seller_Service;
+    private final StoreActivityService storeActivityService;
 
     //	@Scheduled(fixedRate = 5000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
@@ -136,14 +132,14 @@ public class ManageCrons_BLService {
                 break;
         }
 
-        if(mailTemplate != null) {
+        if (mailTemplate != null) {
 
             SEFilter filterU = new SEFilter(SEFilterType.AND);
             filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
             filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, details.getUser_id()));
 
             Users user = usersService.repoFindOne(filterU);
-            if(user == null) {
+            if (user == null) {
                 throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
             }
             String userName = user.getFirst_name() + " " + user.getLast_name();
@@ -202,5 +198,72 @@ public class ManageCrons_BLService {
         }
         listOD.parallelStream().forEach(orderStatusCheckService::checkOrderStatus);
     }
+
+    /* <<<<<<<<<<<<<<  ✨ Windsurf Command 🌟 >>>>>>>>>>>>>>>> */
+//    @Scheduled(cron = "0 */15 * * * *")
+    public void evaluateStoreOpenClose() {
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filter.addClause(WhereClause.eq(Seller.Fields.status, All_Status.Seller_Status.ACTIVE));
+
+        List<Seller> sellers = seller_Service.repoFind(filter);
+        if (CollectionUtils.isEmpty(sellers)) {
+            log.info("No active sellers found");
+            return;
+        }
+
+        int currentHour = getCurrentHourInIST();
+        WeekDay currentDay = getCurrentDayInIST();
+
+        log.info("Current hour in IST: {}", currentHour);
+        log.info("Current day in IST: {}", currentDay);
+
+        sellers.parallelStream().forEach(seller -> {
+            log.info("Evaluating store open/close for seller: {}", seller.getBusiness_name());
+            BusinessHours bh = seller.getBusiness_hours();
+            if (bh == null) {
+                log.info("No business hours found for seller: {}", seller.getBusiness_name());
+                return;
+            }
+
+            List<WeekDay> offDays = bh.getFixed_off_days();
+            if (offDays != null && offDays.contains(currentDay)) {
+                log.info("Seller is closed for the day: {}", seller.getBusiness_name());
+                storeActivityService.autoOpenStore(seller.getId(), Defaults.CLOSE_STORE_CRON);
+                return;
+            }
+
+            Integer start = bh.getStart_time();
+            Integer end = bh.getEnd_time();
+
+            if (start == null || end == null) {
+                log.info("No valid start/end time found for seller: {}", seller.getBusiness_name());
+                storeActivityService.autoOpenStore(seller.getId(), Defaults.CLOSE_STORE_CRON);
+                return;
+            }
+
+            log.info("Evaluating store open/close for seller: {}: start={}, end={}, currentHour={}", seller.getBusiness_name(), start, end, currentHour);
+
+            if (currentHour >= start && currentHour < end) {
+                log.info("Store is open for seller: {}", seller.getBusiness_name());
+                storeActivityService.autoOpenStore(seller.getId(), Defaults.OPEN_STORE_CRON);
+            } else {
+                log.info("Store is closed for seller: {}", seller.getBusiness_name());
+                storeActivityService.autoOpenStore(seller.getId(), Defaults.CLOSE_STORE_CRON);
+            }
+        });
+    }
+    /* <<<<<<<<<<  d435c0d4-d62c-4b61-8842-ee73abdf1c65  >>>>>>>>>>> */
+
+    private int getCurrentHourInIST() {
+        return ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).getHour();
+    }
+
+    private WeekDay getCurrentDayInIST() {
+        DayOfWeek day = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).getDayOfWeek();
+        return WeekDay.values()[day.getValue()];
+    }
+
+
 }
 
