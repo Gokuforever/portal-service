@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <property name="LOGS" value="./logs"/>
+    <!-- Use environment variable for logs directory with fallback to './logs' -->
+    <property name="LOGS" value="${LOG_DIR:-./logs}"/>
 
     <!-- Enable async logging for better performance -->
     <conversionRule conversionWord="clr" converterClass="org.springframework.boot.logging.logback.ColorConverter"/>

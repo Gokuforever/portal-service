@@ -89,8 +89,9 @@ jobs:
         run: |
           echo "======== DEPLOYMENT STARTED ========"
           
-          # Ensure config directory exists
+          # Ensure config and logs directories exist
           mkdir -p /home/ubuntu/studeaze/config
+          mkdir -p /home/ubuntu/studeaze/logs
           
           # Stop and remove existing container if it exists
           echo "*** Gracefully stopping application ***"
@@ -123,7 +124,9 @@ jobs:
             -p 443:443 \
             -e SE_ENV=/app/config \
             -e SPRING_PROFILES_ACTIVE=prod \
+            -e LOG_DIR=/app/logs \
             --mount type=bind,source=/home/ubuntu/studeaze/config,target=/app/config \
+            --mount type=bind,source=/home/ubuntu/studeaze/logs,target=/app/logs \
             --mount type=bind,source=/home/ubuntu/api.studeaze.in.keystore.p12,target=/app/ssl/api.studeaze.in.keystore.p12 \
             ghcr.io/gokuforever/portal-service:latest
           

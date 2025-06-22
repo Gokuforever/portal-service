@@ -27,6 +27,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,7 +42,7 @@ public class ManageSignUp_BLService {
     private final ManageOtp manageOtp;
     private final Users_Service users_Service;
     private final RoleService roleService;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     @Value("${se.portal.customer.signup.role}")
     private String customer_signup_role;
     private final SignUpService signUpService;
