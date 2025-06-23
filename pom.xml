@@ -31,7 +31,7 @@
         <dependency>
             <groupId>com.sorted</groupId>
             <artifactId>se-commons</artifactId>
-            <version>25.06.15-SNAPSHOT</version>
+            <version>25.06.16-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
