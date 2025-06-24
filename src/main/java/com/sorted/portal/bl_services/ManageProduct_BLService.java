@@ -112,13 +112,14 @@ public class ManageProduct_BLService {
             this.validateRequestForBulk(products);
             Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
 
-            Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master);
-
-
             List<Products> listP = products.parallelStream()
                     .map(productReqBean -> {
+                        if (productReqBean.getGroup_id() == null || productReqBean.getGroup_id() <= 0) {
+                            throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_GROUP);
+                        }
+                        Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, productReqBean.getGroup_id());
                         List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(productReqBean, mapSC);
-                        this.validateMandatorySubCategories(category_Master, listSC);
+                        this.validateMandatorySubCategories(category_Master, listSC, productReqBean.getGroup_id());
                         BigDecimal mrp = new BigDecimal(productReqBean.getMrp());
                         BigDecimal sp = new BigDecimal(productReqBean.getSelling_price());
                         Products product = new Products();
@@ -130,6 +131,7 @@ public class ManageProduct_BLService {
                         product.setSeller_code(seller.getCode());
                         product.setCategory_id(category_Master.getId());
                         product.setQuantity(Long.valueOf(productReqBean.getQuantity()));
+                        product.setGroup_id(productReqBean.getGroup_id());
                         product.setDescription(
                                 StringUtils.hasText(productReqBean.getDescription()) ? productReqBean.getDescription() : null);
 
@@ -188,11 +190,11 @@ public class ManageProduct_BLService {
 
             Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
 
-            Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master);
+            Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, req.getGroup_id());
 
             List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(req, mapSC);
 
-            this.validateMandatorySubCategories(category_Master, listSC);
+            this.validateMandatorySubCategories(category_Master, listSC, req.getGroup_id());
 
             String varient_mapping_id = this.upsertAndGetVariantMappingId(req, usersBean, role);
 
@@ -208,6 +210,7 @@ public class ManageProduct_BLService {
             product.setCategory_id(category_Master.getId());
             product.setQuantity(Long.valueOf(req.getQuantity()));
             product.setVarient_mapping_id(varient_mapping_id);
+            product.setGroup_id(req.getGroup_id());
             product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
 
 
@@ -285,11 +288,11 @@ public class ManageProduct_BLService {
 
             Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
 
-            Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master);
+            Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, req.getGroup_id());
 
             List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(req, mapSC);
 
-            this.validateMandatorySubCategories(category_Master, listSC);
+            this.validateMandatorySubCategories(category_Master, listSC, req.getGroup_id());
 
             String varient_mapping_id = this.upsertAndGetVariantMappingId(req, usersBean, role);
 
@@ -301,6 +304,7 @@ public class ManageProduct_BLService {
             product.setSelected_sub_catagories(listSC);
             product.setCategory_id(category_Master.getId());
             product.setQuantity(Long.valueOf(req.getQuantity()));
+            product.setGroup_id(req.getGroup_id());
             product.setVarient_mapping_id(varient_mapping_id);
             product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
             product.setMedia(req.getMedia());
@@ -800,11 +804,19 @@ public class ManageProduct_BLService {
         if (!StringUtils.hasText(req.getName())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_NAME);
         }
+        if (req.getGroup_id() == null || req.getGroup_id() <= 0) {
+            throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_GROUP);
+        }
 //		if (!SERegExpUtils.standardTextValidation(req.getName())) {
 //			throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_NAME);
 //		}
         if (CollectionUtils.isEmpty(req.getSub_categories())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SUB_CATEGORY);
+        }
+        if (StringUtils.hasText(req.getDescription())) {
+            if (!SERegExpUtils.standardTextValidation(req.getDescription())) {
+                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
+            }
         }
         if (!StringUtils.hasText(req.getQuantity())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_QUANTITY);
@@ -867,16 +879,20 @@ public class ManageProduct_BLService {
         return categoryMaster;
     }
 
-    private Map<String, List<String>> getSubCategoriesMap(Category_Master categoryMaster) {
+    private Map<String, List<String>> getSubCategoriesMap(Category_Master categoryMaster, Integer groupId) {
         if (CollectionUtils.isEmpty(categoryMaster.getGroups())) {
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
-        List<SubCategory> sub_categories = categoryMaster.getSub_categories();
+        Map<Integer, List<SubCategory>> sub_categories = categoryMaster.getSub_categories_by_group();
         if (CollectionUtils.isEmpty(sub_categories)) {
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
 
-        return sub_categories.stream().collect(Collectors.toMap(SubCategory::getName,
+        if (!sub_categories.containsKey(groupId)) {
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+
+        return sub_categories.get(groupId).stream().collect(Collectors.toMap(SubCategory::getName,
                 e -> CollectionUtils.isEmpty(e.getAttributes()) ? new ArrayList<>() : e.getAttributes()));
     }
 
@@ -910,10 +926,10 @@ public class ManageProduct_BLService {
         return listSC;
     }
 
-    private void validateMandatorySubCategories(Category_Master categoryMaster, List<SelectedSubCatagories> listSC) {
+    private void validateMandatorySubCategories(Category_Master categoryMaster, List<SelectedSubCatagories> listSC, Integer groupId) {
         Map<String, List<String>> mapSC = listSC.stream()
                 .collect(Collectors.toMap(SelectedSubCatagories::getSub_category, SelectedSubCatagories::getSelected_attributes));
-        List<SubCategory> sub_categories = categoryMaster.getSub_categories();
+        List<SubCategory> sub_categories = categoryMaster.getSub_categories_by_group().getOrDefault(groupId, new ArrayList<>());
         List<SubCategory> sorted = sub_categories.stream()
                 .sorted(Comparator.comparingInt(SubCategory::getOrder))
                 .toList();
