@@ -29,6 +29,7 @@ public class ProductDetailsBean {
     private String seller_code;
     private String seller_name;
     private String modification_date;
+    private Integer group_id;
 
     @Builder
     @Data

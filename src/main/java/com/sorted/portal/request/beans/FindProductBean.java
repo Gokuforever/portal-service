@@ -17,6 +17,7 @@ public class FindProductBean extends ReqBaseBean {
 
     private String id;
     private String catagory_id;
+    private String group_id;
     private Map<String, List<String>> filters;
     private String name;
     private String pincode;

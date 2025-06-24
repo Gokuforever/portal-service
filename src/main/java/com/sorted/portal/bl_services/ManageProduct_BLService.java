@@ -638,6 +638,7 @@ public class ManageProduct_BLService {
             filterSE.addClause(WhereClause.like(Products.Fields.name, req.getName()));
         }
         if (!CollectionUtils.isEmpty(req.getFilters())) {
+
             for (Entry<String, List<String>> entry : req.getFilters().entrySet()) {
                 if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
                     Map<String, Object> map = new HashMap<>();
@@ -754,6 +755,7 @@ public class ManageProduct_BLService {
         bean.setCategory_name(category_Master.getName());
         bean.setSecure(category_Master.isSecure_item());
         bean.setMedia(product.getMedia());
+        bean.setGroup_id(product.getGroup_id());
         return bean;
     }
 
