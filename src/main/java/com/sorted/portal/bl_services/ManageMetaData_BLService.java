@@ -78,7 +78,7 @@ public class ManageMetaData_BLService {
         SEFilter filterPM = new SEFilter(SEFilterType.AND);
         filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         filterPM.setOrderBy(new AggregationFilter.OrderBy(BaseMongoEntity.Fields.id, AggregationFilter.SortOrder.DESC));
-        filterPM.addProjection(Product_Master.Fields.name, Product_Master.Fields.catagory_id, Product_Master.Fields.sub_categories, Product_Master.Fields.cdn_url);
+        filterPM.addProjection(Product_Master.Fields.name, Product_Master.Fields.catagory_id, Product_Master.Fields.sub_categories, Product_Master.Fields.cdn_url, Product_Master.Fields.group_id);
         return productMasterService.repoFind(filterPM);
     }
 
