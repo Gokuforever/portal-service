@@ -2,11 +2,9 @@ package com.sorted.portal.bl_services;
 
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.UsersBean;
-import com.sorted.commons.entity.mongo.Address;
-import com.sorted.commons.entity.mongo.BaseMongoEntity;
-import com.sorted.commons.entity.mongo.Role;
-import com.sorted.commons.entity.mongo.Users;
+import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.Address_Service;
+import com.sorted.commons.entity.service.Pincode_Master_Service;
 import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.*;
@@ -43,6 +41,7 @@ public class ManageAddress_BLService {
     private final Users_Service users_Service;
     private final RoleService roleService;
     private final Address_Service address_Service;
+    private final Pincode_Master_Service pincode_Master_Service;
 
     @PostMapping("/add")
     public SEResponse add(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
@@ -136,6 +135,14 @@ public class ManageAddress_BLService {
 
         ValidationUtil.validateAddress(addressDTO, address);
 
+        SEFilter filterP = new SEFilter(SEFilterType.AND);
+        filterP.addClause(WhereClause.eq(Pincode_Master.Fields.pincode, address.getPincode()));
+        filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        Pincode_Master pincode_Master = pincode_Master_Service.repoFindOne(filterP);
+        if (pincode_Master == null) {
+            throw new CustomIllegalArgumentsException(ResponseCode.NOT_DELIVERIBLE);
+        }
 
         SEFilter filterA = new SEFilter(SEFilterType.AND);
         filterA.addClause(WhereClause.eq(Address.Fields.entity_id, user_id));
