@@ -1,5 +1,6 @@
 package com.sorted.portal.bl_services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sorted.commons.beans.Item;
 import com.sorted.commons.beans.Media;
 import com.sorted.commons.beans.UsersBean;
@@ -15,7 +16,10 @@ import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
+import com.sorted.commons.porter.req.beans.GetQuoteRequest;
+import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
+import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.assisting.beans.CartItems;
 import com.sorted.portal.assisting.beans.CartItemsBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
@@ -23,12 +27,10 @@ import com.sorted.portal.response.beans.CartBean;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -44,6 +46,12 @@ public class ManageCart_BLService {
     private final ProductService productService;
     private final Users_Service users_Service;
     private final Category_MasterService category_MasterService;
+    private final PorterUtility porterUtility;
+    private final Address_Service addressService;
+    private final Seller_Service sellerService;
+
+    @Value("${se.minimum-cart-value.in-paise:10000}")
+    private long minCartValueInPaise;
 
     @PostMapping("/clear")
     public SEResponse clear(HttpServletRequest httpServletRequest) {
@@ -82,7 +90,8 @@ public class ManageCart_BLService {
     }
 
     @PostMapping("/fetch")
-    public SEResponse fetch(HttpServletRequest httpServletRequest) {
+    public SEResponse fetch(HttpServletRequest httpServletRequest,
+                            @RequestParam(name = "address_id", required = false) String address_id) {
         try {
             String req_user_id = httpServletRequest.getHeader("req_user_id");
             UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Permission.VIEW,
@@ -104,7 +113,7 @@ public class ManageCart_BLService {
                 cart = cart_Service.create(cart, req_user_id);
             }
 
-            CartBean cartBean = this.getCartBean(cart);
+            CartBean cartBean = this.getCartBean(cart, address_id, usersBean.getMobile_no(), usersBean.getFirst_name() + " " + usersBean.getLast_name());
             return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
@@ -226,13 +235,17 @@ public class ManageCart_BLService {
         }
     }
 
-    private CartBean getCartBean(Cart cart) {
+    private CartBean getCartBean(Cart cart) throws JsonProcessingException {
+        return this.getCartBean(cart, null, null, null);
+    }
+
+    private CartBean getCartBean(Cart cart, String address_id, String mobile, String customerName) throws JsonProcessingException {
         CartBean cartBean = new CartBean();
         List<CartItems> cartItems = new ArrayList<>();
         List<Long> total_price_in_paise = new ArrayList<>();
         List<Long> total_cart_items = new ArrayList<>();
         List<Item> cart_items = cart.getCart_items();
-        Map<String, String> mapImg = new HashMap<>();
+        String seller_id = null;
         if (!CollectionUtils.isEmpty(cart_items)) {
             List<String> product_ids = cart_items.stream().map(Item::getProduct_id).toList();
             SEFilter filterP = new SEFilter(SEFilterType.AND);
@@ -241,6 +254,7 @@ public class ManageCart_BLService {
 
             List<Products> listP = productService.repoFind(filterP);
             if (!CollectionUtils.isEmpty(listP)) {
+                seller_id = listP.get(0).getSeller_id();
                 Map<String, Products> mapP = listP.stream().collect(Collectors.toMap(BaseMongoEntity::getId, p -> p));
 
                 cart_items.forEach(e -> {
@@ -252,7 +266,6 @@ public class ManageCart_BLService {
                         items.setProduct_id(e.getProduct_id());
                         items.setQuantity(e.getQuantity());
                         items.setSelling_price(CommonUtils.paiseToRupee(products.getSelling_price()));
-//						items.setIn_stock(products.getQuantity().compareTo(e.getQuantity()) >= 0);
                         items.setSecure_item(e.is_secure());
                         if (products.isDeleted()) {
                             items.setCurrent_status(ProductCurrentStatus.CURRENTLY_UNAVAILABLE.getStatus_id());
@@ -275,9 +288,28 @@ public class ManageCart_BLService {
         }
         long summed = total_price_in_paise.stream().mapToLong(Long::longValue).sum();
         long total_items = total_cart_items.stream().mapToLong(Long::longValue).sum();
+        long deliveryChargeInPaise = 0;
+        if (StringUtils.hasText(address_id)) {
+            Address deliveryAddress = addressService.findById(address_id);
+            if (deliveryAddress == null) {
+                throw new CustomIllegalArgumentsException(ResponseCode.ADDRESS_NOT_FOUND);
+            }
+            Seller seller = sellerService.findById(seller_id);
+            Address pickUpAddress = addressService.findById(seller.getAddress_id());
+            if (pickUpAddress == null) {
+                throw new CustomIllegalArgumentsException(ResponseCode.ADDRESS_NOT_FOUND);
+            }
+            GetQuoteRequest getQuoteRequest = porterUtility.buildGetQuoteRequest(pickUpAddress, deliveryAddress, mobile, customerName);
+            GetQuoteResponse quote = porterUtility.getQuote(getQuoteRequest, "/cart/fetch");
+            if (quote != null) {
+                deliveryChargeInPaise = quote.getVehicle().getFare().getMinor_amount();
+            }
+        }
         cartBean.setTotal_amount(CommonUtils.paiseToRupee(summed));
         cartBean.setTotal_count(total_items);
         cartBean.setCart_items(cartItems);
+        cartBean.setDelivery_charge(CommonUtils.paiseToRupee(deliveryChargeInPaise));
+        cartBean.set_free_delivery(minCartValueInPaise < summed);
         return cartBean;
     }
 
