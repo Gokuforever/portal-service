@@ -290,27 +290,23 @@ public class ManageCart_BLService {
         long total_items = total_cart_items.stream().mapToLong(Long::longValue).sum();
         long deliveryChargeInPaise = 0;
         if (StringUtils.hasText(address_id)) {
-            Address deliveryAddress = addressService.findById(address_id);
-            if (deliveryAddress == null) {
-                throw new CustomIllegalArgumentsException(ResponseCode.ADDRESS_NOT_FOUND);
-            }
             Seller seller = sellerService.findById(seller_id);
-            Address pickUpAddress = addressService.findById(seller.getAddress_id());
-            if (pickUpAddress == null) {
-                throw new CustomIllegalArgumentsException(ResponseCode.ADDRESS_NOT_FOUND);
-            }
-            GetQuoteRequest getQuoteRequest = porterUtility.buildGetQuoteRequest(pickUpAddress, deliveryAddress, mobile, customerName);
-            GetQuoteResponse quote = porterUtility.getQuote(getQuoteRequest, "/cart/fetch");
+            GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address_id,seller.getAddress_id(), mobile, customerName);
             if (quote != null) {
                 deliveryChargeInPaise = quote.getVehicle().getFare().getMinor_amount();
+                cart.setDelivery_charges(deliveryChargeInPaise);
+                cart_Service.update(cart.getId(), cart, cart.getModified_by());
             }
         }
         cartBean.setTotal_amount(CommonUtils.paiseToRupee(summed));
         cartBean.setTotal_count(total_items);
         cartBean.setCart_items(cartItems);
         cartBean.setDelivery_charge(CommonUtils.paiseToRupee(deliveryChargeInPaise));
-        cartBean.set_free_delivery(minCartValueInPaise < summed);
+        cartBean.set_free_delivery(minCartValueInPaise <= summed);
+
         return cartBean;
     }
+
+
 
 }

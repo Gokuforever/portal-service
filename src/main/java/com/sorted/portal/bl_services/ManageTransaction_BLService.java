@@ -16,6 +16,7 @@ import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
+import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.GsonUtils;
 import com.sorted.commons.utils.PorterUtility;
@@ -29,6 +30,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -53,11 +55,14 @@ public class ManageTransaction_BLService {
     private final Order_Item_Service order_Item_Service;
     private final RazorpayUtility razorpayUtility;
     private final Seller_Service seller_Service;
-    private final PorterUtility porterUtility;
     private final Order_Dump_Service orderDumpService;
     private final OrderService orderService;
     private final PhonePeUtility phonePeUtility;
     private final OrderStatusCheckService orderStatusCheckService;
+    private final PorterUtility porterUtility;
+
+    @Value("${se.minimum-cart-value.in-paise:10000}")
+    private long minCartValueInPaise;
 
     @GetMapping("/status")
     public FindOneOrder status(@RequestParam("orderId") String orderId, HttpServletRequest httpServletRequest) {
@@ -175,6 +180,19 @@ public class ManageTransaction_BLService {
             long totalSum = listOI.stream().mapToLong(Order_Item::getTotal_cost).sum();
             if (totalSum < 1) {
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_AMOUNT);
+            }
+            if (minCartValueInPaise <= totalSum) {
+                if (cart.getDelivery_charges() == null || cart.getDelivery_charges() <= 1) {
+
+                    GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address.getId(), seller.getAddress_id(), address.getPhone_no(), usersBean.getFirst_name() + " " + usersBean.getLast_name());
+                    if (quote == null) {
+                        throw new CustomIllegalArgumentsException(ResponseCode.NOT_DELIVERIBLE);
+                    }
+                }
+                totalSum += cart.getDelivery_charges();
+            }
+            if (minCartValueInPaise <= totalSum && cart.getDelivery_charges() != null && cart.getDelivery_charges() > 0) {
+                totalSum += cart.getDelivery_charges();
             }
 
             // Create order
