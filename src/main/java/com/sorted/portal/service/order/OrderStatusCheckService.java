@@ -45,11 +45,11 @@ public class OrderStatusCheckService {
 
     public List<OrderItemResponse> checkOrderStatus(@NonNull Order_Details order_Details) {
         OrderStatus status = order_Details.getStatus();
-        boolean cartAndProductUpdated = status.equals(OrderStatus.TRANSACTION_PENDING) || status.equals(OrderStatus.TRANSACTION_PROCESSED);
+//        boolean cartAndProductUpdated = status.equals(OrderStatus.TRANSACTION_PENDING) || status.equals(OrderStatus.TRANSACTION_PROCESSED);
         // Process payment status if needed
         boolean isPaid = processPaymentStatus(order_Details);
 
-        List<OrderItemResponse> orderItemResponseList = getOrderItemResponses(order_Details, cartAndProductUpdated);
+        List<OrderItemResponse> orderItemResponseList = getOrderItemResponses(order_Details);
 
         log.info("status:: Successfully retrieved status for order ID: {}, with {} items",
                 order_Details.getId(), orderItemResponseList.size());
@@ -157,7 +157,7 @@ public class OrderStatusCheckService {
         return false;
     }
 
-    private List<OrderItemResponse> getOrderItemResponses(Order_Details order_Details, boolean cartAndProductUpdated) {
+    private List<OrderItemResponse> getOrderItemResponses(Order_Details order_Details) {
         List<OrderItemResponse> orderItemResponseList = new ArrayList<>();
 
         AggregationFilter.SEFilter filterOI = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
@@ -174,16 +174,16 @@ public class OrderStatusCheckService {
 
             if (!CollectionUtils.isEmpty(productIds)) {
                 // Handle cart updates based on transaction status
-                if (!cartAndProductUpdated && (order_Details.getStatus().equals(OrderStatus.TRANSACTION_PROCESSED) || order_Details.getStatus().equals(OrderStatus.TRANSACTION_PENDING))) {
-                    updateCartAfterTransaction(order_Details.getUser_id(), productIds);
-                }
+//                if (!cartAndProductUpdated && (order_Details.getStatus().equals(OrderStatus.TRANSACTION_PROCESSED) || order_Details.getStatus().equals(OrderStatus.TRANSACTION_PENDING))) {
+//                    updateCartAfterTransaction(order_Details.getUser_id(), productIds);
+//                }
 
                 Map<String, Products> mapP = getProductsMap(productIds);
 
-                // Update product quantities if needed
-                if (!cartAndProductUpdated && (order_Details.getStatus().equals(OrderStatus.TRANSACTION_PROCESSED) || order_Details.getStatus().equals(OrderStatus.TRANSACTION_PENDING))) {
-                    updateProductQuantities(orderItems, mapP);
-                }
+//                // Update product quantities if needed
+//                if (!cartAndProductUpdated && (order_Details.getStatus().equals(OrderStatus.TRANSACTION_PROCESSED) || order_Details.getStatus().equals(OrderStatus.TRANSACTION_PENDING))) {
+//                    updateProductQuantities(orderItems, mapP);
+//                }
 
 
                 for (Order_Item item : orderItems) {

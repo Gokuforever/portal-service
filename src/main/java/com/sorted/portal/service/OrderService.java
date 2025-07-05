@@ -1,26 +1,27 @@
 package com.sorted.portal.service;
 
 import com.sorted.commons.constants.Defaults;
+import com.sorted.commons.entity.mongo.Cart;
 import com.sorted.commons.entity.mongo.Order_Item;
 import com.sorted.commons.entity.mongo.Products;
+import com.sorted.commons.entity.service.Cart_Service;
 import com.sorted.commons.entity.service.Order_Item_Service;
 import com.sorted.commons.entity.service.ProductService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class OrderService {
 
     private final ProductService productService;
     private final Order_Item_Service orderItemService;
-
-    public OrderService(ProductService productService, Order_Item_Service orderItemService) {
-        this.productService = productService;
-        this.orderItemService = orderItemService;
-    }
+    private final Cart_Service cartService;
 
     @Async
     public void reduceProductQuantity(List<Products> listP, Map<String, Long> mapPQ) {
@@ -33,6 +34,14 @@ public class OrderService {
             product.setQuantity(quantity);
             productService.update(product.getId(), product, Defaults.SYSTEM_ADMIN);
         }
+    }
+
+    @Async
+    public void emptyCart(String cartId, String cudBy) {
+        Cart cart = cartService.findById(cartId);
+        if (cart == null) return;
+        cart.setCart_items(new ArrayList<>());
+        cartService.update(cartId, cart, cudBy);
     }
 
     @Async

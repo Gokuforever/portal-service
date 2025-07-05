@@ -159,7 +159,6 @@ public class ManageTransaction_BLService {
 
             // Process cart items
             List<Item> cart_items = cart.getCart_items();
-            LocalDateTime return_date = validateCartItems(cart_items, req);
 
             // Get products
             List<Products> listP = getProductsForCart(cart_items);
@@ -172,10 +171,12 @@ public class ManageTransaction_BLService {
 
             // Create order items
             Map<String, Products> mapP = listP.stream().collect(Collectors.toMap(BaseMongoEntity::getId, e -> e));
-            List<Order_Item> listOI = createOrderItems(cart_items, mapP, return_date);
+            List<Order_Item> listOI = createOrderItems(cart_items, mapP);
 
             // Calculate total
-            Map<String, Long> mapPQ = listOI.stream()
+            Map<String, Long> mapSecurePQ = listOI.stream().filter(e-> e.getType()==PurchaseType.SECURE)
+                    .collect(Collectors.toMap(Order_Item::getProduct_id, Order_Item::getQuantity));
+            Map<String, Long> mapDirectPQ = listOI.stream().filter(e-> e.getType()==PurchaseType.BUY)
                     .collect(Collectors.toMap(Order_Item::getProduct_id, Order_Item::getQuantity));
             long totalSum = listOI.stream().mapToLong(Order_Item::getTotal_cost).sum();
             if (totalSum < 1) {
@@ -184,10 +185,12 @@ public class ManageTransaction_BLService {
             if (minCartValueInPaise <= totalSum) {
                 if (cart.getDelivery_charges() == null || cart.getDelivery_charges() <= 1) {
 
-                    GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address.getId(), seller.getAddress_id(), address.getPhone_no(), usersBean.getFirst_name() + " " + usersBean.getLast_name());
+                    GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address.getId(), seller.getAddress_id(), usersBean.getMobile_no(), usersBean.getFirst_name() + " " + usersBean.getLast_name());
                     if (quote == null) {
                         throw new CustomIllegalArgumentsException(ResponseCode.NOT_DELIVERIBLE);
                     }
+                    cart.setDelivery_charges(quote.getVehicle().getFare().getMinor_amount());
+                    cart_Service.update(cart.getId(), cart, usersBean.getId());
                 }
                 totalSum += cart.getDelivery_charges();
             }
@@ -199,7 +202,11 @@ public class ManageTransaction_BLService {
             Order_Details order = createOrder(usersBean, seller.getId(), totalSum, address, sellerAddress);
 
             // Reduce product quantity
-            orderService.reduceProductQuantity(mapP.values().stream().toList(), mapPQ);
+            orderService.reduceProductQuantity(mapP.values().stream().toList(), mapSecurePQ);
+            orderService.reduceProductQuantity(mapP.values().stream().toList(), mapDirectPQ);
+
+            // Reduce cart quantity
+            orderService.emptyCart(cart.getId(), usersBean.getId());
 
             // Save order
             Order_Details order_Details = order_Details_Service.create(order, usersBean.getId());
@@ -346,7 +353,7 @@ public class ManageTransaction_BLService {
         return sellerAddress;
     }
 
-    private List<Order_Item> createOrderItems(List<Item> cart_items, Map<String, Products> mapP, LocalDateTime return_date) {
+    private List<Order_Item> createOrderItems(List<Item> cart_items, Map<String, Products> mapP) {
         List<Order_Item> listOI = new ArrayList<>();
 
         for (Item item : cart_items) {
@@ -361,7 +368,7 @@ public class ManageTransaction_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.FEW_OUT_OF_STOCK);
             }
 
-            Order_Item order_Item = getOrderItem(item, product, return_date);
+            Order_Item order_Item = getOrderItem(item, product);
             listOI.add(order_Item);
         }
         return listOI;
@@ -423,7 +430,7 @@ public class ManageTransaction_BLService {
     }
 
     @NotNull
-    private static Order_Item getOrderItem(Item item, Products product, LocalDateTime return_date) {
+    private static Order_Item getOrderItem(Item item, Products product) {
         Order_Item order_Item = new Order_Item();
         order_Item.setProduct_id(product.getId());
         order_Item.setProduct_code(product.getProduct_code());
@@ -437,7 +444,6 @@ public class ManageTransaction_BLService {
         order_Item.setTotal_cost(product.getSelling_price() * item.getQuantity());
         if (item.is_secure()) {
             order_Item.setType(PurchaseType.SECURE);
-            order_Item.setReturn_date(return_date);
         } else {
             order_Item.setType(PurchaseType.BUY);
         }
