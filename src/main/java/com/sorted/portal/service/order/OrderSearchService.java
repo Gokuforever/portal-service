@@ -77,19 +77,11 @@ public class OrderSearchService {
             log.debug("Found {} orders matching criteria", ordersList.size());
 
             // Fetch related data
-            Map<String, Object> relatedData = fetchRelatedData(ordersList);
-
-            @SuppressWarnings("unchecked")
-            Map<String, List<Order_Item>> orderItemsMap =
-                    (Map<String, List<Order_Item>>) relatedData.get("orderItemsMap");
-
-            @SuppressWarnings("unchecked")
-            Map<String, Products> productsMap =
-                    (Map<String, Products>) relatedData.get("productsMap");
+            Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList);
 
             // Map to response beans
             List<FindOrderResBean> resList = ordersList.stream()
-                    .map(order -> responseMapper.mapToInternalResponse(order, orderItemsMap, productsMap))
+                    .map(order -> responseMapper.mapToInternalResponse(order, mapOI))
                     .toList();
 
             log.info("Returning {} orders to internal user", resList.size());
@@ -135,19 +127,12 @@ public class OrderSearchService {
             log.debug("Found {} orders for customer", ordersList.size());
 
             // Fetch related data
-            Map<String, Object> relatedData = fetchRelatedData(ordersList);
+            Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList);
 
-            @SuppressWarnings("unchecked")
-            Map<String, List<Order_Item>> orderItemsMap =
-                    (Map<String, List<Order_Item>>) relatedData.get("orderItemsMap");
-
-            @SuppressWarnings("unchecked")
-            Map<String, Products> productsMap =
-                    (Map<String, Products>) relatedData.get("productsMap");
 
             // Map to response beans
             List<FindOrderResBean> resList = ordersList.stream()
-                    .map(order -> responseMapper.mapToCustomerResponse(order, orderItemsMap, productsMap))
+                    .map(order -> responseMapper.mapToCustomerResponse(order, mapOI))
                     .toList();
 
             log.info("Returning {} orders to customer", resList.size());
@@ -235,7 +220,7 @@ public class OrderSearchService {
      * @param ordersList List of orders
      * @return Map containing related data
      */
-    private Map<String, Object> fetchRelatedData(List<Order_Details> ordersList) {
+    private Map<String, List<Order_Item>> fetchRelatedData(List<Order_Details> ordersList) {
         // Get order IDs
         List<String> orderIds = ordersList.stream()
                 .map(BaseMongoEntity::getId)
@@ -245,25 +230,6 @@ public class OrderSearchService {
         SEFilter orderItemsFilter = filterBuilder.buildOrderItemsFilter(orderIds);
         List<Order_Item> orderItems = orderItemService.repoFind(orderItemsFilter);
 
-        // Group order items by order ID
-        Map<String, List<Order_Item>> orderItemsMap =
-                responseMapper.groupOrderItemsByOrderId(orderItems);
-
-        // Get product IDs
-        List<String> productIds = orderItems.stream()
-                .map(Order_Item::getProduct_id)
-                .toList();
-
-        // Fetch products
-        SEFilter productsFilter = filterBuilder.buildProductFilter(productIds);
-        List<Products> products = productService.repoFind(productsFilter);
-
-        // Group products by ID
-        Map<String, Products> productsMap = responseMapper.groupProductsById(products);
-
-        return Map.of(
-                "orderItemsMap", orderItemsMap,
-                "productsMap", productsMap
-        );
+        return responseMapper.groupOrderItemsByOrderId(orderItems);
     }
 } 

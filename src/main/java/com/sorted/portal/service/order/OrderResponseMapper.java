@@ -30,13 +30,11 @@ public class OrderResponseMapper {
      *
      * @param orderDetails  Order details entity
      * @param orderItemsMap Map of order items by order ID
-     * @param productsMap   Map of products by product ID
      * @return FindOrderResBean
      */
     public FindOrderResBean mapToInternalResponse(
             Order_Details orderDetails,
-            Map<String, List<Order_Item>> orderItemsMap,
-            Map<String, Products> productsMap) {
+            Map<String, List<Order_Item>> orderItemsMap) {
 
         log.debug("Mapping order details to internal response for order ID: {}", orderDetails.getId());
 
@@ -48,7 +46,7 @@ public class OrderResponseMapper {
                 .total_amount(orderDetails.getTotal_amount())
                 .pickup_address(orderDetails.getPickup_address())
                 .delivery_address(orderDetails.getDelivery_address())
-                .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap, productsMap))
+                .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap))
                 .creation_date_str(orderDetails.getCreation_date_str())
                 .build();
     }
@@ -58,13 +56,11 @@ public class OrderResponseMapper {
      *
      * @param orderDetails  Order details entity
      * @param orderItemsMap Map of order items by order ID
-     * @param productsMap   Map of products by product ID
      * @return FindOrderResBean
      */
     public FindOrderResBean mapToCustomerResponse(
             Order_Details orderDetails,
-            Map<String, List<Order_Item>> orderItemsMap,
-            Map<String, Products> productsMap) {
+            Map<String, List<Order_Item>> orderItemsMap) {
 
         log.debug("Mapping order details to customer response for order ID: {}", orderDetails.getId());
 
@@ -73,7 +69,7 @@ public class OrderResponseMapper {
                 .code(orderDetails.getCode())
                 .status(orderDetails.getStatus().getCustomer_status())
                 .total_amount(orderDetails.getTotal_amount())
-                .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap, productsMap))
+                .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap))
                 .creation_date_str(orderDetails.getCreation_date_str())
                 .build();
     }
@@ -83,37 +79,32 @@ public class OrderResponseMapper {
      *
      * @param orderId       Order ID
      * @param orderItemsMap Map of order items by order ID
-     * @param productsMap   Map of products by product ID
      * @return List of OrderItemDTO
      */
     private List<OrderItemDTO> mapOrderItems(
             String orderId,
-            Map<String, List<Order_Item>> orderItemsMap,
-            Map<String, Products> productsMap) {
+            Map<String, List<Order_Item>> orderItemsMap) {
 
         List<Order_Item> orderItems = orderItemsMap.getOrDefault(orderId, List.of());
 
         return orderItems.stream()
-                .map(orderItem -> mapOrderItem(orderItem, productsMap))
+                .map(orderItem -> mapOrderItem(orderItem))
                 .toList();
     }
 
     /**
      * Map a single order item to DTO
      *
-     * @param orderItem   Order item entity
-     * @param productsMap Map of products by product ID
+     * @param orderItem Order item entity
      * @return OrderItemDTO
      */
-    private OrderItemDTO mapOrderItem(Order_Item orderItem, Map<String, Products> productsMap) {
-        Products product = productsMap.getOrDefault(orderItem.getProduct_id(), null);
+    private OrderItemDTO mapOrderItem(Order_Item orderItem) {
 
         return OrderItemDTO.builder()
                 .id(orderItem.getId())
                 .product_id(orderItem.getProduct_id())
-                .product_name(product == null ? "" : product.getName())
-                .cdn_url(product == null || product.getMedia() == null ? ""
-                        : product.getMedia().stream().anyMatch(m -> m.getOrder()==0) ? product.getMedia().stream().filter(m -> m.getOrder()==0).findFirst().get().getCdn_url() : product.getMedia().stream().findFirst().get().getCdn_url())
+                .product_name(orderItem.getProduct_name())
+                .cdn_url(orderItem.getCdn_url())
                 .product_code(orderItem.getProduct_code())
                 .quantity(orderItem.getQuantity())
                 .total_cost(orderItem.getTotal_cost())

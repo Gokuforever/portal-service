@@ -174,9 +174,9 @@ public class ManageTransaction_BLService {
             List<Order_Item> listOI = createOrderItems(cart_items, mapP);
 
             // Calculate total
-            Map<String, Long> mapSecurePQ = listOI.stream().filter(e-> e.getType()==PurchaseType.SECURE)
+            Map<String, Long> mapSecurePQ = listOI.stream().filter(e -> e.getType() == PurchaseType.SECURE)
                     .collect(Collectors.toMap(Order_Item::getProduct_id, Order_Item::getQuantity));
-            Map<String, Long> mapDirectPQ = listOI.stream().filter(e-> e.getType()==PurchaseType.BUY)
+            Map<String, Long> mapDirectPQ = listOI.stream().filter(e -> e.getType() == PurchaseType.BUY)
                     .collect(Collectors.toMap(Order_Item::getProduct_id, Order_Item::getQuantity));
             long totalSum = listOI.stream().mapToLong(Order_Item::getTotal_cost).sum();
             if (totalSum < 1) {
@@ -435,6 +435,7 @@ public class ManageTransaction_BLService {
         order_Item.setProduct_id(product.getId());
         order_Item.setProduct_code(product.getProduct_code());
         order_Item.setProduct_name(product.getName());
+        order_Item.setCdn_url(!CollectionUtils.isEmpty(product.getMedia()) ? product.getMedia().get(0).getCdn_url() : null);
         order_Item.setQuantity(item.getQuantity());
         order_Item.setSelling_price(product.getSelling_price());
         order_Item.setSeller_id(product.getSeller_id());
