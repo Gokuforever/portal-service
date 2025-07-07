@@ -109,6 +109,10 @@ public class PhonePeUtility {
 
             thirdPartyRequestResponseService.registerException(register, message);
             return Optional.empty();
+        } catch (Exception e) {
+            logger.error("PhonePe status check failed - Code: {}, Message: {}, Status: {}, OrderId: {}",
+                    "500", e.getMessage(), 500, orderId);
+            throw new RuntimeException(e);
         }
     }
 }

@@ -1,8 +1,11 @@
 package com.sorted.portal.service.order;
 
+import com.sorted.commons.beans.BusinessHours;
 import com.sorted.commons.entity.mongo.Order_Details;
 import com.sorted.commons.entity.mongo.Order_Item;
 import com.sorted.commons.entity.mongo.Products;
+import com.sorted.commons.entity.mongo.Seller;
+import com.sorted.commons.enums.WeekDay;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
 import com.sorted.portal.response.beans.FindOrderResBean;
@@ -11,6 +14,7 @@ import com.sorted.portal.response.beans.OrderItemReportsDTO;
 import com.sorted.portal.response.beans.OrderReportDTO;
 import com.sorted.portal.service.FileGeneratorUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,6 +28,9 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class OrderResponseMapper {
+
+    @Value("${se.secure.max-return-days:150}")
+    private Integer maxReturnDays;
 
     /**
      * Convert order details entity to response bean for internal users
@@ -56,13 +63,22 @@ public class OrderResponseMapper {
      *
      * @param orderDetails  Order details entity
      * @param orderItemsMap Map of order items by order ID
+     * @param mapS Map of sellers
      * @return FindOrderResBean
      */
     public FindOrderResBean mapToCustomerResponse(
             Order_Details orderDetails,
-            Map<String, List<Order_Item>> orderItemsMap) {
+            Map<String, List<Order_Item>> orderItemsMap, Map<String, Seller> mapS) {
 
         log.debug("Mapping order details to customer response for order ID: {}", orderDetails.getId());
+
+        List<WeekDay> nonWorkingDays = null;
+
+        Seller seller = mapS.getOrDefault(orderDetails.getSeller_id(), null);
+        if (seller != null) {
+            BusinessHours businessHours = seller.getBusiness_hours();
+            nonWorkingDays = businessHours == null ? null : businessHours.getFixed_off_days();
+        }
 
         return FindOrderResBean.builder()
                 .id(orderDetails.getId())
@@ -70,6 +86,8 @@ public class OrderResponseMapper {
                 .status(orderDetails.getStatus().getCustomer_status())
                 .total_amount(orderDetails.getTotal_amount())
                 .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap))
+                .non_operational_days(nonWorkingDays)
+                .max_return_days(maxReturnDays)
                 .creation_date_str(orderDetails.getCreation_date_str())
                 .build();
     }
@@ -88,7 +106,7 @@ public class OrderResponseMapper {
         List<Order_Item> orderItems = orderItemsMap.getOrDefault(orderId, List.of());
 
         return orderItems.stream()
-                .map(orderItem -> mapOrderItem(orderItem))
+                .map(this::mapOrderItem)
                 .toList();
     }
 
@@ -135,12 +153,10 @@ public class OrderResponseMapper {
         FileGeneratorUtil.SheetConfig<OrderItemReportsDTO, OrderItemsProperties> orderItemsConfig =
                 new FileGeneratorUtil.SheetConfig<>(orderItems, OrderItemsProperties.class);
 
-        Map<String, FileGeneratorUtil.SheetConfig<?, ?>> sheetConfigMap = Map.of(
+        return Map.of(
                 "Orders", orderConfig,
                 "Order Items", orderItemsConfig
         );
-
-        return sheetConfigMap;
     }
 
     /**

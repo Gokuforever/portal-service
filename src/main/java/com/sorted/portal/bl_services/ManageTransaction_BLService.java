@@ -171,7 +171,7 @@ public class ManageTransaction_BLService {
 
             // Create order items
             Map<String, Products> mapP = listP.stream().collect(Collectors.toMap(BaseMongoEntity::getId, e -> e));
-            List<Order_Item> listOI = createOrderItems(cart_items, mapP);
+            List<Order_Item> listOI = createOrderItems(cart_items, mapP, usersBean.getId());
 
             // Calculate total
             Map<String, Long> mapSecurePQ = listOI.stream().filter(e -> e.getType() == PurchaseType.SECURE)
@@ -353,7 +353,7 @@ public class ManageTransaction_BLService {
         return sellerAddress;
     }
 
-    private List<Order_Item> createOrderItems(List<Item> cart_items, Map<String, Products> mapP) {
+    private List<Order_Item> createOrderItems(List<Item> cart_items, Map<String, Products> mapP, String userId) {
         List<Order_Item> listOI = new ArrayList<>();
 
         for (Item item : cart_items) {
@@ -368,7 +368,7 @@ public class ManageTransaction_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.FEW_OUT_OF_STOCK);
             }
 
-            Order_Item order_Item = getOrderItem(item, product);
+            Order_Item order_Item = getOrderItem(item, product, userId);
             listOI.add(order_Item);
         }
         return listOI;
@@ -383,7 +383,6 @@ public class ManageTransaction_BLService {
         order.setSeller_id(seller_id);
         order.setTotal_amount(totalSum);
         order.setStatus(OrderStatus.ORDER_PLACED, usersBean.getId());
-        order.setStatus_id(OrderStatus.ORDER_PLACED.getId());
         Order_Status_History order_history = Order_Status_History.builder().status(OrderStatus.ORDER_PLACED)
                 .modification_date(LocalDateTime.now()).modified_by(usersBean.getId()).build();
         order.setOrder_status_history(Collections.singletonList(order_history));
@@ -430,7 +429,7 @@ public class ManageTransaction_BLService {
     }
 
     @NotNull
-    private static Order_Item getOrderItem(Item item, Products product) {
+    private static Order_Item getOrderItem(Item item, Products product, String userId) {
         Order_Item order_Item = new Order_Item();
         order_Item.setProduct_id(product.getId());
         order_Item.setProduct_code(product.getProduct_code());
@@ -440,8 +439,7 @@ public class ManageTransaction_BLService {
         order_Item.setSelling_price(product.getSelling_price());
         order_Item.setSeller_id(product.getSeller_id());
         order_Item.setSeller_code(product.getSeller_code());
-        order_Item.setStatus(OrderStatus.ORDER_PLACED);
-        order_Item.setStatus_id(OrderStatus.ORDER_PLACED.getId());
+        order_Item.setStatus(OrderStatus.ORDER_PLACED, userId);
         order_Item.setTotal_cost(product.getSelling_price() * item.getQuantity());
         if (item.is_secure()) {
             order_Item.setType(PurchaseType.SECURE);

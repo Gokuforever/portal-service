@@ -44,7 +44,6 @@ public class OrderStatusCheckService {
     private final StoreActivityService storeActivityService;
 
     public List<OrderItemResponse> checkOrderStatus(@NonNull Order_Details order_Details) {
-        OrderStatus status = order_Details.getStatus();
 //        boolean cartAndProductUpdated = status.equals(OrderStatus.TRANSACTION_PENDING) || status.equals(OrderStatus.TRANSACTION_PROCESSED);
         // Process payment status if needed
         boolean isPaid = processPaymentStatus(order_Details);

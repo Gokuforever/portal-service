@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -38,8 +39,9 @@ public class OrderService {
 
     @Async
     public void emptyCart(String cartId, String cudBy) {
-        Cart cart = cartService.findById(cartId);
-        if (cart == null) return;
+        Optional<Cart> cartById = cartService.findById(cartId);
+        if (cartById.isEmpty()) return;
+        Cart cart = cartById.get();
         cart.setCart_items(new ArrayList<>());
         cartService.update(cartId, cart, cudBy);
     }

@@ -109,7 +109,7 @@ public class OrderDeliveryService {
 
         // Create the main order bean
         return CreateOrderBean.builder()
-                .request_id(orderDetails.getId())
+                .request_id(orderDetails.getCode())
                 .delivery_instructions(instructionsList)
                 .pickup_details(pickupDetails)
                 .drop_details(dropDetails)

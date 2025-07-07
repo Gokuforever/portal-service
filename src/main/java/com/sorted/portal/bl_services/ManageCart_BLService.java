@@ -290,7 +290,7 @@ public class ManageCart_BLService {
         long total_items = total_cart_items.stream().mapToLong(Long::longValue).sum();
         long deliveryChargeInPaise = 0;
         if (StringUtils.hasText(address_id)) {
-            Seller seller = sellerService.findById(seller_id);
+            Seller seller = sellerService.findById(seller_id).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND));
             GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address_id,seller.getAddress_id(), mobile, customerName);
             if (quote != null) {
                 deliveryChargeInPaise = quote.getVehicle().getFare().getMinor_amount();

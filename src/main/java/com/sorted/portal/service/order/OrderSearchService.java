@@ -1,18 +1,13 @@
 package com.sorted.portal.service.order;
 
 import com.sorted.commons.beans.UsersBean;
-import com.sorted.commons.entity.mongo.BaseMongoEntity;
-import com.sorted.commons.entity.mongo.Order_Details;
-import com.sorted.commons.entity.mongo.Order_Item;
-import com.sorted.commons.entity.mongo.Products;
-import com.sorted.commons.entity.service.Order_Details_Service;
-import com.sorted.commons.entity.service.Order_Item_Service;
-import com.sorted.commons.entity.service.ProductService;
-import com.sorted.commons.entity.service.Users_Service;
+import com.sorted.commons.entity.mongo.*;
+import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.CommonUtils;
@@ -30,6 +25,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Service for searching and retrieving orders
@@ -41,10 +37,10 @@ public class OrderSearchService {
 
     private final Order_Details_Service orderDetailsService;
     private final Order_Item_Service orderItemService;
-    private final ProductService productService;
     private final Users_Service usersService;
     private final OrderFilterBuilder filterBuilder;
     private final OrderResponseMapper responseMapper;
+    private final Seller_Service sellerService;
 
     /**
      * Search for orders for internal users
@@ -129,10 +125,17 @@ public class OrderSearchService {
             // Fetch related data
             Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList);
 
+            List<String> sellerIds = ordersList.stream().map(Order_Details::getSeller_id).toList();
+            AggregationFilter.SEFilter filter = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
+            filter.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            filter.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, sellerIds));
+            List<Seller> sellers = sellerService.repoFind(filter);
+
+            Map<String, Seller> mapS = sellers.stream().collect(Collectors.toMap(Seller::getId, seller -> seller));
 
             // Map to response beans
             List<FindOrderResBean> resList = ordersList.stream()
-                    .map(order -> responseMapper.mapToCustomerResponse(order, mapOI))
+                    .map(order -> responseMapper.mapToCustomerResponse(order, mapOI, mapS))
                     .toList();
 
             log.info("Returning {} orders to customer", resList.size());
