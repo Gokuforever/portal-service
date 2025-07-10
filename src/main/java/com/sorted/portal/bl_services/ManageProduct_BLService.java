@@ -186,7 +186,7 @@ public class ManageProduct_BLService {
                     throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
             }
 
-            this.validateRequest(req, false);
+            this.validateRequest(req, false, false);
 
             Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
 
@@ -284,15 +284,15 @@ public class ManageProduct_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
             }
 
-            this.validateRequest(req, false);
+            this.validateRequest(req, false, true);
 
             Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
 
-            Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, req.getGroup_id());
+            Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, product.getGroup_id());
 
             List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(req, mapSC);
 
-            this.validateMandatorySubCategories(category_Master, listSC, req.getGroup_id());
+            this.validateMandatorySubCategories(category_Master, listSC, product.getGroup_id());
 
             String varient_mapping_id = this.upsertAndGetVariantMappingId(req, usersBean, role);
 
@@ -304,7 +304,6 @@ public class ManageProduct_BLService {
             product.setSelected_sub_catagories(listSC);
             product.setCategory_id(category_Master.getId());
             product.setQuantity(Long.valueOf(req.getQuantity()));
-            product.setGroup_id(req.getGroup_id());
             product.setVarient_mapping_id(varient_mapping_id);
             product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
             product.setMedia(req.getMedia());
@@ -799,14 +798,14 @@ public class ManageProduct_BLService {
         return mapV;
     }
 
-    private void validateRequest(ProductReqBean req, boolean isBulk) {
+    private void validateRequest(ProductReqBean req, boolean isBulk, boolean isEdit) {
         if (!isBulk && !StringUtils.hasText(req.getCategory_id())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_CATEGORY);
         }
         if (!StringUtils.hasText(req.getName())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_NAME);
         }
-        if (req.getGroup_id() == null || req.getGroup_id() <= 0) {
+        if (!isEdit && (req.getGroup_id() == null || req.getGroup_id() <= 0)) {
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_GROUP);
         }
 //		if (!SERegExpUtils.standardTextValidation(req.getName())) {
@@ -850,7 +849,7 @@ public class ManageProduct_BLService {
 
     private void validateRequestForBulk(List<ProductReqBean> list) {
         for (ProductReqBean req : list) {
-            this.validateRequest(req, true);
+            this.validateRequest(req, true, false);
         }
     }
 
