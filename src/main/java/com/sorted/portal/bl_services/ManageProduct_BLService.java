@@ -134,7 +134,7 @@ public class ManageProduct_BLService {
                         product.setGroup_id(productReqBean.getGroup_id());
                         product.setDescription(
                                 StringUtils.hasText(productReqBean.getDescription()) ? productReqBean.getDescription() : null);
-
+                        product.setIs_secure(productReqBean.getIs_secure() == null ? false : productReqBean.getIs_secure());
                         if (!CollectionUtils.isEmpty(productReqBean.getMedia())) {
                             product.setMedia(getMediaList(productReqBean.getMedia()));
                         }
@@ -212,7 +212,7 @@ public class ManageProduct_BLService {
             product.setVarient_mapping_id(varient_mapping_id);
             product.setGroup_id(req.getGroup_id());
             product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
-
+            product.setIs_secure(req.getIs_secure() == null ? false : req.getIs_secure());
 
             List<Media> mediaList = getMediaList(req.getMedia());
             product.setMedia(mediaList);
@@ -307,6 +307,7 @@ public class ManageProduct_BLService {
             product.setVarient_mapping_id(varient_mapping_id);
             product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
             product.setMedia(req.getMedia());
+            product.setIs_secure(req.getIs_secure() == null ? false : req.getIs_secure());
 
             product = productService.update(product.getId(), product, usersBean.getId());
             return SEResponse.getBasicSuccessResponseObject(product, ResponseCode.SUCCESSFUL);
@@ -752,7 +753,7 @@ public class ManageProduct_BLService {
         bean.setDescription(product.getDescription());
         bean.setCategory_id(category_Master.getId());
         bean.setCategory_name(category_Master.getName());
-        bean.setSecure(category_Master.isSecure_item());
+        bean.setSecure(Boolean.TRUE.equals(product.getIs_secure()));
         bean.setMedia(product.getMedia());
         bean.setGroup_id(product.getGroup_id());
         return bean;
