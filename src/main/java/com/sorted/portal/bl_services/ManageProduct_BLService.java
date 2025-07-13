@@ -134,7 +134,7 @@ public class ManageProduct_BLService {
                         product.setGroup_id(productReqBean.getGroup_id());
                         product.setDescription(
                                 StringUtils.hasText(productReqBean.getDescription()) ? productReqBean.getDescription() : null);
-                        product.setIs_secure(productReqBean.getIs_secure() == null ? false : productReqBean.getIs_secure());
+                        product.setIs_secure(productReqBean.getIs_secure() != null && productReqBean.getIs_secure());
                         if (!CollectionUtils.isEmpty(productReqBean.getMedia())) {
                             product.setMedia(getMediaList(productReqBean.getMedia()));
                         }
@@ -212,7 +212,7 @@ public class ManageProduct_BLService {
             product.setVarient_mapping_id(varient_mapping_id);
             product.setGroup_id(req.getGroup_id());
             product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
-            product.setIs_secure(req.getIs_secure() == null ? false : req.getIs_secure());
+            product.setIs_secure(req.getIs_secure() != null && req.getIs_secure());
 
             List<Media> mediaList = getMediaList(req.getMedia());
             product.setMedia(mediaList);
@@ -307,7 +307,7 @@ public class ManageProduct_BLService {
             product.setVarient_mapping_id(varient_mapping_id);
             product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
             product.setMedia(req.getMedia());
-            product.setIs_secure(req.getIs_secure() == null ? false : req.getIs_secure());
+            product.setIs_secure(req.getIs_secure() != null && req.getIs_secure());
 
             product = productService.update(product.getId(), product, usersBean.getId());
             return SEResponse.getBasicSuccessResponseObject(product, ResponseCode.SUCCESSFUL);
@@ -662,7 +662,7 @@ public class ManageProduct_BLService {
         int page = req.getPage() < 0 ? defaultPage : req.getPage();
         int size = req.getSize() < 1 ? defaultSize : req.getSize();
         Pagination pagination = new Pagination(page, size);
-        filterSE.setPagination(pagination);
+//        filterSE.setPagination(pagination);
         log.debug("createFilterForProductList:: filterSE: {}", filterSE);
         return filterSE;
     }
