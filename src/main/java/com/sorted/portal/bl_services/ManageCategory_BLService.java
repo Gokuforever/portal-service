@@ -14,8 +14,4 @@ public class ManageCategory_BLService {
 
     private final Category_MasterService categoryMasterService;
 
-    @GetMapping("/category-master")
-    public List<Category_Master> categoryMasterData() {
-        return categoryMasterService.repoFindAll();
-    }
 }
