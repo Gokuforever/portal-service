@@ -12,10 +12,7 @@ import com.sorted.commons.utils.Preconditions;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
@@ -60,7 +57,7 @@ public class ManageCategory_BLService {
     }
 
     @DeleteMapping("/category/delete")
-    public void delete(@RequestBody String id) {
+    public void delete(@RequestParam String id) {
         Preconditions.check(StringUtils.hasText(id), ResponseCode.MISSING_ID);
         categoryMasterService.deleteOne(id, Defaults.SYSTEM_ADMIN);
     }
