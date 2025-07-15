@@ -12,7 +12,9 @@ import com.sorted.commons.utils.Preconditions;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -27,7 +29,7 @@ public class ManageCategory_BLService {
     private final Category_MasterService categoryMasterService;
 
     @PostMapping("/category/upsert")
-    public void update(List<Category_Master> categoryMasters) {
+    public void update(@RequestBody List<Category_Master> categoryMasters) {
         Preconditions.check(CollectionUtils.isNotEmpty(categoryMasters), ResponseCode.MANDATE_CATEGORY);
         categoryMasters.forEach(categoryMaster -> {
             Preconditions.check(StringUtils.hasText(categoryMaster.getId()), ResponseCode.MISSING_ID);
@@ -55,5 +57,11 @@ public class ManageCategory_BLService {
             }
             categoryMasterService.create(categoryMaster, Defaults.SYSTEM_ADMIN);
         });
+    }
+
+    @DeleteMapping("/category/delete")
+    public void delete(@RequestBody String id) {
+        Preconditions.check(StringUtils.hasText(id), ResponseCode.MISSING_ID);
+        categoryMasterService.deleteOne(id, Defaults.SYSTEM_ADMIN);
     }
 }
