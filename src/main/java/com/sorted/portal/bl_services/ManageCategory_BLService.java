@@ -31,7 +31,7 @@ public class ManageCategory_BLService {
         categoryMasters.forEach(categoryMaster -> {
             Preconditions.check(StringUtils.hasText(categoryMaster.getId()), ResponseCode.MISSING_ID);
             Preconditions.check(StringUtils.hasText(categoryMaster.getName()), ResponseCode.MISSING_CATEGORY_NAME);
-            Preconditions.check(CollectionUtils.isEmpty(categoryMaster.getGroups()), ResponseCode.MISSING_GROUPS);
+            Preconditions.check(CollectionUtils.isNotEmpty(categoryMaster.getGroups()), ResponseCode.MISSING_GROUPS);
         });
 
         List<String> ids = categoryMasters.stream().filter(e -> StringUtils.hasText(e.getId())).map(BaseMongoEntity::getId).toList();
