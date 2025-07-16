@@ -22,6 +22,7 @@ import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDeta
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
 import com.sorted.portal.enums.ReportType;
+import com.sorted.portal.request.beans.BulkEditProductReqBean;
 import com.sorted.portal.request.beans.FindProductBean;
 import com.sorted.portal.response.beans.OrderItemReportsDTO;
 import com.sorted.portal.response.beans.OrderReportDTO;
@@ -43,7 +44,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -66,9 +67,6 @@ public class ManageProduct_BLService {
     private int defaultPage;
     @Value("${se.default.size}")
     private int defaultSize;
-    private final Map<String, Category_Master> categoryMasterCache = new ConcurrentHashMap<>();
-    private static final long CACHE_EXPIRY_TIME = 30 * 60 * 1000; // 30 minutes
-    private long lastCacheClearTime = System.currentTimeMillis();
     private final StoreActivityService storeActivityService;
 
 
@@ -110,13 +108,16 @@ public class ManageProduct_BLService {
             }
 
             this.validateRequestForBulk(products);
-            Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
+            List<String> categoryIds = products.stream().map(ProductReqBean::getCategory_id).distinct().toList();
+
+            Map<String, Category_Master> mapC = this.getStringCategoryMasterMap(categoryIds);
 
             List<Products> listP = products.parallelStream()
                     .map(productReqBean -> {
                         if (productReqBean.getGroup_id() == null || productReqBean.getGroup_id() <= 0) {
                             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_GROUP);
                         }
+                        Category_Master category_Master = mapC.get(productReqBean.getCategory_id());
                         Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, productReqBean.getGroup_id());
                         List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(productReqBean, mapSC);
                         this.validateMandatorySubCategories(category_Master, listSC, productReqBean.getGroup_id());
@@ -153,6 +154,20 @@ public class ManageProduct_BLService {
         }
     }
 
+    @NotNull
+    private Map<String, Category_Master> getStringCategoryMasterMap(List<String> categoryIds) {
+        SEFilter filterC = new SEFilter(SEFilterType.AND);
+        filterC.addClause(WhereClause.in(BaseMongoEntity.Fields.id, categoryIds));
+        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Category_Master> categoryMasters = category_MasterService.repoFind(filterC);
+        if (CollectionUtils.isEmpty(categoryMasters)) {
+            throw new CustomIllegalArgumentsException(ResponseCode.CATEGORY_NOT_FOUND);
+        }
+
+        return categoryMasters.stream().collect(Collectors.toMap(Category_Master::getId, Function.identity()));
+    }
+
     @PostMapping("/create")
     public SEResponse create(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
@@ -186,7 +201,7 @@ public class ManageProduct_BLService {
                     throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
             }
 
-            this.validateRequest(req, false, false);
+            this.validateRequest(req, false);
 
             Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
 
@@ -237,6 +252,102 @@ public class ManageProduct_BLService {
                 .build()).toList();
     }
 
+    @PostMapping("/bulk/edit")
+    public SEResponse bulkEdit(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+        try {
+            log.info("/bulk/edit:: API started");
+            BulkEditProductReqBean req = request.getGenericRequestDataObject(BulkEditProductReqBean.class);
+            CommonUtils.extractHeaders(httpServletRequest, req);
+            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
+                    Activity.INVENTORY_MANAGEMENT);
+
+            Role role = usersBean.getRole();
+            UserType user_type = role.getUser_type();
+            Seller seller;
+            switch (user_type) {
+                case SELLER:
+                    seller = usersBean.getSeller();
+                    break;
+                case SUPER_ADMIN:
+                    if (!StringUtils.hasText(req.getSeller_id())) {
+                        throw new CustomIllegalArgumentsException(ResponseCode.PLEASE_SELECT_SELLER);
+                    }
+                    SEFilter filterS = new SEFilter(SEFilterType.AND);
+                    filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getSeller_id()));
+                    filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+                    seller = seller_Service.repoFindOne(filterS);
+                    if (seller == null) {
+                        throw new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND);
+                    }
+                    break;
+                default:
+                    throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+            }
+
+            if (CollectionUtils.isEmpty(req.getProducts())) {
+                throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCTS);
+            }
+            req.getProducts().forEach(product -> {
+                if (!StringUtils.hasText(product.getProduct_id())) {
+                    throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_ID);
+                }
+            });
+            List<String> productIds = req.getProducts().stream().map(ProductReqBean::getProduct_id).toList();
+            this.bulkEdit(productIds, seller, req.getProducts(), usersBean);
+            return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
+        } catch (CustomIllegalArgumentsException ex) {
+            throw ex;
+        } catch (Exception e) {
+            log.error("/product/bulk/edit:: error occurred:: {}", e.getMessage());
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+    }
+
+    private void bulkEdit(List<String> productIds, Seller seller, List<ProductReqBean> req, UsersBean usersBean) {
+        SEFilter filterP = new SEFilter(SEFilterType.AND);
+        filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productIds));
+        filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterP.addClause(WhereClause.eq(Products.Fields.seller_id, seller.getId()));
+
+        List<Products> products = productService.repoFind(filterP);
+        if (CollectionUtils.isEmpty(products)) {
+            throw new CustomIllegalArgumentsException(ResponseCode.PRODUCT_NOT_FOUND);
+        }
+        if (products.size() != req.size()) {
+            throw new CustomIllegalArgumentsException(ResponseCode.PRODUCT_NOT_FOUND);
+        }
+
+        List<Products> updatedProducts = new ArrayList<>();
+
+        Map<String, Products> mapP = products.stream().collect(Collectors.toMap(Products::getId, product -> product));
+        Map<String, Category_Master> mapC = this.getStringCategoryMasterMap(products.stream()
+                .map(Products::getCategory_id).distinct().toList());
+
+        req.forEach(product -> {
+                    this.validateRequest(product, true);
+                    Category_Master category_Master = mapC.get(product.getCategory_id());
+                    Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, product.getGroup_id());
+                    List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(product, mapSC);
+                    this.validateMandatorySubCategories(category_Master, listSC, product.getGroup_id());
+                    Products products1 = mapP.get(product.getProduct_id());
+                    BigDecimal mrp = new BigDecimal(product.getMrp());
+                    BigDecimal sp = new BigDecimal(product.getSelling_price());
+                    products1.setName(product.getName());
+                    products1.setMrp(CommonUtils.rupeeToPaise(mrp));
+                    products1.setSelling_price(CommonUtils.rupeeToPaise(sp));
+                    products1.setSelected_sub_catagories(listSC);
+                    products1.setCategory_id(category_Master.getId());
+                    products1.setQuantity(Long.valueOf(product.getQuantity()));
+                    products1.setDescription(StringUtils.hasText(product.getDescription()) ? product.getDescription() : null);
+                    products1.setMedia(product.getMedia());
+                    products1.setIs_secure(product.getIs_secure() != null && product.getIs_secure());
+                    updatedProducts.add(products1);
+                }
+        );
+        updatedProducts.forEach(product -> productService.update(product.getId(), product, usersBean.getId()));
+    }
+
     @PostMapping("/edit")
     public SEResponse edit(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
@@ -273,44 +384,8 @@ public class ManageProduct_BLService {
             if (!StringUtils.hasText(req.getProduct_id())) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_ID);
             }
-
-            SEFilter filterP = new SEFilter(SEFilterType.AND);
-            filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getProduct_id()));
-            filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-            filterP.addClause(WhereClause.eq(Products.Fields.seller_id, seller.getId()));
-
-            Products product = productService.repoFindOne(filterP);
-            if (product == null) {
-                throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
-            }
-
-            this.validateRequest(req, false, true);
-
-            Category_Master category_Master = this.getCategoryMaster(req.getCategory_id());
-
-            Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, product.getGroup_id());
-
-            List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(req, mapSC);
-
-            this.validateMandatorySubCategories(category_Master, listSC, product.getGroup_id());
-
-            String varient_mapping_id = this.upsertAndGetVariantMappingId(req, usersBean, role);
-
-            BigDecimal mrp = new BigDecimal(req.getMrp());
-            BigDecimal sp = new BigDecimal(req.getSelling_price());
-            product.setName(req.getName());
-            product.setMrp(CommonUtils.rupeeToPaise(mrp));
-            product.setSelling_price(CommonUtils.rupeeToPaise(sp));
-            product.setSelected_sub_catagories(listSC);
-            product.setCategory_id(category_Master.getId());
-            product.setQuantity(Long.valueOf(req.getQuantity()));
-            product.setVarient_mapping_id(varient_mapping_id);
-            product.setDescription(StringUtils.hasText(req.getDescription()) ? req.getDescription() : null);
-            product.setMedia(req.getMedia());
-            product.setIs_secure(req.getIs_secure() != null && req.getIs_secure());
-
-            product = productService.update(product.getId(), product, usersBean.getId());
-            return SEResponse.getBasicSuccessResponseObject(product, ResponseCode.SUCCESSFUL);
+            this.bulkEdit(List.of(req.getProduct_id()), seller, List.of(req), usersBean);
+            return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
@@ -799,8 +874,8 @@ public class ManageProduct_BLService {
         return mapV;
     }
 
-    private void validateRequest(ProductReqBean req, boolean isBulk, boolean isEdit) {
-        if (!isBulk && !StringUtils.hasText(req.getCategory_id())) {
+    private void validateRequest(ProductReqBean req, boolean isEdit) {
+        if (!StringUtils.hasText(req.getCategory_id())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_CATEGORY);
         }
         if (!StringUtils.hasText(req.getName())) {
@@ -850,22 +925,22 @@ public class ManageProduct_BLService {
 
     private void validateRequestForBulk(List<ProductReqBean> list) {
         for (ProductReqBean req : list) {
-            this.validateRequest(req, true, false);
+            this.validateRequest(req, false);
         }
     }
 
     private Category_Master getCategoryMaster(String categoryId) {
         // Clear cache if expired
-        if (System.currentTimeMillis() - lastCacheClearTime > CACHE_EXPIRY_TIME) {
-            categoryMasterCache.clear();
-            lastCacheClearTime = System.currentTimeMillis();
-        }
+//        if (System.currentTimeMillis() - lastCacheClearTime > CACHE_EXPIRY_TIME) {
+//            categoryMasterCache.clear();
+//            lastCacheClearTime = System.currentTimeMillis();
+//        }
 
         // Try to get from cache first
-        Category_Master cached = categoryMasterCache.get(categoryId);
-        if (cached != null) {
-            return cached;
-        }
+//        Category_Master cached = categoryMasterCache.get(categoryId);
+//        if (cached != null) {
+//            return cached;
+//        }
 
         SEFilter filterC = new SEFilter(SEFilterType.AND);
         filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, categoryId));
@@ -876,8 +951,6 @@ public class ManageProduct_BLService {
             throw new CustomIllegalArgumentsException(ResponseCode.CATEGORY_NOT_FOUND);
         }
 
-        // Cache the result
-        categoryMasterCache.put(categoryId, categoryMaster);
         return categoryMaster;
     }
 
