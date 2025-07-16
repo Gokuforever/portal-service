@@ -327,10 +327,11 @@ public class ManageProduct_BLService {
         req.forEach(product -> {
                     this.validateRequest(product, true);
                     Category_Master category_Master = mapC.get(product.getCategory_id());
-                    Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, product.getGroup_id());
+                    Products products1 = mapP.get(product.getProduct_id());
+                    Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, products1.getGroup_id());
                     List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(product, mapSC);
                     this.validateMandatorySubCategories(category_Master, listSC, product.getGroup_id());
-                    Products products1 = mapP.get(product.getProduct_id());
+
                     BigDecimal mrp = new BigDecimal(product.getMrp());
                     BigDecimal sp = new BigDecimal(product.getSelling_price());
                     products1.setName(product.getName());
