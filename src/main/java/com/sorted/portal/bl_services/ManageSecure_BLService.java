@@ -46,6 +46,7 @@ public class ManageSecure_BLService {
         log.info("Completed secure return initiation for order ID: {}", secureBean.getOrderId());
     }
 
+    @PostMapping("/secure/appraise")
     public void appraiseSecureReturn(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("Received secure return secure/appraise request");
 
