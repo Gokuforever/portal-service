@@ -166,7 +166,7 @@ public class OrderSearchService {
 
             // Validate user permissions
             UsersBean usersBean = usersService.validateUserForActivity(
-                    req.getReq_user_id(), null, null);
+                    req.getReq_user_id(), Permission.VIEW, Activity.ORDER_MANAGEMENT);
 
             // Build filter
             SEFilter orderFilter = filterBuilder.buildOrderFilter(req, usersBean);
