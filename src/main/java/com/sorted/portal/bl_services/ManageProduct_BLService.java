@@ -892,9 +892,9 @@ public class ManageProduct_BLService {
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SUB_CATEGORY);
         }
         if (StringUtils.hasText(req.getDescription())) {
-            if (!SERegExpUtils.standardTextValidation(req.getDescription())) {
-                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
-            }
+//            if (!SERegExpUtils.standardTextValidation(req.getDescription())) {
+//                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
+//            }
         }
         if (!StringUtils.hasText(req.getQuantity())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_QUANTITY);
@@ -919,9 +919,9 @@ public class ManageProduct_BLService {
         if (sp.compareTo(mrp) > 0) {
             throw new CustomIllegalArgumentsException(ResponseCode.SP_MAX_MRP);
         }
-        if (StringUtils.hasText(req.getDescription()) && !SERegExpUtils.standardTextValidation(req.getDescription())) {
-            throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
-        }
+//        if (StringUtils.hasText(req.getDescription()) && !SERegExpUtils.standardTextValidation(req.getDescription())) {
+//            throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
+//        }
     }
 
     private void validateRequestForBulk(List<ProductReqBean> list) {
