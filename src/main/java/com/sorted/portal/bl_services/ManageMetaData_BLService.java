@@ -59,12 +59,14 @@ public class ManageMetaData_BLService {
         List<String> ids = req.getIds();
         MetaData data = new MetaData();
 
-        List<Category_Master> categoryMasterData = categoryCache.computeIfAbsent(CM_CACHE_KEY, key -> this.getCategoryMasterData());
+        List<Category_Master> categoryMasterData = this.getCategoryMasterData();
+//        List<Category_Master> categoryMasterData = categoryCache.computeIfAbsent(CM_CACHE_KEY, key -> this.getCategoryMasterData());
         if (!CollectionUtils.isEmpty(categoryMasterData)) {
             data.setCatagories(categoryMasterData);
         }
 
-        List<Product_Master> listPM = productCache.computeIfAbsent(PM_CACHE_KEY, key -> this.getProductMasters());
+        List<Product_Master> listPM = this.getProductMasters();
+//        List<Product_Master> listPM = productCache.computeIfAbsent(PM_CACHE_KEY, key -> this.getProductMasters());
         if (!CollectionUtils.isEmpty(listPM)) {
             data.setProducts(listPM);
         }
