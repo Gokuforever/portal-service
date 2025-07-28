@@ -1,21 +1,16 @@
 package com.sorted.portal.request.beans;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.sorted.commons.beans.EducationCategoryBean;
 import com.sorted.commons.helper.ReqBaseBean;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.math.BigDecimal;
-
-@Data
 @EqualsAndHashCode(callSuper = true)
-public class NearestSellerReq extends ReqBaseBean {
-
+@Data
+public class FormDataBean extends ReqBaseBean {
     private String pincode;
-    private BigDecimal lat;
-    private BigDecimal lng;
-    private String branch;
-    private String desc;
-    private String semester;
+    @JsonProperty("education_details")
+    private EducationCategoryBean educationDetails;
     private String college;
 }

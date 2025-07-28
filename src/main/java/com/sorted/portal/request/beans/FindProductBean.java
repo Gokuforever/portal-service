@@ -1,5 +1,6 @@
 package com.sorted.portal.request.beans;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.sorted.commons.helper.ReqBaseBean;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -16,8 +17,8 @@ import java.util.stream.Collectors;
 public class FindProductBean extends ReqBaseBean {
 
     private String id;
-    private String catagory_id;
-    private String group_id;
+    private String category_id;
+    private Integer group_id;
     private Map<String, List<String>> filters;
     private String name;
     private String pincode;

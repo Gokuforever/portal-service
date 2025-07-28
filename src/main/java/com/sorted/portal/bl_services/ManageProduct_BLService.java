@@ -6,12 +6,14 @@ import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.mongo.Category_Master.SubCategory;
 import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.*;
+import com.sorted.commons.exceptions.AccessDeniedException;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.*;
 import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
+import com.sorted.commons.repository.mongo.ProductRepository;
 import com.sorted.commons.utils.AwsS3Service;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.PorterUtility;
@@ -22,8 +24,10 @@ import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDeta
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
 import com.sorted.portal.enums.ReportType;
+import com.sorted.portal.request.beans.BlankReqBean;
 import com.sorted.portal.request.beans.BulkEditProductReqBean;
 import com.sorted.portal.request.beans.FindProductBean;
+import com.sorted.portal.request.beans.RandomProductReqBean;
 import com.sorted.portal.response.beans.OrderItemReportsDTO;
 import com.sorted.portal.response.beans.OrderReportDTO;
 import com.sorted.portal.service.ExcelGenerationUtility;
@@ -31,7 +35,7 @@ import com.sorted.portal.service.FileGeneratorUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
@@ -48,7 +52,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-@Slf4j
+@Log4j2
 @RestController
 @RequestMapping("/product")
 @RequiredArgsConstructor
@@ -68,6 +72,119 @@ public class ManageProduct_BLService {
     @Value("${se.default.size}")
     private int defaultSize;
     private final StoreActivityService storeActivityService;
+    private final ProductRepository productRepository;
+    private final EducationCategoriesService educationCategoriesService;
+
+
+    @GetMapping("/curated")
+    public SEResponse getCuratedProduct(@RequestBody SERequest request, HttpServletRequest httpServletRequest) throws JsonProcessingException {
+        BlankReqBean req = request.getGenericRequestDataObject(BlankReqBean.class);
+        CommonUtils.extractHeaders(httpServletRequest, req);
+        UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(),
+                Activity.PRODUCTS);
+        Role role = usersBean.getRole();
+        UserType user_type = role.getUser_type();
+        switch (user_type) {
+            case GUEST, CUSTOMER:
+                break;
+            default:
+                throw new AccessDeniedException();
+        }
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        String nearestSeller = usersBean.getNearestSeller();
+        if (StringUtils.hasText(nearestSeller)) {
+            boolean storeOperational = storeActivityService.isStoreOperational(nearestSeller);
+            if (!storeOperational) {
+                NearestSellerRes nearestSellerRes = porterUtility.getNearestSeller(usersBean.getNearestPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
+                if (!nearestSellerRes.getSeller_id().equals(nearestSeller)) {
+                    nearestSeller = nearestSellerRes.getSeller_id();
+                    @SuppressWarnings("OptionalGetWithoutIsPresent")
+                    Users users = users_Service.findById(usersBean.getId()).get();
+                    users.setNearestSeller(nearestSeller);
+                    users_Service.update(users.getId(), users, users.getId());
+                }
+            }
+            filter.addClause(WhereClause.eq(Products.Fields.seller_id, nearestSeller));
+        }
+        EducationCategoryBean educationDetails = usersBean.getEducationDetails();
+
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        if (educationDetails != null) {
+            educationDetails.getId();
+            Optional<EducationCategories> optional = educationCategoriesService.findById(educationDetails.getId());
+            if (optional.isPresent()) {
+                EducationCategories educationCategories = optional.get();
+                List<String> categoryIds = educationCategories.getCategory_ids();
+                if (!CollectionUtils.isEmpty(categoryIds)) {
+                    filter.addClause(WhereClause.in(Products.Fields.category_id, categoryIds));
+                }
+            }
+            List<EducationCategoryField> fields = educationDetails.getFields();
+            for (EducationCategoryField field : fields) {
+                Map<String, Object> map = new HashMap<>();
+                map.put(SelectedSubCatagories.Fields.sub_category, field.getAlias());
+                map.put(SelectedSubCatagories.Fields.selected_attributes, field.getOptions());
+                filter.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+            }
+        }
+
+        List<Products> products = productService.repoFind(filter);
+        List<ProductDetailsBean> productDetailsBeans = this.convertToBean(products);
+        log.info("Successfully processed curated product request, returning {} products", productDetailsBeans.size());
+        return SEResponse.getBasicSuccessResponseList(productDetailsBeans, ResponseCode.SUCCESSFUL);
+    }
+
+    @PostMapping("/random")
+    public SEResponse getRandomProduct(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+        try {
+            RandomProductReqBean req = request.getGenericRequestDataObject(RandomProductReqBean.class);
+            log.debug("Received request to get random products with params: {}", req);
+
+            CommonUtils.extractHeaders(httpServletRequest, req);
+            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
+                    Activity.INVENTORY_MANAGEMENT);
+            Role role = usersBean.getRole();
+            UserType user_type = role.getUser_type();
+            log.debug("User type: {}", user_type);
+
+            switch (user_type) {
+                case GUEST, CUSTOMER:
+                    break;
+                default:
+                    log.warn("Access denied for user type: {}", user_type);
+                    throw new AccessDeniedException();
+            }
+
+            String categoryId = req.getCategory_id();
+            long count = req.getCount();
+            log.debug("Category ID: {}, Requested count: {}", categoryId, count);
+
+            SEFilter filter = new SEFilter(SEFilterType.AND);
+            filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            if (StringUtils.hasText(categoryId)) {
+                filter.addClause(WhereClause.eq(Products.Fields.category_id, categoryId));
+            }
+
+            if (count < 0 || count > 100) {
+                log.debug("Count out of bounds ({}), defaulting to 12", count);
+                count = 12;
+            }
+
+            List<Products> randomProducts = productRepository.getRandomProducts(filter, count);
+            log.debug("Retrieved {} random products", randomProducts.size());
+
+            List<ProductDetailsBean> productDetailsBeans = this.convertToBean(randomProducts);
+            log.info("Successfully processed random product request, returning {} products", productDetailsBeans.size());
+
+            return SEResponse.getBasicSuccessResponseList(productDetailsBeans, ResponseCode.SUCCESSFUL);
+        } catch (CustomIllegalArgumentsException ex) {
+            log.error("/random:: error occurred:: {}", ex.getMessage());
+            throw ex;
+        } catch (Exception e) {
+            log.error("/random:: error occurred:: {}", e.getMessage());
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+    }
 
 
     @PostMapping("/bulk/create")
@@ -478,7 +595,7 @@ public class ManageProduct_BLService {
             return Collections.emptyList();
         }
 
-        return this.convertToBean(null, listP);
+        return this.convertToBean(listP);
     }
 
     @PostMapping("/delete")
@@ -583,26 +700,23 @@ public class ManageProduct_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
             }
             SEFilter filterRI = new SEFilter(SEFilterType.AND);
-            List<SEFilterNode> nodes = new ArrayList<>();
+            Map<String, Object> map = new HashMap<>();
             for (Entry<String, List<String>> entry : relatedFilters.entrySet()) {
-                SEFilterNode node = new SEFilterNode(SEFilterType.OR);
                 if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
-                    Map<String, Object> map = new HashMap<>();
                     map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
                     map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
-                    node.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
-                    nodes.add(node);
                 }
             }
-            filterRI.addNodes(nodes);
+            if (!map.isEmpty()) {
+                filterRI.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+            }
+            filterRI.addClause(WhereClause.eq("groups.group_id", product.getGroup_id()));
             filterRI.addClause(WhereClause.notEq(BaseMongoEntity.Fields.id, product.getId()));
             filterRI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
             List<Products> listRI = productService.repoFind(filterRI);
 
-            Map<String, List<Products>> mapV = this.getVariants(product);
-
-            ProductDetailsBean resBean = this.productToBean(listRI, mapV, product);
+            ProductDetailsBean resBean = this.productToBean(listRI, product);
             if (usersBean.getRole().getUser_type() == UserType.CUSTOMER
                     || usersBean.getRole().getUser_type() == UserType.GUEST) {
                 SEFilter filterC = new SEFilter(SEFilterType.AND);
@@ -634,7 +748,6 @@ public class ManageProduct_BLService {
                 }
                 resBean.setCart_info(cartDetailsBuilder.build());
             }
-
             return SEResponse.getBasicSuccessResponseObject(resBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
@@ -677,28 +790,22 @@ public class ManageProduct_BLService {
                 break;
             case CUSTOMER, GUEST:
                 String nearest_seller_id;
-                Map<String, String> properties = usersBean.getProperties();
-                if (CollectionUtils.isEmpty(properties) || !properties.containsKey("nearest_pincode")) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.SELECT_PINCODE);
-                }
                 boolean storeOperational = false;
-                String nearest_seller = properties.getOrDefault("nearest_seller", null);
+                String nearest_seller = usersBean.getNearestSeller();
                 if (StringUtils.hasText(nearest_seller)) {
                     storeOperational = storeActivityService.isStoreOperational(nearest_seller);
                 }
                 if (!storeOperational || !StringUtils.hasText(nearest_seller)) {
-                    NearestSellerRes nearestSeller = porterUtility.getNearestSeller(properties.get("nearest_pincode"), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
+                    NearestSellerRes nearestSeller = porterUtility.getNearestSeller(usersBean.getNearestPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
                     nearest_seller_id = nearestSeller.getSeller_id();
                     if (!nearest_seller_id.equals(nearest_seller)) {
-                        properties.put("nearest_seller", nearest_seller_id);
-
                         String user_id = usersBean.getId();
                         SEFilter filterU = new SEFilter(SEFilterType.AND);
                         filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, user_id));
                         filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
                         Users users = users_Service.repoFindOne(filterU);
-                        users.setProperties(properties);
+                        users.setNearestSeller(nearest_seller_id);
 
                         users_Service.update(user_id, users, user_id);
                     }
@@ -707,19 +814,51 @@ public class ManageProduct_BLService {
                 }
                 filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, nearest_seller_id));
                 break;
+
             default:
                 break;
         }
         if (StringUtils.hasText(req.getName())) {
             filterSE.addClause(WhereClause.like(Products.Fields.name, req.getName()));
         }
-        if (!CollectionUtils.isEmpty(req.getFilters())) {
+        // TODO: 2 endpoints for store and customer
+        if (StringUtils.hasText(req.getCategory_id())) {
+            filterSE.addClause(WhereClause.eq(Products.Fields.category_id, req.getCategory_id()));
+        }
 
+        List<SubCategory> mappableSubCategories = null;
+        if (req.getGroup_id() != null) {
+            if (!CollectionUtils.isEmpty(req.getFilters())) {
+                SEFilter filterG = new SEFilter(SEFilterType.AND);
+                filterG.addClause(WhereClause.eq("groups.group_id", req.getGroup_id()));
+                filterG.addClause(WhereClause.eq("groups.sub_categories.mappable", true));
+                filterG.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+                Category_Master category_master = category_MasterService.repoFindOne(filterG);
+                if (category_master != null) {
+                    mappableSubCategories = category_master.getGroups().stream().flatMap(e -> e.getSub_categories().stream()).filter(SubCategory::isMappable).toList();
+                }
+            }
+        }
+        if (!CollectionUtils.isEmpty(req.getFilters())) {
             for (Entry<String, List<String>> entry : req.getFilters().entrySet()) {
                 if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
                     Map<String, Object> map = new HashMap<>();
                     map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
-                    map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
+                    if (mappableSubCategories != null) {
+                        for (SubCategory subCategory : mappableSubCategories) {
+                            if (subCategory.getName().equals(entry.getKey())) {
+                                Map<String, List<String>> mapping = subCategory.getMapping();
+                                List<String> attributes = new ArrayList<>();
+                                for (String attribute : entry.getValue()) {
+                                    attributes.addAll(mapping.getOrDefault(attribute, List.of(attribute)));
+                                }
+                                map.put(SelectedSubCatagories.Fields.selected_attributes, attributes);
+                            }
+                        }
+                    } else {
+                        map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
+                    }
                     filterSE.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
                 }
             }
@@ -751,9 +890,8 @@ public class ManageProduct_BLService {
         }
     }
 
-    private ProductDetailsBean productToBean(List<Products> relatedProducts, Map<String, List<Products>> variantMap,
-                                             Products product) {
-        ProductDetailsBean mainProductDetails = this.convertToBean(variantMap, Collections.singletonList(product)).get(0);
+    private ProductDetailsBean productToBean(List<Products> relatedProducts, Products product) {
+        ProductDetailsBean mainProductDetails = this.convertToBean(Collections.singletonList(product)).get(0);
         if (!CollectionUtils.isEmpty(relatedProducts)) {
             List<String> category_ids = new ArrayList<>();
             List<ProductDetailsBean> relatedProductDetailsList = new ArrayList<>();
@@ -768,32 +906,32 @@ public class ManageProduct_BLService {
         return mainProductDetails;
     }
 
-    private List<ProductDetailsBean> convertToBean(Map<String, List<Products>> variantMap, List<Products> products) {
+    private List<ProductDetailsBean> convertToBean(List<Products> products) {
 
         List<ProductDetailsBean> productDetailsList = new ArrayList<>();
         List<String> category_ids = new ArrayList<>();
-        if (variantMap != null && !variantMap.isEmpty()) {
-            Collection<List<Products>> values = variantMap.values();
-            category_ids.addAll(values.stream().flatMap(Collection::stream).map(Products::getCategory_id).distinct().toList());
-        }
+//        if (variantMap != null && !variantMap.isEmpty()) {
+//            Collection<List<Products>> values = variantMap.values();
+//            category_ids.addAll(values.stream().flatMap(Collection::stream).map(Products::getCategory_id).distinct().toList());
+//        }
         Map<String, Category_Master> mapCM = this.getCategoryMaster(products, category_ids);
         for (Products product : products) {
             Category_Master category_Master = mapCM.get(product.getCategory_id());
             ProductDetailsBean productDetailsBean = this.convertProductToBean(product, category_Master);
-            if (StringUtils.hasText(product.getVarient_mapping_id()) && !CollectionUtils.isEmpty(variantMap)
-                    && variantMap.containsKey(product.getVarient_mapping_id())) {
-                List<Products> variants = variantMap.get(product.getVarient_mapping_id());
-                for (Products variant : variants) {
-                    if (!variant.getId().equals(product.getId())) {
-                        Category_Master cm = mapCM.get(product.getCategory_id());
-                        ProductDetailsBean variantBean = this.convertProductToBean(variant, cm);
-                        if (CollectionUtils.isEmpty(productDetailsBean.getVarients())) {
-                            productDetailsBean.setVarients(new ArrayList<>());
-                        }
-                        productDetailsBean.getVarients().add(variantBean);
-                    }
-                }
-            }
+//            if (StringUtils.hasText(product.getVarient_mapping_id()) && !CollectionUtils.isEmpty(variantMap)
+//                    && variantMap.containsKey(product.getVarient_mapping_id())) {
+//                List<Products> variants = variantMap.get(product.getVarient_mapping_id());
+//                for (Products variant : variants) {
+//                    if (!variant.getId().equals(product.getId())) {
+//                        Category_Master cm = mapCM.get(product.getCategory_id());
+//                        ProductDetailsBean variantBean = this.convertProductToBean(variant, cm);
+//                        if (CollectionUtils.isEmpty(productDetailsBean.getVarients())) {
+//                            productDetailsBean.setVarients(new ArrayList<>());
+//                        }
+//                        productDetailsBean.getVarients().add(variantBean);
+//                    }
+//                }
+//            }
             productDetailsList.add(productDetailsBean);
         }
         return productDetailsList;

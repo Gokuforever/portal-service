@@ -112,7 +112,7 @@ public class ManageCart_BLService {
                 cart.setUser_id(req_user_id);
                 cart = cart_Service.create(cart, req_user_id);
             }
-
+            String nearestSeller = usersBean.getNearestSeller();
             CartBean cartBean = this.getCartBean(cart, address_id, usersBean.getMobile_no(), usersBean.getFirst_name() + " " + usersBean.getLast_name());
             return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
