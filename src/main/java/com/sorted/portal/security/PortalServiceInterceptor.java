@@ -181,7 +181,7 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
                 generateUnauthorizedResponse(response, "Token generation failed");
                 return false;
             }
-            setAuthenticationCookies(response, newTokens[0], newTokens[1], request);
+            setAuthenticationCookies(response, newTokens[0], newTokens[1]);
             log.info("Successfully refreshed tokens for user: {}", userIdFromHeader);
             clearFailedAttempts(clientIp);
             return true;
@@ -257,14 +257,12 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
         }
     }
 
-    private void setAuthenticationCookies(HttpServletResponse response, String accessToken, String refreshToken, HttpServletRequest request) {
+    private void setAuthenticationCookies(HttpServletResponse response, String accessToken, String refreshToken) {
         // Set access token cookie
-        Cookie accessCookie = createSecureCookie(ACCESS_TOKEN_COOKIE, accessToken, accessTokenMaxAge, request);
-        response.addCookie(accessCookie);
+        createSecureCookie(ACCESS_TOKEN_COOKIE, accessToken, accessTokenMaxAge, response);
 
         // Set refresh token cookie
-        Cookie refreshCookie = createSecureCookie(REFRESH_TOKEN_COOKIE, refreshToken, refreshTokenMaxAge, request);
-        response.addCookie(refreshCookie);
+        createSecureCookie(REFRESH_TOKEN_COOKIE, refreshToken, refreshTokenMaxAge, response);
     }
 
     private String getClientIpAddress(HttpServletRequest request) {

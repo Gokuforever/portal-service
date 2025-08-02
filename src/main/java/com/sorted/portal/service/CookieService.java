@@ -47,24 +47,33 @@ public class CookieService {
 //        httpServletResponse.addCookie(accessCookie);
 //        httpServletResponse.addCookie(refreshCookie);
 //    }
+//
+//    public static Cookie createSecureCookie(String name, String value, int maxAge, HttpServletRequest request) {
+//        Cookie cookie = new Cookie(name, value);
+//        cookie.setHttpOnly(true);
+//        cookie.setSecure(true);
+//        cookie.setMaxAge(maxAge);
+//        cookie.setPath("/");
+//
+//        // Set domain based on request origin if it matches allowed domains
+//        String cookieDomain = determineCookieDomain(request);
+//        if (StringUtils.hasText(cookieDomain)) {
+//            cookie.setDomain(cookieDomain);
+//        }
+//
+//        // Note: SameSite attribute would need to be set via response headers
+//        // as Cookie class doesn't directly support it in older versions
+//
+//        return cookie;
+//    }
 
-    public static Cookie createSecureCookie(String name, String value, int maxAge, HttpServletRequest request) {
-        Cookie cookie = new Cookie(name, value);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setMaxAge(maxAge);
-        cookie.setPath("/");
-
-        // Set domain based on request origin if it matches allowed domains
-        String cookieDomain = determineCookieDomain(request);
-        if (StringUtils.hasText(cookieDomain)) {
-            cookie.setDomain(cookieDomain);
-        }
-
-        // Note: SameSite attribute would need to be set via response headers
-        // as Cookie class doesn't directly support it in older versions
-
-        return cookie;
+    public static void createSecureCookie(String name, String value, int maxAge, HttpServletResponse response) {
+        // Access Token Cookie
+        String cookie = String.format(
+                "%s=%s; Max-Age=%d; Path=/; Secure; HttpOnly; SameSite=None",
+                name, value, maxAge
+        );
+        response.setHeader("Set-Cookie", cookie); // First cookie
     }
 
     private static String determineCookieDomain(HttpServletRequest request) {
