@@ -6,9 +6,8 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.Getter;
+import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -23,15 +22,15 @@ import java.util.stream.Collectors;
 
 import static com.sorted.portal.service.CookieService.createSecureCookie;
 
+@Log4j2
 @Component
 public class PortalServiceInterceptor implements HandlerInterceptor {
 
-    private static final Logger logger = LoggerFactory.getLogger(PortalServiceInterceptor.class);
     private static final String ACCESS_TOKEN_COOKIE = "access_token";
     private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
 
     // Rate limiting for failed attempts
-    private static final int MAX_FAILED_ATTEMPTS = 5;
+    private static final int MAX_FAILED_ATTEMPTS = 500;
     private static final long RATE_LIMIT_WINDOW_MS = 300000; // 5 minutes
     private final ConcurrentHashMap<String, RateLimitInfo> rateLimitMap = new ConcurrentHashMap<>();
 
@@ -79,7 +78,7 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
                     "https://studeaze.retool.com"
             );
         }
-        logger.info("Initialized allowed domains: {}", allowedDomainsSet);
+        log.info("Initialized allowed domains: {}", allowedDomainsSet);
     }
 
     @Override
@@ -93,20 +92,20 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
 
         // Check rate limiting
         if (isRateLimited(clientIp)) {
-            logger.warn("Rate limit exceeded for IP: {} on URI: {}", clientIp, requestUri);
+            log.warn("Rate limit exceeded for IP: {} on URI: {}", clientIp, requestUri);
             generateUnauthorizedResponse(response, "Too many failed attempts. Please try again later.");
             return false;
         }
 
 //        // Validate origin against allowed domains
 //        if (!StringUtils.hasText(origin)) {
-//            logger.warn("Request from unauthorized origin: {} for URI: {}", origin, requestUri);
+//            log.warn("Request from unauthorized origin: {} for URI: {}", origin, requestUri);
 //            recordFailedAttempt(clientIp);
 //            generateUnauthorizedResponse(response, "Unauthorized origin");
 //            return false;
 //        }
 //        if (!isOriginAllowed(origin)) {
-//            logger.warn("Request from unauthorized origin: {} for URI: {}", origin, requestUri);
+//            log.warn("Request from unauthorized origin: {} for URI: {}", origin, requestUri);
 //            recordFailedAttempt(clientIp);
 //            generateUnauthorizedResponse(response, "Unauthorized origin");
 //            return false;
@@ -114,7 +113,7 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
 
         // Validate required header
         if (!StringUtils.hasText(userIdFromHeader)) {
-            logger.warn("Missing {} header for request: {}", userIdHeader, requestUri);
+            log.warn("Missing {} header for request: {}", userIdHeader, requestUri);
             recordFailedAttempt(clientIp);
             generateUnauthorizedResponse(response, "Missing user ID header");
             return false;
@@ -124,7 +123,7 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
         TokenPair tokens = extractTokensFromCookies(request);
 
         if (tokens.isEmpty()) {
-            logger.warn("No authentication tokens found for user: {} on request: {}", userIdFromHeader, requestUri);
+            log.warn("No authentication tokens found for user: {} on request: {}", userIdFromHeader, requestUri);
             recordFailedAttempt(clientIp);
             generateUnauthorizedResponse(response, "Authentication required");
             return false;
@@ -134,25 +133,25 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
         if (tokens.hasAccessToken()) {
             AuthResult accessResult = validateToken(tokens.accessToken, userIdFromHeader, "access");
             if (accessResult.isValid() && !accessResult.isExpired()) {
-                logger.debug("Successfully authenticated user: {} with access token", userIdFromHeader);
+                log.debug("Successfully authenticated user: {} with access token", userIdFromHeader);
                 clearFailedAttempts(clientIp);
                 return true;
             }
 
             if (!accessResult.isValid()) {
-                logger.warn("Invalid access token for user: {}", userIdFromHeader);
+                log.warn("Invalid access token for user: {}", userIdFromHeader);
                 recordFailedAttempt(clientIp);
                 generateUnauthorizedResponse(response, "Invalid access token");
                 return false;
             }
 
             // Access token expired, try refresh token
-            logger.debug("Access token expired for user: {}, attempting refresh", userIdFromHeader);
+            log.debug("Access token expired for user: {}, attempting refresh", userIdFromHeader);
         }
 
         // Validate and use refresh token
         if (tokens.lacksRefreshToken()) {
-            logger.warn("No refresh token available for user: {}", userIdFromHeader);
+            log.warn("No refresh token available for user: {}", userIdFromHeader);
             recordFailedAttempt(clientIp);
             generateUnauthorizedResponse(response, "Authentication expired");
             return false;
@@ -160,14 +159,14 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
 
         AuthResult refreshResult = validateToken(tokens.refreshToken, userIdFromHeader, "refresh");
         if (!refreshResult.isValid()) {
-            logger.warn("Invalid refresh token for user: {}", userIdFromHeader);
+            log.warn("Invalid refresh token for user: {}", userIdFromHeader);
             recordFailedAttempt(clientIp);
             generateUnauthorizedResponse(response, "Invalid refresh token");
             return false;
         }
 
         if (refreshResult.isExpired()) {
-            logger.warn("Refresh token expired for user: {}", userIdFromHeader);
+            log.warn("Refresh token expired for user: {}", userIdFromHeader);
             recordFailedAttempt(clientIp);
             generateUnauthorizedResponse(response, "Session expired");
             return false;
@@ -177,17 +176,17 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
         try {
             String[] newTokens = jwtTokenUtil.generateToken(userIdFromHeader);
             if (newTokens == null || newTokens.length < 2) {
-                logger.error("Invalid token generation result for user: {}", userIdFromHeader);
+                log.error("Invalid token generation result for user: {}", userIdFromHeader);
                 recordFailedAttempt(clientIp);
                 generateUnauthorizedResponse(response, "Token generation failed");
                 return false;
             }
             setAuthenticationCookies(response, newTokens[0], newTokens[1], request);
-            logger.info("Successfully refreshed tokens for user: {}", userIdFromHeader);
+            log.info("Successfully refreshed tokens for user: {}", userIdFromHeader);
             clearFailedAttempts(clientIp);
             return true;
         } catch (Exception e) {
-            logger.error("Failed to generate new tokens for user: {}", userIdFromHeader, e);
+            log.error("Failed to generate new tokens for user: {}", userIdFromHeader, e);
             recordFailedAttempt(clientIp);
             generateUnauthorizedResponse(response, "Token generation failed");
             return false;
@@ -212,7 +211,7 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
         String lowerOrigin = origin.toLowerCase();
         if (lowerOrigin.startsWith("data:") || lowerOrigin.startsWith("javascript:") ||
                 lowerOrigin.startsWith("vbscript:") || lowerOrigin.startsWith("file:")) {
-            logger.warn("Potentially malicious origin scheme detected: {}", origin);
+            log.warn("Potentially malicious origin scheme detected: {}", origin);
             return false;
         }
 
@@ -247,13 +246,13 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
             boolean isExpired = jwtTokenUtil.isTokenExpired(token);
 
             if (!isValidUser) {
-                logger.warn("User ID mismatch in {} token. Expected: {}, Found: {}",
+                log.warn("User ID mismatch in {} token. Expected: {}, Found: {}",
                         tokenType, expectedUserId, extractedUserId);
             }
 
             return new AuthResult(isValidUser, isExpired);
         } catch (Exception e) {
-            logger.warn("Failed to validate {} token for user: {}", tokenType, expectedUserId, e);
+            log.warn("Failed to validate {} token for user: {}", tokenType, expectedUserId, e);
             return new AuthResult(false, true);
         }
     }
