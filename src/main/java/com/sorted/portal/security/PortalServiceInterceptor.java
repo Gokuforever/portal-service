@@ -91,11 +91,11 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
         String clientIp = getClientIpAddress(request);
 
         // Check rate limiting
-        if (isRateLimited(clientIp)) {
-            log.warn("Rate limit exceeded for IP: {} on URI: {}", clientIp, requestUri);
-            generateUnauthorizedResponse(response, "Too many failed attempts. Please try again later.");
-            return false;
-        }
+//        if (isRateLimited(clientIp)) {
+//            log.warn("Rate limit exceeded for IP: {} on URI: {}", clientIp, requestUri);
+//            generateUnauthorizedResponse(response, "Too many failed attempts. Please try again later.");
+//            return false;
+//        }
 
 //        // Validate origin against allowed domains
 //        if (!StringUtils.hasText(origin)) {
