@@ -13,23 +13,40 @@ import java.net.URI;
 @Log4j2
 public class CookieService {
 
-    public static void setCookies(HttpServletResponse httpServletResponse, UsersBean usersBean) {
-        Cookie accessCookie = new Cookie("access_token", usersBean.getToken());
-        accessCookie.setHttpOnly(true);
-        accessCookie.setSecure(true);
-        accessCookie.setMaxAge(15 * 60); // 15 minutes
-        accessCookie.setPath("/");
 
-        // Refresh Token Cookie (longer-lived)
-        Cookie refreshCookie = new Cookie("refresh_token", usersBean.getRefresh_token());
-        refreshCookie.setHttpOnly(true);
-        refreshCookie.setSecure(true);
-        refreshCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
-        refreshCookie.setPath("/");
+    public static void setCookies(HttpServletResponse response, UsersBean usersBean) {
+        // Access Token Cookie
+        String accessCookie = String.format(
+                "access_token=%s; Max-Age=%d; Path=/; Secure; HttpOnly; SameSite=None",
+                usersBean.getToken(), 15 * 60
+        );
+        response.setHeader("Set-Cookie", accessCookie); // First cookie
 
-        httpServletResponse.addCookie(accessCookie);
-        httpServletResponse.addCookie(refreshCookie);
+        // Refresh Token Cookie
+        String refreshCookie = String.format(
+                "refresh_token=%s; Max-Age=%d; Path=/; Secure; HttpOnly; SameSite=None",
+                usersBean.getRefresh_token(), 7 * 24 * 60 * 60
+        );
+        response.addHeader("Set-Cookie", refreshCookie); // Add second cookie
     }
+
+//    public static void setCookies(HttpServletResponse httpServletResponse, UsersBean usersBean) {
+//        Cookie accessCookie = new Cookie("access_token", usersBean.getToken());
+//        accessCookie.setHttpOnly(true);
+//        accessCookie.setSecure(true);
+//        accessCookie.setMaxAge(15 * 60); // 15 minutes
+//        accessCookie.setPath("/");
+//
+//        // Refresh Token Cookie (longer-lived)
+//        Cookie refreshCookie = new Cookie("refresh_token", usersBean.getRefresh_token());
+//        refreshCookie.setHttpOnly(true);
+//        refreshCookie.setSecure(true);
+//        refreshCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
+//        refreshCookie.setPath("/");
+//
+//        httpServletResponse.addCookie(accessCookie);
+//        httpServletResponse.addCookie(refreshCookie);
+//    }
 
     public static Cookie createSecureCookie(String name, String value, int maxAge, HttpServletRequest request) {
         Cookie cookie = new Cookie(name, value);
