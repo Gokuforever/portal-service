@@ -24,6 +24,7 @@ import com.sorted.portal.request.beans.SignUpRequest;
 import com.sorted.portal.request.beans.VerifyOtpBean;
 import com.sorted.portal.service.SignUpService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import static com.sorted.portal.service.CookieService.setCookies;
 
 @Slf4j
 @RestController
@@ -164,7 +167,7 @@ public class ManageSignUp_BLService {
     }
 
     @PostMapping("/signup/verify")
-    public SEResponse verify(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+    public SEResponse verify(@RequestBody SERequest request, HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
         try {
             log.info("/signup/verify:: API started");
             VerifyOtpBean req = request.getGenericRequestDataObject(VerifyOtpBean.class);
@@ -229,7 +232,7 @@ public class ManageSignUp_BLService {
             builder.setContent(cont);
             builder.setTemplate(MailTemplate.SIGN_UP_COMPLETED);
             emailSenderImpl.sendEmailHtmlTemplate(builder);
-
+            setCookies(httpServletResponse, usersBean);
             return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;

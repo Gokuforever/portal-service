@@ -55,7 +55,7 @@ public class ManagePopUp_BLService {
         return result;
     }
 
-    @PostMapping("/form-data")
+    @PostMapping("/form-data/submit")
     public SEResponse updatePopUpDetails(@RequestBody SERequest request, HttpServletRequest httpServletRequest) throws JsonProcessingException {
         log.info("Received request to update popup details");
 

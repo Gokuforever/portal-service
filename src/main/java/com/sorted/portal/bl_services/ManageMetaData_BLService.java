@@ -16,11 +16,13 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.portal.request.beans.MetaDataReq;
+import com.sorted.portal.response.beans.Config;
 import com.sorted.portal.response.beans.MetaData;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -51,6 +53,17 @@ public class ManageMetaData_BLService {
         productCache.clear();
     }
 
+    @GetMapping("/preferences")
+    public Config getPreferences() {
+        log.info("getPreferences:: API started");
+        List<Category_Master> categoryMasterData = this.getCategoryMasterData();
+        Config config = Config.builder()
+                .categories(categoryMasterData)
+                .build();
+
+        return config;
+    }
+
     @PostMapping("/getMetaData")
     public SEResponse getMetaData(@RequestBody SERequest request) {
 
@@ -66,7 +79,6 @@ public class ManageMetaData_BLService {
         }
 
         List<Product_Master> listPM = this.getProductMasters();
-//        List<Product_Master> listPM = productCache.computeIfAbsent(PM_CACHE_KEY, key -> this.getProductMasters());
         if (!CollectionUtils.isEmpty(listPM)) {
             data.setProducts(listPM);
         }

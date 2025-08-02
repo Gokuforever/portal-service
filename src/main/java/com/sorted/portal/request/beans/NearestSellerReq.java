@@ -1,6 +1,5 @@
 package com.sorted.portal.request.beans;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.sorted.commons.helper.ReqBaseBean;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

@@ -9,12 +9,15 @@ import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.SEResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import static com.sorted.portal.service.CookieService.setCookies;
 
 @Slf4j
 @RequestMapping("/guest")
@@ -37,7 +40,7 @@ public class ManageGuest_BLService {
     private String guest_role_id;
 
     @PostMapping("/create")
-    public SEResponse createGuest() {
+    public SEResponse createGuest(HttpServletResponse httpServletResponse) {
         try {
             Users user = new Users();
             user.setFirst_name(guest_first_name);
@@ -52,6 +55,9 @@ public class ManageGuest_BLService {
             cart_Service.create(cart, guest.getId());
 
             UsersBean usersBean = users_Service.validateAndGetUserInfo(guest.getId());
+
+            setCookies(httpServletResponse, usersBean);
+
             return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
@@ -61,4 +67,6 @@ public class ManageGuest_BLService {
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
+
+
 }

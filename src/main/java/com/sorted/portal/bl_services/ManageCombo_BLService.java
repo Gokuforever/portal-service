@@ -13,12 +13,16 @@ import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.AccessDeniedException;
-import com.sorted.commons.helper.AggregationFilter.*;
+import com.sorted.commons.helper.AggregationFilter.SEFilter;
+import com.sorted.commons.helper.AggregationFilter.SEFilterType;
+import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.Preconditions;
 import com.sorted.portal.request.beans.CreateComboBean;
+import com.sorted.portal.request.beans.GetCombosBean;
+import com.sorted.portal.response.beans.ComboBean;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -29,8 +33,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Log4j2
 @RestController
@@ -43,7 +48,7 @@ public class ManageCombo_BLService {
     private final ComboService comboService;
 
     @PostMapping("/create")
-    public SEResponse createCombo(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+    public SEResponse create(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("Starting combo creation process");
 
         try {
@@ -121,4 +126,51 @@ public class ManageCombo_BLService {
             throw e;
         }
     }
+
+    public SEResponse getCombos(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+
+        GetCombosBean req = request.getGenericRequestDataObject(GetCombosBean.class);
+        CommonUtils.extractHeaders(httpServletRequest, req);
+        UsersBean usersBean = usersService.validateUserForActivity(req, Permission.VIEW, Activity.PRODUCTS, Activity.INVENTORY_MANAGEMENT, Activity.MANAGE_COMBO);
+        UserType userType = usersBean.getRole().getUser_type();
+        String sellerId = switch (userType) {
+            case CUSTOMER, GUEST -> usersBean.getNearestSeller();
+            case SELLER -> usersBean.getRole().getSeller_id();
+            default -> throw new AccessDeniedException();
+        };
+
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(Combo.Fields.seller_id, sellerId));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Combo> combos = comboService.repoFind(filter);
+        Preconditions.check(CollectionUtils.isNotEmpty(combos), ResponseCode.NO_RECORD);
+
+        Set<String> productIds = combos.stream().flatMap(e -> e.getItem_ids().stream()).collect(Collectors.toSet());
+
+        SEFilter productFilter = new SEFilter(SEFilterType.AND);
+        productFilter.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(productIds)));
+        productFilter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Products> products = productService.repoFind(productFilter);
+        Preconditions.check(CollectionUtils.isNotEmpty(products), ResponseCode.NO_RECORD);
+
+        Map<String, Products> productMap = products.stream().collect(Collectors.toMap(Products::getId, Function.identity()));
+
+        List<ComboBean> comboBeans = new ArrayList<>();
+        for (Combo combo : combos) {
+
+
+            comboBeans.add(ComboBean.builder()
+                    .name(combo.getName())
+                    .description(combo.getDescription())
+                    .price(CommonUtils.paiseToRupee(combo.getPrice()))
+                    .creationDate(combo.getCreation_date_str())
+                    .id(combo.getId())
+                    .build());
+        }
+
+        return SEResponse.getBasicSuccessResponseList(comboBeans, ResponseCode.SUCCESSFUL);
+    }
+
 }

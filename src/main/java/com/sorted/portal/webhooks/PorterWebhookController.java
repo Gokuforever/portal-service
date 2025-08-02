@@ -26,7 +26,7 @@ public class PorterWebhookController {
     @Value("${se.porter.config.auth.token:cd659135-c032-4f1e-80fa-ff78db812511}")
     private String porterToken;
 
-    @PostMapping("porter/order_update")
+    @PostMapping("/porter/order_update")
     public SEResponse porterOrderUpdate(@RequestBody PorterWebhookBean response, HttpServletRequest httpServletRequest) {
         String api_key = httpServletRequest.getHeader("x-api-key");
         if (!StringUtils.hasText(api_key) || !api_key.equals(porterToken)) {

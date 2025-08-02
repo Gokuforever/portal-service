@@ -12,6 +12,8 @@ public class PortalServiceInterceptorAppConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(portalServiceInterceptor).excludePathPatterns("/**");
+        registry.addInterceptor(portalServiceInterceptor).excludePathPatterns("/auth/**", "/cache/clear",
+                "/getMetaData", "/guest", "/createErrorLogTrace", "/createInfoLogTrace", "/createDebugLogTrace",
+                "/form-data","/preferences", "/porter/order_update");
     }
 }

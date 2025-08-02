@@ -23,6 +23,7 @@ import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.annotation.RateLimited;
 import com.sorted.portal.request.beans.*;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +37,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+
+import static com.sorted.portal.service.CookieService.setCookies;
 
 @Slf4j
 @RequestMapping("/auth")
@@ -76,7 +79,7 @@ public class ManageAuth_BLService {
 
     @PostMapping("/verifyOtp")
     @RateLimited(value = 5.0)
-    public SEResponse verifyOtp(@RequestBody SERequest request) {
+    public SEResponse verifyOtp(@RequestBody SERequest request, HttpServletResponse httpServletResponse) {
         try {
             log.info("auth/verifyOtp:: API started!");
             VerifyOtpBean req = request.getGenericRequestDataObject(VerifyOtpBean.class);
@@ -97,6 +100,7 @@ public class ManageAuth_BLService {
             }
             manageOtp.verify(EntityDetails.USERS, reference_id, otp, entity_id, ProcessType.SIGN_IN, Defaults.SIGN_IN);
             UsersBean usersBean = users_Service.validateAndGetUserInfo(entity_id);
+            setCookies(httpServletResponse, usersBean);
             return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
@@ -169,13 +173,13 @@ public class ManageAuth_BLService {
             response.setReference_id(uuid);
             response.setProcess_type(ProcessType.FORGOT_PASS.name());
             response.setEntity_id(users.getId());
-            log.info("signin:: API ended");
+            log.info("forgotPass:: API ended");
             return SEResponse.getBasicSuccessResponseObject(response, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("signin:: exception occurred");
-            log.error("signin:: {}", e.getMessage());
+            log.error("forgotPass:: exception occurred");
+            log.error("forgotPass:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -184,7 +188,7 @@ public class ManageAuth_BLService {
     @RateLimited(value = 5.0)
     public SEResponse forgotpassVerifyOtp(@RequestBody SERequest request) {
         try {
-            log.info("auth/forgotpass/verifyOtp:: API started!");
+            log.info("/forgotPass/verifyOtp:: API started!");
             VerifyOtpBean req = request.getGenericRequestDataObject(VerifyOtpBean.class);
             String otp = req.getOtp();
             String reference_id = req.getReference_id();
@@ -227,8 +231,8 @@ public class ManageAuth_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("auth/verifyOtp:: exception occurred");
-            log.error("auth/verifyOtp:: {}", e.getMessage());
+            log.error("/forgotPass/verifyOtp:: exception occurred");
+            log.error("/forgotPass/verifyOtp:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -288,13 +292,13 @@ public class ManageAuth_BLService {
             users.setUuid(null);
             users_Service.update(users.getId(), users, users.getId());
 
-            log.info("signin:: API ended");
+            log.info("/forgotPass/changePassword:: API ended");
             return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("signin:: exception occurred");
-            log.error("signin:: {}", e.getMessage());
+            log.error("/forgotPass/changePassword:: exception occurred");
+            log.error("/forgotPass/changePassword:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
@@ -308,8 +312,8 @@ public class ManageAuth_BLService {
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
-            log.error("signin:: exception occurred");
-            log.error("signin:: {}", e.getMessage());
+            log.error("/refresh:: exception occurred");
+            log.error("/refresh:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
     }
