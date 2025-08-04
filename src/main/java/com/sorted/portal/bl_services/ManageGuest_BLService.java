@@ -57,7 +57,7 @@ public class ManageGuest_BLService {
 
             UsersBean usersBean = users_Service.validateAndGetUserInfo(guest.getId());
 
-            setCookies(httpServletResponse, usersBean);
+            setCookies(httpServletRequest, httpServletResponse, usersBean);
 
             return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
