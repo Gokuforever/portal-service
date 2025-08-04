@@ -14,67 +14,67 @@ import java.net.URI;
 public class CookieService {
 
 
-//    public static void setCookies(HttpServletResponse response, UsersBean usersBean) {
-//        // Access Token Cookie
-//        String accessCookie = String.format(
-//                "access_token=%s; Max-Age=%d; Path=/; Secure; HttpOnly; SameSite=None",
-//                usersBean.getToken(), 15 * 60
-//        );
-//        response.setHeader("Set-Cookie", accessCookie); // First cookie
+    public static void setCookies(HttpServletResponse response, UsersBean usersBean) {
+        // Access Token Cookie
+        String accessCookie = String.format(
+                "access_token=%s; Max-Age=%d; Path=/; Secure; HttpOnly; SameSite=None",
+                usersBean.getToken(), 15 * 60
+        );
+        response.addHeader("Set-Cookie", accessCookie); // First cookie
+
+        // Refresh Token Cookie
+        String refreshCookie = String.format(
+                "refresh_token=%s; Max-Age=%d; Path=/; Secure; HttpOnly; SameSite=None",
+                usersBean.getRefresh_token(), 7 * 24 * 60 * 60
+        );
+        response.addHeader("Set-Cookie", refreshCookie); // Add second cookie
+    }
+
+//    public static void setCookies(HttpServletResponse httpServletResponse, UsersBean usersBean) {
+//        Cookie accessCookie = new Cookie("access_token", usersBean.getToken());
+//        accessCookie.setHttpOnly(true);
+//        accessCookie.setSecure(true);
+//        accessCookie.setMaxAge(15 * 60); // 15 minutes
+//        accessCookie.setPath("/");
 //
-//        // Refresh Token Cookie
-//        String refreshCookie = String.format(
-//                "refresh_token=%s; Max-Age=%d; Path=/; Secure; HttpOnly; SameSite=None",
-//                usersBean.getRefresh_token(), 7 * 24 * 60 * 60
-//        );
-//        response.addHeader("Set-Cookie", refreshCookie); // Add second cookie
+//        // Refresh Token Cookie (longer-lived)
+//        Cookie refreshCookie = new Cookie("refresh_token", usersBean.getRefresh_token());
+//        refreshCookie.setHttpOnly(true);
+//        refreshCookie.setSecure(true);
+//        refreshCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
+//        refreshCookie.setPath("/");
+//
+//        // Manually add SameSite=None
+//        String refreshHeader = String.format("%s=%s; Path=%s; Secure; HttpOnly; SameSite=None",
+//                refreshCookie.getName(), refreshCookie.getValue(), refreshCookie.getPath());
+//
+//        String accessHeader = String.format("%s=%s; Path=%s; Secure; HttpOnly; SameSite=None",
+//                accessCookie.getName(), accessCookie.getValue(), accessCookie.getPath());
+//
+//        httpServletResponse.addHeader("Set-Cookie", accessHeader);
+//        httpServletResponse.addHeader("Set-Cookie", refreshHeader);
+//        httpServletResponse.addCookie(accessCookie);
+//        httpServletResponse.addCookie(refreshCookie);
 //    }
-
-    public static void setCookies(HttpServletResponse httpServletResponse, UsersBean usersBean) {
-        Cookie accessCookie = new Cookie("access_token", usersBean.getToken());
-        accessCookie.setHttpOnly(true);
-        accessCookie.setSecure(true);
-        accessCookie.setMaxAge(15 * 60); // 15 minutes
-        accessCookie.setPath("/");
-
-        // Refresh Token Cookie (longer-lived)
-        Cookie refreshCookie = new Cookie("refresh_token", usersBean.getRefresh_token());
-        refreshCookie.setHttpOnly(true);
-        refreshCookie.setSecure(true);
-        refreshCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
-        refreshCookie.setPath("/");
-
-        // Manually add SameSite=None
-        String refreshHeader = String.format("%s=%s; Path=%s; Secure; HttpOnly; SameSite=None",
-                refreshCookie.getName(), refreshCookie.getValue(), refreshCookie.getPath());
-
-        String accessHeader = String.format("%s=%s; Path=%s; Secure; HttpOnly; SameSite=None",
-                accessCookie.getName(), accessCookie.getValue(), accessCookie.getPath());
-
-        httpServletResponse.addHeader("Set-Cookie", accessHeader);
-        httpServletResponse.addHeader("Set-Cookie", refreshHeader);
-        httpServletResponse.addCookie(accessCookie);
-        httpServletResponse.addCookie(refreshCookie);
-    }
-
-    public static Cookie createSecureCookie(String name, String value, int maxAge, HttpServletRequest request) {
-        Cookie cookie = new Cookie(name, value);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setMaxAge(maxAge);
-        cookie.setPath("/");
-
-        // Set domain based on request origin if it matches allowed domains
-        String cookieDomain = determineCookieDomain(request);
-        if (StringUtils.hasText(cookieDomain)) {
-            cookie.setDomain(cookieDomain);
-        }
-
-        // Note: SameSite attribute would need to be set via response headers
-        // as Cookie class doesn't directly support it in older versions
-
-        return cookie;
-    }
+//
+//    public static Cookie createSecureCookie(String name, String value, int maxAge, HttpServletRequest request) {
+//        Cookie cookie = new Cookie(name, value);
+//        cookie.setHttpOnly(true);
+//        cookie.setSecure(true);
+//        cookie.setMaxAge(maxAge);
+//        cookie.setPath("/");
+//
+//        // Set domain based on request origin if it matches allowed domains
+//        String cookieDomain = determineCookieDomain(request);
+//        if (StringUtils.hasText(cookieDomain)) {
+//            cookie.setDomain(cookieDomain);
+//        }
+//
+//        // Note: SameSite attribute would need to be set via response headers
+//        // as Cookie class doesn't directly support it in older versions
+//
+//        return cookie;
+//    }
 
     public static void createSecureCookie(String name, String value, int maxAge, HttpServletResponse response) {
         // Access Token Cookie
