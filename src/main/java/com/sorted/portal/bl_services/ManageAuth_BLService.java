@@ -79,7 +79,7 @@ public class ManageAuth_BLService {
 
     @PostMapping("/verifyOtp")
     @RateLimited(value = 5.0)
-    public SEResponse verifyOtp(@RequestBody SERequest request, HttpServletResponse httpServletResponse) {
+    public SEResponse verifyOtp(@RequestBody SERequest request, HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
         try {
             log.info("auth/verifyOtp:: API started!");
             VerifyOtpBean req = request.getGenericRequestDataObject(VerifyOtpBean.class);
@@ -100,7 +100,7 @@ public class ManageAuth_BLService {
             }
             manageOtp.verify(EntityDetails.USERS, reference_id, otp, entity_id, ProcessType.SIGN_IN, Defaults.SIGN_IN);
             UsersBean usersBean = users_Service.validateAndGetUserInfo(entity_id);
-            setCookies(httpServletResponse, usersBean);
+            setCookies(httpServletRequest, httpServletResponse, usersBean);
             return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;

@@ -232,7 +232,7 @@ public class ManageSignUp_BLService {
             builder.setContent(cont);
             builder.setTemplate(MailTemplate.SIGN_UP_COMPLETED);
             emailSenderImpl.sendEmailHtmlTemplate(builder);
-            setCookies(httpServletResponse, usersBean);
+            setCookies(httpServletRequest, httpServletResponse, usersBean);
             return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;

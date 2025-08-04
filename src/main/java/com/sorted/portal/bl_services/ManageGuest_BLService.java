@@ -9,6 +9,7 @@ import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.SEResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,7 +41,7 @@ public class ManageGuest_BLService {
     private String guest_role_id;
 
     @PostMapping("/create")
-    public SEResponse createGuest(HttpServletResponse httpServletResponse) {
+    public SEResponse createGuest(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
         try {
             Users user = new Users();
             user.setFirst_name(guest_first_name);
