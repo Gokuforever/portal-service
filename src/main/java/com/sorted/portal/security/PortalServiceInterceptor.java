@@ -14,6 +14,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -227,10 +229,10 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
             for (Cookie cookie : request.getCookies()) {
                 switch (cookie.getName()) {
                     case ACCESS_TOKEN_COOKIE:
-                        accessToken = cookie.getValue();
+                        accessToken = URLDecoder.decode(cookie.getValue(), StandardCharsets.UTF_8);;
                         break;
                     case REFRESH_TOKEN_COOKIE:
-                        refreshToken = cookie.getValue();
+                        refreshToken = URLDecoder.decode(cookie.getValue(), StandardCharsets.UTF_8);
                         break;
                 }
             }
