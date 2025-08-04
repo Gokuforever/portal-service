@@ -8,27 +8,39 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.util.StringUtils;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 
 @Log4j2
 public class CookieService {
 
 
-    public static void setCookies(HttpServletResponse response, UsersBean usersBean) {
-        // Access Token Cookie
-        String accessCookie = String.format(
-                "access_token=%s; Max-Age=%d; Path=/; Secure; HttpOnly; SameSite=None",
-                usersBean.getToken(), 15 * 60
-        );
-        response.addHeader("Set-Cookie", accessCookie); // First cookie
+    public static void setCookies(HttpServletRequest request, HttpServletResponse response, UsersBean usersBean) {
+        boolean isSecure = request.isSecure(); // true if HTTPS
+        String sameSiteAndSecure = isSecure
+                ? "Secure; SameSite=None"
+                : "SameSite=Lax"; // Can't use SameSite=None without Secure
 
-        // Refresh Token Cookie
-        String refreshCookie = String.format(
-                "refresh_token=%s; Max-Age=%d; Path=/; Secure; HttpOnly; SameSite=None",
-                usersBean.getRefresh_token(), 7 * 24 * 60 * 60
+        // Access Token
+        String accessCookie = String.format(
+                "access_token=%s; Max-Age=%d; Path=/; HttpOnly; %s",
+                URLEncoder.encode(usersBean.getToken(), StandardCharsets.UTF_8),
+                15 * 60,
+                sameSiteAndSecure
         );
-        response.addHeader("Set-Cookie", refreshCookie); // Add second cookie
+        response.addHeader("Set-Cookie", accessCookie);
+
+        // Refresh Token
+        String refreshCookie = String.format(
+                "refresh_token=%s; Max-Age=%d; Path=/; HttpOnly; %s",
+                URLEncoder.encode(usersBean.getRefresh_token(), StandardCharsets.UTF_8),
+                7 * 24 * 60 * 60,
+                sameSiteAndSecure
+        );
+        response.addHeader("Set-Cookie", refreshCookie);
     }
+
 
 //    public static void setCookies(HttpServletResponse httpServletResponse, UsersBean usersBean) {
 //        Cookie accessCookie = new Cookie("access_token", usersBean.getToken());
