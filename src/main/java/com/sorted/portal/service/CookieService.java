@@ -49,7 +49,7 @@ public class CookieService {
                 refreshCookie.getName(), refreshCookie.getValue(), refreshCookie.getPath());
 
         String accessHeader = String.format("%s=%s; Path=%s; Secure; HttpOnly; SameSite=None",
-                refreshCookie.getName(), refreshCookie.getValue(), refreshCookie.getPath());
+                accessCookie.getName(), accessCookie.getValue(), accessCookie.getPath());
 
         httpServletResponse.addHeader("Set-Cookie", accessHeader);
         httpServletResponse.addHeader("Set-Cookie", refreshHeader);
