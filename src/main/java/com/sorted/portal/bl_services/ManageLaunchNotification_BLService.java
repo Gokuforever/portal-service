@@ -3,10 +3,10 @@ package com.sorted.portal.bl_services;
 import com.sorted.commons.entity.mongo.LaunchingEmail;
 import com.sorted.commons.entity.service.LaunchingEmailService;
 import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.utils.Preconditions;
-import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.request.beans.NotifyOnLaunch;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,12 +19,11 @@ import java.util.stream.Collectors;
 import static com.sorted.commons.constants.Defaults.SYSTEM_ADMIN;
 
 @RestController
+@RequiredArgsConstructor
 public class ManageLaunchNotification_BLService {
 
-    @Autowired
-    private LaunchingEmailService launchingEmailService;
-
-
+    private final LaunchingEmailService launchingEmailService;
+    private final EmailSenderImpl emailSenderImpl;
 
     @PostMapping("/notify")
     public void notification(@RequestBody NotifyOnLaunch request) {
@@ -43,10 +42,9 @@ public class ManageLaunchNotification_BLService {
         if (launchingEmails.isEmpty()) {
             return;
         }
-        Set<String> emailIds = launchingEmails.stream().map(LaunchingEmail::getMail).collect(Collectors.toSet());
-        for (LaunchingEmail launchingEmail : launchingEmails) {
-
+        Set<String> emailIds = launchingEmails.stream().filter(e -> !e.isSent()).map(LaunchingEmail::getMail).collect(Collectors.toSet());
+        if (emailIds.isEmpty()) {
+            return;
         }
     }
-
 }
