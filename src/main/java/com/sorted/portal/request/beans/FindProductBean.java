@@ -31,7 +31,7 @@ public class FindProductBean extends ReqBaseBean {
                 Object[] array = value.toArray();
                 map.put(key, Arrays.asList(array));
             });
-            this.filters = map.entrySet().stream().collect(Collectors.toMap(e -> e.getKey(),
+            this.filters = map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
                     e -> e.getValue().stream().map(Object::toString).collect(Collectors.toList())));
         }
         this.name = name;

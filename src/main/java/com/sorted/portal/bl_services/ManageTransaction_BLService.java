@@ -1,11 +1,9 @@
 package com.sorted.portal.bl_services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayResponse;
 import com.razorpay.RazorpayException;
-import com.sorted.commons.beans.AddressDTO;
-import com.sorted.commons.beans.Item;
-import com.sorted.commons.beans.Order_Status_History;
-import com.sorted.commons.beans.UsersBean;
+import com.sorted.commons.beans.*;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
@@ -81,7 +79,6 @@ public class ManageTransaction_BLService {
         log.info("status:: Checking status for order ID: {}", orderId);
 
         Order_Details order_Details = findOrderDetails(orderId, usersBean.getId());
-
 
         try {
             List<OrderItemResponse> orderItemResponseList = orderStatusCheckService.checkOrderStatus(order_Details);
@@ -257,7 +254,7 @@ public class ManageTransaction_BLService {
         return usersBean;
     }
 
-    private Address validateDeliveryAddress(PayNowBean req, UsersBean usersBean) {
+    private Address validateDeliveryAddress(PayNowBean req, UsersBean usersBean) throws JsonProcessingException {
         if (!StringUtils.hasText(req.getDelivery_address_id())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MISSING_DELIVERY_ADD);
         }
@@ -271,6 +268,14 @@ public class ManageTransaction_BLService {
         Address address = address_Service.repoFindOne(filterA);
         if (address == null) {
             throw new CustomIllegalArgumentsException(ResponseCode.ADDRESS_NOT_FOUND);
+        }
+        String nearestSeller = usersBean.getNearestSeller();
+        if(nearestSeller == null) {
+            NearestSellerRes nearestSellerRes = porterUtility.getNearestSeller(address.getPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getLast_name());
+            nearestSeller = nearestSellerRes.getSeller_id();
+            Users users = users_Service.findById(usersBean.getId()).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.NO_RECORD));
+            users.setNearestSeller(nearestSeller);
+            users_Service.update(users.getId(), users, Defaults.SYSTEM_ADMIN);
         }
         return address;
     }

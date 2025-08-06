@@ -812,7 +812,9 @@ public class ManageProduct_BLService {
                 } else {
                     nearest_seller_id = nearest_seller;
                 }
-                filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, nearest_seller_id));
+                if (StringUtils.hasText(nearest_seller_id)) {
+                    filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, nearest_seller_id));
+                }
                 break;
 
             default:
