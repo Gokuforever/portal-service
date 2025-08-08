@@ -141,8 +141,7 @@ public class ManageProduct_BLService {
             log.debug("Received request to get random products with params: {}", req);
 
             CommonUtils.extractHeaders(httpServletRequest, req);
-            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
-                    Activity.INVENTORY_MANAGEMENT);
+            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.PRODUCTS);
             Role role = usersBean.getRole();
             UserType user_type = role.getUser_type();
             log.debug("User type: {}", user_type);

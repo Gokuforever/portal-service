@@ -1,12 +1,8 @@
 package com.sorted.portal.bl_services;
-import com.sorted.commons.beans.Order_Status_History;
-import com.sorted.commons.beans.Spoc_Details;
-import com.sorted.commons.beans.UsersBean;
+
+import com.sorted.commons.beans.*;
 import com.sorted.commons.entity.mongo.*;
-import com.sorted.commons.entity.service.Order_Details_Service;
-import com.sorted.commons.entity.service.Order_Item_Service;
-import com.sorted.commons.entity.service.Seller_Service;
-import com.sorted.commons.entity.service.Users_Service;
+import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
@@ -16,22 +12,28 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.IndianCurrencyConverter;
 import com.sorted.commons.utils.Preconditions;
-import com.sorted.portal.assisting.beans.invoice.*;
 import com.sorted.portal.request.beans.GenerateInvoiceBean;
+import com.sorted.portal.utils.InvoicePdfGenerator;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
+@Log4j2
 @RestController
 @RequiredArgsConstructor
 public class ManageInvoice_BLService {
@@ -40,9 +42,10 @@ public class ManageInvoice_BLService {
     private final Order_Details_Service orderService;
     private final Seller_Service sellerService;
     private final Order_Item_Service orderItemService;
+    private final InvoiceService invoiceService;
 
-    @PostMapping
-    public void generateInvoice(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+    @PostMapping("/generateInvoice")
+    public String generateInvoice(@RequestBody SERequest request, HttpServletRequest httpServletRequest) throws IOException {
         GenerateInvoiceBean req = request.getGenericRequestDataObject(GenerateInvoiceBean.class);
         CommonUtils.extractHeaders(httpServletRequest, req);
 
@@ -52,7 +55,7 @@ public class ManageInvoice_BLService {
 
         Order_Details orderDetails = orderService.findById(req.getOrderId()).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.ORDER_NOT_FOUND));
         switch (orderDetails.getStatus()) {
-            case DELIVERED:
+            case DELIVERED, READY_FOR_PICK_UP:
                 break;
             default:
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_ORDER_STATUS);
@@ -80,8 +83,8 @@ public class ManageInvoice_BLService {
         }
 
 
-        InvoiceDTO invoiceDTO = InvoiceDTO.builder()
-                .invoiceId("")
+        Invoice invoice = Invoice.builder()
+                .invoiceId("INV" + orderDetails.getCode() + CommonUtils.generateFixedLengthRandomNumber(2))
                 .invoiceDate(LocalDateTime.now())
                 .seller(SellerInfo.builder()
                         .name(seller.getBusiness_name())
@@ -99,7 +102,7 @@ public class ManageInvoice_BLService {
                 .totalAmount(CommonUtils.paiseToRupee(orderDetails.getTotal_amount()))
                 .totalGstAmount(BigDecimal.ZERO)
                 .totalNetAmount(CommonUtils.paiseToRupee(orderDetails.getTotal_amount()))
-                .totalAmountInWords(IndianCurrencyConverter.convertToWords(orderDetails.getTotal_amount()))
+                .totalAmountInWords(IndianCurrencyConverter.convertToWords(CommonUtils.paiseToRupee(orderDetails.getTotal_amount()).doubleValue()))
                 .paymentInfo(PaymentInfo.builder()
                         .paymentMethod(orderDetails.getPayment_mode())
                         .transactionId(orderDetails.getTransaction_id())
@@ -110,6 +113,19 @@ public class ManageInvoice_BLService {
                                 .orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.ERR_0001)))
                         .build())
                 .build();
+
+        invoice = invoiceService.create(invoice, usersBean.getId());
+
+        String invoiceHtml = InvoicePdfGenerator.generateOnlyHtml(invoice);
+        log.info("Invoice HTML: {}", invoiceHtml);
+        byte[] pdfBytes = InvoicePdfGenerator.generateInvoicePdf(invoice);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        // Use "inline" to display in browser, "attachment" to download
+        headers.setContentDisposition(ContentDisposition.inline().filename("invoice-" + orderDetails.getCode() + ".pdf").build());
+
+
+        return invoiceHtml;
 
     }
 

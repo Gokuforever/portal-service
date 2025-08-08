@@ -191,9 +191,9 @@ public class ManageTransaction_BLService {
                 }
                 totalSum += cart.getDelivery_charges();
             }
-            if (minCartValueInPaise <= totalSum && cart.getDelivery_charges() != null && cart.getDelivery_charges() > 0) {
-                totalSum += cart.getDelivery_charges();
-            }
+//            if (minCartValueInPaise <= totalSum && cart.getDelivery_charges() != null && cart.getDelivery_charges() > 0) {
+//                totalSum += cart.getDelivery_charges();
+//            }
 
             // Create order
             Order_Details order = createOrder(usersBean, seller.getId(), totalSum, address, sellerAddress);
@@ -271,11 +271,12 @@ public class ManageTransaction_BLService {
         }
         String nearestSeller = usersBean.getNearestSeller();
         if(nearestSeller == null) {
-            NearestSellerRes nearestSellerRes = porterUtility.getNearestSeller(address.getPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getLast_name());
+            NearestSellerRes nearestSellerRes = porterUtility.getNearestSeller(address.getPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
             nearestSeller = nearestSellerRes.getSeller_id();
             Users users = users_Service.findById(usersBean.getId()).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.NO_RECORD));
             users.setNearestSeller(nearestSeller);
             users_Service.update(users.getId(), users, Defaults.SYSTEM_ADMIN);
+            usersBean.setNearestSeller(nearestSeller);
         }
         return address;
     }
