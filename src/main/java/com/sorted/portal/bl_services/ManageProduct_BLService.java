@@ -71,6 +71,8 @@ public class ManageProduct_BLService {
     private int defaultPage;
     @Value("${se.default.size}")
     private int defaultSize;
+    @Value("${se.default.seller:6870158e00e94802261d857a}")
+    private String defaultSeller;
     private final StoreActivityService storeActivityService;
     private final ProductRepository productRepository;
     private final EducationCategoriesService educationCategoriesService;
@@ -794,7 +796,7 @@ public class ManageProduct_BLService {
                 if (StringUtils.hasText(nearest_seller)) {
                     storeOperational = storeActivityService.isStoreOperational(nearest_seller);
                 }
-                if (!storeOperational || !StringUtils.hasText(nearest_seller)) {
+                if (StringUtils.hasText(usersBean.getNearestPincode()) && (!storeOperational || !StringUtils.hasText(nearest_seller))) {
                     NearestSellerRes nearestSeller = porterUtility.getNearestSeller(usersBean.getNearestPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
                     nearest_seller_id = nearestSeller.getSeller_id();
                     if (!nearest_seller_id.equals(nearest_seller)) {
@@ -809,7 +811,7 @@ public class ManageProduct_BLService {
                         users_Service.update(user_id, users, user_id);
                     }
                 } else {
-                    nearest_seller_id = nearest_seller;
+                    nearest_seller_id = defaultSeller;
                 }
                 if (StringUtils.hasText(nearest_seller_id)) {
                     filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, nearest_seller_id));

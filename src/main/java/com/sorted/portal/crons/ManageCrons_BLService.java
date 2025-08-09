@@ -45,13 +45,13 @@ public class ManageCrons_BLService {
     private final SecureReturnDataService secureReturnDataService;
     private final SecureReturnService secureReturnService;
 
-//    @Scheduled(fixedRate = 10000) // Executes every 5000ms (5 seconds)
+    @Scheduled(fixedRate = 10000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
         filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        filterOD.addClause(
-                WhereClause.lte(BaseMongoEntity.Fields.modification_date, LocalDateTime.now().minusMinutes(5)));
+//        filterOD.addClause(
+//                WhereClause.lte(BaseMongoEntity.Fields.modification_date, LocalDateTime.now().minusMinutes(5)));
         filterOD.addClause(
                 WhereClause.in(Order_Details.Fields.status_id, Arrays.asList(OrderStatus.READY_FOR_PICK_UP.getId(),
                         OrderStatus.RIDER_ASSIGNED.getId(), OrderStatus.OUT_FOR_DELIVERY.getId())));
