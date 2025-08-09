@@ -58,6 +58,7 @@ public class ManageTransaction_BLService {
     private final PhonePeUtility phonePeUtility;
     private final OrderStatusCheckService orderStatusCheckService;
     private final PorterUtility porterUtility;
+    private final DemandingPincodeService demandingPincodeService;
 
     @Value("${se.minimum-cart-value.in-paise:10000}")
     private long minCartValueInPaise;
@@ -184,6 +185,7 @@ public class ManageTransaction_BLService {
 
                     GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address.getId(), seller.getAddress_id(), usersBean.getMobile_no(), usersBean.getFirst_name() + " " + usersBean.getLast_name());
                     if (quote == null) {
+                        demandingPincodeService.storeDemandingPincode(address.getPincode(), usersBean.getId());
                         throw new CustomIllegalArgumentsException(ResponseCode.NOT_DELIVERIBLE);
                     }
                     cart.setDelivery_charges(quote.getVehicle().getFare().getMinor_amount());
@@ -270,7 +272,7 @@ public class ManageTransaction_BLService {
             throw new CustomIllegalArgumentsException(ResponseCode.ADDRESS_NOT_FOUND);
         }
         String nearestSeller = usersBean.getNearestSeller();
-        if(nearestSeller == null) {
+        if (nearestSeller == null) {
             NearestSellerRes nearestSellerRes = porterUtility.getNearestSeller(address.getPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
             nearestSeller = nearestSellerRes.getSeller_id();
             Users users = users_Service.findById(usersBean.getId()).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.NO_RECORD));
