@@ -3,10 +3,7 @@ package com.sorted.portal.bl_services;
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.*;
-import com.sorted.commons.entity.service.Address_Service;
-import com.sorted.commons.entity.service.Pincode_Master_Service;
-import com.sorted.commons.entity.service.RoleService;
-import com.sorted.commons.entity.service.Users_Service;
+import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
@@ -41,6 +38,7 @@ public class ManageAddress_BLService {
     private final RoleService roleService;
     private final Address_Service address_Service;
     private final Pincode_Master_Service pincode_Master_Service;
+    private final DemandingPincodeService demandingPincodeService;
 
     @PostMapping("/add")
     public SEResponse add(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
@@ -140,6 +138,7 @@ public class ManageAddress_BLService {
 
         Pincode_Master pincode_Master = pincode_Master_Service.repoFindOne(filterP);
         if (pincode_Master == null) {
+            demandingPincodeService.storeDemandingPincode(address.getPincode(), user_id);
             throw new CustomIllegalArgumentsException(ResponseCode.NOT_DELIVERIBLE);
         }
 
