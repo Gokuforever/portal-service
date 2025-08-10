@@ -57,11 +57,10 @@ public class ManageMetaData_BLService {
     public Config getPreferences() {
         log.info("getPreferences:: API started");
         List<Category_Master> categoryMasterData = this.getCategoryMasterData();
-        Config config = Config.builder()
+
+        return Config.builder()
                 .categories(categoryMasterData)
                 .build();
-
-        return config;
     }
 
     @PostMapping("/getMetaData")
