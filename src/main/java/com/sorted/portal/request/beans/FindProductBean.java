@@ -1,5 +1,6 @@
 package com.sorted.portal.request.beans;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.sorted.commons.helper.ReqBaseBean;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -23,6 +24,9 @@ public class FindProductBean extends ReqBaseBean {
     private String pincode;
     private String nearest_seller;
     private String sort_by;
+    private long count;
+    @JsonProperty
+    private boolean fetchRandom;
 
     public void creatObj(MultiValueMap<String, List<List<String>>> filters, String name, int page, int size) {
         if (filters != null) {

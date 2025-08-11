@@ -1,9 +1,9 @@
 package com.sorted.portal.bl_services;
 
+import com.sorted.commons.beans.GroupComponent;
+import com.sorted.commons.beans.ProductCarousel;
 import com.sorted.commons.beans.UsersBean;
-import com.sorted.commons.entity.mongo.BaseMongoEntity;
-import com.sorted.commons.entity.mongo.Category_Master;
-import com.sorted.commons.entity.mongo.Product_Master;
+import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.Category_MasterService;
 import com.sorted.commons.entity.service.Product_Master_Service;
 import com.sorted.commons.entity.service.Users_Service;
@@ -15,12 +15,18 @@ import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
+import com.sorted.commons.repository.mongo.ProductRepository;
+import com.sorted.portal.assisting.beans.config.GroupComponentBean;
+import com.sorted.portal.assisting.beans.config.HomeProductsBean;
+import com.sorted.portal.assisting.beans.config.ProductBean;
+import com.sorted.portal.assisting.beans.config.ProductCarouselBean;
 import com.sorted.portal.request.beans.MetaDataReq;
 import com.sorted.portal.response.beans.Config;
 import com.sorted.portal.response.beans.MetaData;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,6 +34,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,6 +47,8 @@ public class ManageMetaData_BLService {
     private final Category_MasterService categoryMasterService;
     private final Users_Service usersService;
     private final Product_Master_Service productMasterService;
+    private final ProductRepository productRepository;
+    private final HomeConfigService homeConfigService;
 
     private final Map<String, List<Category_Master>> categoryCache = new ConcurrentHashMap<>();
     private final Map<String, List<Product_Master>> productCache = new ConcurrentHashMap<>();
@@ -58,9 +67,86 @@ public class ManageMetaData_BLService {
         log.info("getPreferences:: API started");
         List<Category_Master> categoryMasterData = this.getCategoryMasterData();
 
+        HomeProductsBean.HomeProductsBeanBuilder homeProductsBeanBuilder = HomeProductsBean.builder();
+
+        List<HomeConfig> homeConfigs = homeConfigService.repoFindAll();
+
+        List<HomeProductsBean> homeProductsBeans = new ArrayList<>();
+
+        for (HomeConfig homeConfig : homeConfigs) {
+
+            String categoryId = homeConfig.getCategoryId();
+            homeProductsBeanBuilder.mainTitle(homeConfig.getMainTitle())
+                    .mainSubtitle(homeConfig.getMainSubtitle())
+                    .categoryId(categoryId);
+
+            SEFilter filter = new SEFilter(SEFilterType.AND);
+            filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            filter.addClause(WhereClause.eq(Products.Fields.category_id, categoryId));
+            filter.addClause(WhereClause.eq(Products.Fields.seller_id, "68711a63a2dcdf55ed170972"));
+
+            List<Products> randomProducts = productRepository.getRandomProducts(filter, 7);
+
+            ProductCarousel productCarousel = homeConfig.getProductCarousel();
+
+            List<ProductBean> productBeans = getProductBeans(randomProducts);
+
+
+            ProductCarouselBean productCarouselBean = ProductCarouselBean.builder()
+                    .title(productCarousel.getTitle())
+                    .subtitle(productCarousel.getSubtitle())
+                    .products(productBeans)
+                    .build();
+
+            homeProductsBeanBuilder.productCarousel(productCarouselBean);
+
+            List<GroupComponent> groupComponent = homeConfig.getGroupComponent();
+
+            List<GroupComponentBean> groupComponentBeans = new ArrayList<>();
+
+            for (GroupComponent group : groupComponent) {
+                SEFilter filterPM = new SEFilter(SEFilterType.AND);
+                filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+                filterPM.addClause(WhereClause.eq(Products.Fields.category_id, categoryId));
+                filterPM.addClause(WhereClause.eq(Products.Fields.group_id, group.getId()));
+                filterPM.addClause(WhereClause.eq(Products.Fields.seller_id, "68711a63a2dcdf55ed170972"));
+
+                List<Products> products = productRepository.getRandomProducts(filterPM, 7);
+
+                GroupComponentBean groupComponentBean = GroupComponentBean.builder()
+                        .groupId(group.getId())
+                        .title(group.getTitle())
+                        .products(getProductBeans(products))
+                        .build();
+                groupComponentBeans.add(groupComponentBean);
+            }
+            HomeProductsBean homeProductsBean = homeProductsBeanBuilder.groupComponent(groupComponentBeans)
+                    .build();
+            homeProductsBeans.add(homeProductsBean);
+        }
+
+
         return Config.builder()
                 .categories(categoryMasterData)
+                .homeProducts(homeProductsBeans)
                 .build();
+    }
+
+    @NotNull
+    private static List<ProductBean> getProductBeans(List<Products> randomProducts) {
+        List<ProductBean> productBeans = new ArrayList<>();
+        for (Products product : randomProducts) {
+
+            ProductBean productBean = ProductBean.builder()
+                    .mrp(product.getMrp())
+                    .sellingPrice(product.getSelling_price())
+                    .image(CollectionUtils.isEmpty(product.getMedia()) ? "" : product.getMedia().stream().filter(e -> e.getOrder() == 0).findFirst().get().getCdn_url())
+                    .id(product.getId())
+                    .name(product.getName())
+                    .build();
+            productBeans.add(productBean);
+        }
+        return productBeans;
     }
 
     @PostMapping("/getMetaData")
