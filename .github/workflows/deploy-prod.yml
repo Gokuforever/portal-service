@@ -71,12 +71,12 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: self-hosted
+    runs-on: prod-runner  # ✅ This targets only your prod EC2
     environment: production
     permissions:
       contents: read
       packages: read
-    
+
     steps:
       - name: Login to GitHub Container Registry on EC2
         uses: docker/login-action@v3
@@ -88,35 +88,26 @@ jobs:
       - name: Deploy to Production Server
         run: |
           echo "======== DEPLOYMENT STARTED ========"
-          
-          # Ensure config and logs directories exist
+
           mkdir -p /home/ubuntu/studeaze/config
           mkdir -p /home/ubuntu/studeaze/logs
           
-          # Stop and remove existing container if it exists
           echo "*** Gracefully stopping application ***"
           if docker ps -q -f name=portal-service | grep -q .; then
             docker exec portal-service sh -c "kill -15 1" || true
-            # Wait up to 5 seconds for graceful shutdown
             timeout 5s sh -c 'until ! docker ps -q -f name=portal-service | grep -q .; do sleep 0.5; done' || true
             docker stop portal-service --time=3 || true
             docker rm portal-service || true
           fi
           
-          # Pull latest image explicitly before running
           echo "*** Pulling latest image ***"
           docker pull ghcr.io/gokuforever/portal-service:latest
           if [ $? -ne 0 ]; then
             echo "ERROR: Failed to pull the image. Checking Docker login status."
             docker login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
-            docker pull ghcr.io/gokuforever/portal-service:latest
-            if [ $? -ne 0 ]; then
-              echo "ERROR: Still failed to pull the image. Exiting with error."
-              exit 1
-            fi
+            docker pull ghcr.io/gokuforever/portal-service:latest || exit 1
           fi
           
-          # Run the container
           echo "*** Starting container ***"
           docker run -d \
             --name portal-service \
@@ -130,13 +121,7 @@ jobs:
             --mount type=bind,source=/home/ubuntu/api.studeaze.in.keystore.p12,target=/app/ssl/api.studeaze.in.keystore.p12 \
             ghcr.io/gokuforever/portal-service:latest
           
-          # Verify the container is running
           echo "*** Verifying deployment ***"
-          docker ps | grep portal-service
-          if [ $? -ne 0 ]; then
-            echo "ERROR: Container failed to start. Checking container logs:"
-            docker logs portal-service || echo "Could not get container logs."
-            exit 1
-          fi
+          docker ps | grep portal-service || (docker logs portal-service && exit 1)
           
-          echo "======== DEPLOYMENT COMPLETED ======="
+          echo "======== DEPLOYMENT COMPLETED ========"
