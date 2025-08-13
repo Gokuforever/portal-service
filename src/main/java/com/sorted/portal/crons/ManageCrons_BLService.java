@@ -45,7 +45,7 @@ public class ManageCrons_BLService {
     private final SecureReturnDataService secureReturnDataService;
     private final SecureReturnService secureReturnService;
 
-    @Scheduled(fixedRate = 10000) // Executes every 5000ms (5 seconds)
+//    @Scheduled(fixedRate = 10000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
