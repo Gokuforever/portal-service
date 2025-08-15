@@ -16,6 +16,7 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.repository.mongo.ProductRepository;
+import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.assisting.beans.config.GroupComponentBean;
 import com.sorted.portal.assisting.beans.config.HomeProductsBean;
 import com.sorted.portal.assisting.beans.config.ProductBean;
@@ -76,7 +77,8 @@ public class ManageMetaData_BLService {
         for (HomeConfig homeConfig : homeConfigs) {
 
             String categoryId = homeConfig.getCategoryId();
-            homeProductsBeanBuilder.mainTitle(homeConfig.getMainTitle())
+            homeProductsBeanBuilder.mainBadge(homeConfig.getMainBadge())
+                    .mainTitle(homeConfig.getMainTitle())
                     .mainSubtitle(homeConfig.getMainSubtitle())
                     .categoryId(categoryId);
 
@@ -138,8 +140,8 @@ public class ManageMetaData_BLService {
         for (Products product : randomProducts) {
 
             ProductBean productBean = ProductBean.builder()
-                    .mrp(product.getMrp())
-                    .sellingPrice(product.getSelling_price())
+                    .mrp(CommonUtils.paiseToRupee(product.getMrp()))
+                    .sellingPrice(CommonUtils.paiseToRupee(product.getSelling_price()))
                     .image(CollectionUtils.isEmpty(product.getMedia()) ? "" : product.getMedia().stream().filter(e -> e.getOrder() == 0).findFirst().get().getCdn_url())
                     .id(product.getId())
                     .name(product.getName())

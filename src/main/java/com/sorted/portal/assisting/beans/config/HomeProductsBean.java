@@ -9,6 +9,7 @@ import java.util.List;
 @Builder
 public class HomeProductsBean {
     private String categoryId;
+    private String mainBadge;
     private String mainTitle;
     private String mainSubtitle;
     private ProductCarouselBean productCarousel;
