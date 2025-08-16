@@ -20,6 +20,7 @@ import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.Preconditions;
 import com.sorted.portal.request.beans.FormDataBean;
+import com.sorted.portal.service.EducationDetailsValidationService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -41,6 +42,7 @@ import java.util.stream.Collectors;
 public class ManagePopUp_BLService {
 
     private final EducationCategoriesService educationCategoriesService;
+    private final EducationDetailsValidationService validationService;
     private final Users_Service usersService;
     private final RoleService roleService;
     private final PorterUtility porterUtility;
@@ -62,7 +64,7 @@ public class ManagePopUp_BLService {
         FormDataBean req = request.getGenericRequestDataObject(FormDataBean.class);
         log.debug("Request data: {}", req);
         CommonUtils.extractHeaders(httpServletRequest, req);
-        
+
         log.debug("Looking up user with ID: {}", req.getReq_user_id());
         Users user = usersService.findById(req.getReq_user_id())
                 .orElseThrow(() -> {
@@ -75,7 +77,7 @@ public class ManagePopUp_BLService {
                     log.error("Role not found for role ID: {}", user.getRole_id());
                     return new AccessDeniedException();
                 });
-        
+
         if (!role.getUser_type().equals(UserType.GUEST)) {
             log.warn("Access denied for non-GUEST user: {}", user.getId());
             throw new AccessDeniedException();
@@ -83,41 +85,16 @@ public class ManagePopUp_BLService {
         log.debug("Validating request parameters");
         Preconditions.check(StringUtils.hasText(req.getPincode()), ResponseCode.MANDATE_PINCODE);
         log.debug("Pincode validation successful");
-        
+
         EducationCategoryBean educationDetails = req.getEducationDetails();
         if (educationDetails != null) {
-            Preconditions.check(StringUtils.hasText(educationDetails.getId()), ResponseCode.MANDATE_EDUCATION_ID);
-            Preconditions.check(StringUtils.hasText(educationDetails.getEducation_level()), ResponseCode.MANDATE_EDUCATION_LEVEL);
-            Preconditions.check(CollectionUtils.isNotEmpty(educationDetails.getFields()), ResponseCode.MANDATE_EDUCATION_LEVEL_DETAILS);
-
-            log.debug("Processing education details for education ID: {}", educationDetails.getId());
-            EducationCategories educationCategory = educationCategoriesService.findById(educationDetails.getId())
-                    .orElseThrow(() -> {
-                        log.error("Education category not found for ID: {}", educationDetails.getId());
-                        return new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-                    });
-            List<EducationCategoryField> fields = educationCategory.getFields();
-            Map<String, List<String>> map = educationDetails.getFields().stream().collect(Collectors.toMap(
-                    EducationCategoryField::getAlias, EducationCategoryField::getOptions));
-
-            for (EducationCategoryField field : fields) {
-                boolean mandatory = field.isMandatory();
-                boolean containsKey = map.containsKey(field.getAlias());
-                if (mandatory) {
-                    Preconditions.check(containsKey, ResponseCode.MISSING_MANDATE_EDUCATION_DETAILS);
-                }
-                if (!containsKey)
-                    continue;
-                List<String> options = map.get(field.getAlias());
-                Preconditions.check(CollectionUtils.isNotEmpty(options), ResponseCode.MISSING_MANDATE_EDUCATION_DETAILS);
-                Preconditions.check(new HashSet<>(field.getOptions()).containsAll(options), ResponseCode.ERR_0001);
-            }
+            validationService.validate(educationDetails);
             user.setEducationDetails(educationDetails);
             log.debug("Updating user education details for user: {}", user.getId());
             usersService.update(user.getId(), user, user.getId());
             log.info("Successfully updated education details for user: {}", user.getId());
         }
-        
+
         log.debug("Finding nearest seller for pincode: {}", req.getPincode());
         NearestSellerRes response = porterUtility.getNearestSeller(req.getPincode(), null, user.getMobile_no(), user.getId());
         log.debug("Found nearest seller: {}", response.getSeller_id());
@@ -126,9 +103,10 @@ public class ManagePopUp_BLService {
         user.setNearestPincode(req.getPincode());
         usersService.update(user.getId(), user, user.getId());
         log.info("Successfully updated user {} with nearest seller: {}", user.getId(), response.getSeller_id());
-        
+
         SEResponse successResponse = SEResponse.getBasicSuccessResponseObject(response, ResponseCode.SUCCESSFUL);
         log.debug("Returning success response for user: {}", user.getId());
         return successResponse;
     }
+
 }

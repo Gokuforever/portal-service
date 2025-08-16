@@ -2,6 +2,7 @@ package com.sorted.portal.bl_services;
 
 import com.sorted.commons.beans.GroupComponent;
 import com.sorted.commons.beans.ProductCarousel;
+import com.sorted.commons.beans.SelectedSubCatagories;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.Category_MasterService;
@@ -29,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -36,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -85,6 +88,7 @@ public class ManageMetaData_BLService {
             SEFilter filter = new SEFilter(SEFilterType.AND);
             filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
             filter.addClause(WhereClause.eq(Products.Fields.category_id, categoryId));
+            filter.addClause(WhereClause.isNotNull(Products.Fields.media));
             filter.addClause(WhereClause.eq(Products.Fields.seller_id, "68711a63a2dcdf55ed170972"));
 
             List<Products> randomProducts = productRepository.getRandomProducts(filter, 7);
@@ -111,13 +115,25 @@ public class ManageMetaData_BLService {
                 filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
                 filterPM.addClause(WhereClause.eq(Products.Fields.category_id, categoryId));
                 filterPM.addClause(WhereClause.eq(Products.Fields.group_id, group.getId()));
+                filterPM.addClause(WhereClause.isNotNull(Products.Fields.media));
                 filterPM.addClause(WhereClause.eq(Products.Fields.seller_id, "68711a63a2dcdf55ed170972"));
+                if (group.getFilters() != null && !group.getFilters().isEmpty()) {
+                    for (Map.Entry<String, List<String>> entry : group.getFilters().entrySet()) {
+                        if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
+                            Map<String, Object> map = new HashMap<>();
+                            map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
+                            map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
+                            filterPM.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+                        }
+                    }
+                }
 
                 List<Products> products = productRepository.getRandomProducts(filterPM, 7);
 
                 GroupComponentBean groupComponentBean = GroupComponentBean.builder()
                         .groupId(group.getId())
                         .title(group.getTitle())
+                        .filters(group.getFilters())
                         .products(getProductBeans(products))
                         .build();
                 groupComponentBeans.add(groupComponentBean);

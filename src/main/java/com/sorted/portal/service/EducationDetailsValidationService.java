@@ -1,0 +1,58 @@
+package com.sorted.portal.service;
+
+import com.sorted.commons.beans.EducationCategoryBean;
+import com.sorted.commons.beans.EducationCategoryField;
+import com.sorted.commons.entity.mongo.EducationCategories;
+import com.sorted.commons.entity.service.EducationCategoriesService;
+import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.utils.Preconditions;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@RequiredArgsConstructor
+@Service
+@Log4j2
+public class EducationDetailsValidationService {
+
+    private final EducationCategoriesService educationCategoriesService;
+
+    public void validate(EducationCategoryBean educationDetails) {
+        Preconditions.check(educationDetails != null, ResponseCode.INVALID_REQ);
+        Preconditions.check(StringUtils.hasText(educationDetails.getId()), ResponseCode.MANDATE_EDUCATION_ID);
+        Preconditions.check(StringUtils.hasText(educationDetails.getEducation_level()), ResponseCode.MANDATE_EDUCATION_LEVEL);
+        Preconditions.check(CollectionUtils.isNotEmpty(educationDetails.getFields()), ResponseCode.MANDATE_EDUCATION_LEVEL_DETAILS);
+
+        log.debug("Processing education details for education ID: {}", educationDetails.getId());
+        EducationCategories educationCategory = educationCategoriesService.findById(educationDetails.getId())
+                .orElseThrow(() -> {
+                    log.error("Education category not found for ID: {}", educationDetails.getId());
+                    return new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+                });
+        List<EducationCategoryField> fields = educationCategory.getFields();
+        Map<String, List<String>> map = educationDetails.getFields().stream().collect(Collectors.toMap(
+                EducationCategoryField::getAlias, EducationCategoryField::getOptions));
+
+        for (EducationCategoryField field : fields) {
+            boolean mandatory = field.isMandatory();
+            boolean containsKey = map.containsKey(field.getAlias());
+            if (mandatory) {
+                Preconditions.check(containsKey, ResponseCode.MISSING_MANDATE_EDUCATION_DETAILS);
+            }
+            if (!containsKey)
+                continue;
+            List<String> options = map.get(field.getAlias());
+            Preconditions.check(CollectionUtils.isNotEmpty(options), ResponseCode.MISSING_MANDATE_EDUCATION_DETAILS);
+            Preconditions.check(new HashSet<>(field.getOptions()).containsAll(options), ResponseCode.ERR_0001);
+        }
+    }
+
+}

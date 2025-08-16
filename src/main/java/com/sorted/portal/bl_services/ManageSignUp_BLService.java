@@ -1,5 +1,6 @@
 package com.sorted.portal.bl_services;
 
+import com.sorted.commons.beans.EducationCategoryBean;
 import com.sorted.commons.beans.OTPResponse;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.constants.Defaults;
@@ -8,7 +9,10 @@ import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Users_Service;
-import com.sorted.commons.enums.*;
+import com.sorted.commons.enums.EntityDetails;
+import com.sorted.commons.enums.MailTemplate;
+import com.sorted.commons.enums.ProcessType;
+import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
@@ -22,6 +26,7 @@ import com.sorted.commons.utils.PasswordValidatorUtils;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.request.beans.SignUpRequest;
 import com.sorted.portal.request.beans.VerifyOtpBean;
+import com.sorted.portal.service.EducationDetailsValidationService;
 import com.sorted.portal.service.SignUpService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -50,7 +55,7 @@ public class ManageSignUp_BLService {
     private String customer_signup_role;
     private final SignUpService signUpService;
     private final EmailSenderImpl emailSenderImpl;
-
+    private final EducationDetailsValidationService validationService;
 
     @PostMapping("/signup")
     public SEResponse signUp(@RequestBody SERequest request) {
@@ -72,16 +77,6 @@ public class ManageSignUp_BLService {
             if (!StringUtils.hasText(req.getPassword())) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PASS);
             }
-            if (!StringUtils.hasText(req.getBranch())) {
-                throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_BRANCH_NAME);
-            }
-            boolean isOtherBranch = req.getBranch().equalsIgnoreCase("other");
-            if (isOtherBranch && !StringUtils.hasText(req.getDesc())) {
-                throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SEMESTER_DESC);
-            }
-            if (!StringUtils.hasText(req.getSemester())) {
-                throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SEMISTER);
-            }
             if (!SERegExpUtils.isAlphabeticString(req.getFirst_name())) {
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_FN);
             }
@@ -94,21 +89,12 @@ public class ManageSignUp_BLService {
             if (!SERegExpUtils.isEmail(req.getEmail_id())) {
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_EI);
             }
-            if (!SERegExpUtils.standardTextValidation(req.getBranch())) {
-                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_BRANCH);
-            }
-            Semester semester = Semester.getByAlias(req.getSemester());
-            if (semester == null) {
-                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SEMISTER);
-            }
-            if (!StringUtils.hasText(req.getCollege())) {
-                throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_COLLEGE_NAME);
-            }
-            if (!SERegExpUtils.standardTextValidation(req.getCollege())) {
-                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_COLLEGE_NAME);
-            }
             if (req.getGender() == null) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_GENDER);
+            }
+            EducationCategoryBean educationDetails = req.getEducationDetails();
+            if (educationDetails != null) {
+                validationService.validate(educationDetails);
             }
             String password = req.getPassword().trim();
             PasswordValidatorUtils.validatePassword(password);
@@ -141,12 +127,9 @@ public class ManageSignUp_BLService {
             user.setLast_name(req.getLast_name());
             user.setMobile_no(req.getMobile_no());
             user.setEmail_id(req.getEmail_id());
-            user.setBranch(req.getBranch());
-            user.setBranch_desc(isOtherBranch ? req.getDesc() : null);
-            user.setSemester(semester.getAlias());
-            user.setCollege(StringUtils.hasText(req.getCollege()) ? req.getCollege() : null);
             user.setGender(req.getGender());
             user.setPassword(encode);
+            user.setEducationDetails(educationDetails);
 
             users_Service.upsert(user.getId(), user, Defaults.SIGN_UP);
 
@@ -208,7 +191,6 @@ public class ManageSignUp_BLService {
             }
             users.setIs_verified(true);
             users.setRole_id(customer_signup_role);
-
 
             String guest_user_id = httpServletRequest.getHeader("req_user_id");
             if (StringUtils.hasText(guest_user_id)) {

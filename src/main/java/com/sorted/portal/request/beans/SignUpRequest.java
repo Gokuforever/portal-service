@@ -1,5 +1,6 @@
 package com.sorted.portal.request.beans;
 
+import com.sorted.commons.beans.EducationCategoryBean;
 import com.sorted.commons.enums.Gender;
 import com.sorted.commons.helper.ReqBaseBean;
 import lombok.Data;
@@ -20,4 +21,5 @@ public class SignUpRequest extends ReqBaseBean {
     private String college;
     private Gender gender;
     private String pincode;
+    private EducationCategoryBean educationDetails;
 }
