@@ -47,7 +47,7 @@ public class ManagePopUp_BLService {
     private final RoleService roleService;
     private final PorterUtility porterUtility;
 
-    @GetMapping("/form-data")
+    @GetMapping("/formConfig")
     public List<EducationCategoryBean> getPopUpDetails() {
         log.info("Fetching all popup form data");
         List<EducationCategoryBean> result = educationCategoriesService.repoFindAll().stream()
