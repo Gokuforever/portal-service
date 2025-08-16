@@ -52,6 +52,9 @@ public class EducationDetailsValidationService {
             List<String> options = map.get(field.getAlias());
             Preconditions.check(CollectionUtils.isNotEmpty(options), ResponseCode.MISSING_MANDATE_EDUCATION_DETAILS);
             Preconditions.check(new HashSet<>(field.getOptions()).containsAll(options), ResponseCode.ERR_0001);
+            if (field.getOptions().contains("Other")) {
+                Preconditions.check(StringUtils.hasText(field.getDescription()), ResponseCode.MISSING_DESCRIPTION);
+            }
         }
     }
 
