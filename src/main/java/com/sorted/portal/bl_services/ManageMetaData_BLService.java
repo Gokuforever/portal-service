@@ -88,7 +88,7 @@ public class ManageMetaData_BLService {
             SEFilter filter = new SEFilter(SEFilterType.AND);
             filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
             filter.addClause(WhereClause.eq(Products.Fields.category_id, categoryId));
-            filter.addClause(WhereClause.isNotNull("media.cdn_url"));
+            filter.addClause(WhereClause.isNotEmpty("media.cdn_url"));
             filter.addClause(WhereClause.eq(Products.Fields.seller_id, "68711a63a2dcdf55ed170972"));
 
             List<Products> randomProducts = productRepository.getRandomProducts(filter, 7);
@@ -115,7 +115,7 @@ public class ManageMetaData_BLService {
                 filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
                 filterPM.addClause(WhereClause.eq(Products.Fields.category_id, categoryId));
                 filterPM.addClause(WhereClause.eq(Products.Fields.group_id, group.getId()));
-                filterPM.addClause(WhereClause.isNotNull("media.cdn_url"));
+                filterPM.addClause(WhereClause.isNotEmpty("media.cdn_url"));
                 filterPM.addClause(WhereClause.eq(Products.Fields.seller_id, "68711a63a2dcdf55ed170972"));
                 if (group.getFilters() != null && !group.getFilters().isEmpty()) {
                     for (Map.Entry<String, List<String>> entry : group.getFilters().entrySet()) {
