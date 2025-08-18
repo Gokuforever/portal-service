@@ -831,37 +831,38 @@ public class ManageProduct_BLService {
 
         List<SubCategory> mappableSubCategories = null;
         if (req.getGroup_id() != null) {
-            if (!CollectionUtils.isEmpty(req.getFilters())) {
-                SEFilter filterG = new SEFilter(SEFilterType.AND);
-                filterG.addClause(WhereClause.eq("groups.group_id", req.getGroup_id()));
-                filterG.addClause(WhereClause.eq("groups.sub_categories.mappable", true));
-                filterG.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-                Category_Master category_master = category_MasterService.repoFindOne(filterG);
-                if (category_master != null) {
-                    mappableSubCategories = category_master.getGroups().stream().flatMap(e -> e.getSub_categories().stream()).filter(SubCategory::isMappable).toList();
-                }
-            }
+//            if (!CollectionUtils.isEmpty(req.getFilters())) {
+//                SEFilter filterG = new SEFilter(SEFilterType.AND);
+//                filterG.addClause(WhereClause.eq("groups.group_id", req.getGroup_id()));
+//                filterG.addClause(WhereClause.eq("groups.sub_categories.mappable", true));
+//                filterG.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//
+//                Category_Master category_master = category_MasterService.repoFindOne(filterG);
+//                if (category_master != null) {
+//                    mappableSubCategories = category_master.getGroups().stream().flatMap(e -> e.getSub_categories().stream()).filter(SubCategory::isMappable).toList();
+//                }
+//            }
+            filterSE.addClause(WhereClause.eq(Products.Fields.group_id, req.getGroup_id()));
         }
         if (!CollectionUtils.isEmpty(req.getFilters())) {
             for (Entry<String, List<String>> entry : req.getFilters().entrySet()) {
                 if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
                     Map<String, Object> map = new HashMap<>();
                     map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
-                    if (mappableSubCategories != null) {
-                        for (SubCategory subCategory : mappableSubCategories) {
-                            if (subCategory.getName().equals(entry.getKey())) {
-                                Map<String, List<String>> mapping = subCategory.getMapping();
-                                List<String> attributes = new ArrayList<>();
-                                for (String attribute : entry.getValue()) {
-                                    attributes.addAll(mapping.getOrDefault(attribute, List.of(attribute)));
-                                }
-                                map.put(SelectedSubCatagories.Fields.selected_attributes, attributes);
-                            }
-                        }
-                    } else {
-                        map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
-                    }
+//                    if (mappableSubCategories != null) {
+//                        for (SubCategory subCategory : mappableSubCategories) {
+//                            if (subCategory.getName().equals(entry.getKey())) {
+//                                Map<String, List<String>> mapping = subCategory.getMapping();
+//                                List<String> attributes = new ArrayList<>();
+//                                for (String attribute : entry.getValue()) {
+//                                    attributes.addAll(mapping.getOrDefault(attribute, List.of(attribute)));
+//                                }
+//                                map.put(SelectedSubCatagories.Fields.selected_attributes, attributes);
+//                            }
+//                        }
+//                    } else {
+                    map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
+//                    }
                     filterSE.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
                 }
             }
