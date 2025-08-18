@@ -21,5 +21,5 @@ public class SignUpRequest extends ReqBaseBean {
     private String college;
     private Gender gender;
     private String pincode;
-    private EducationCategoryBean educationDetails;
+    private EducationCategoryBean education_details;
 }
