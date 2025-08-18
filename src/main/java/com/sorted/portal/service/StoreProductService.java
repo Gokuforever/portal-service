@@ -23,7 +23,7 @@ import java.util.*;
 public class StoreProductService {
 
     private final ProductService productService;
-    @Value("${se.default.seller:6870158e00e94802261d857a}")
+    @Value("${se.default.seller:68711a63a2dcdf55ed170972}")
     private String defaultSeller;
     private final SearchHistoryAsyncHelper searchHistoryAsyncHelper;
 
