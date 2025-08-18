@@ -92,7 +92,7 @@ public class ManageSignUp_BLService {
             if (req.getGender() == null) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_GENDER);
             }
-            EducationCategoryBean educationDetails = req.getEducationDetails();
+            EducationCategoryBean educationDetails = req.getEducation_details();
             if (educationDetails != null) {
                 validationService.validate(educationDetails);
             }
