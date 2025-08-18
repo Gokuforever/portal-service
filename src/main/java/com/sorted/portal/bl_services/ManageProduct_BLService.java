@@ -829,7 +829,6 @@ public class ManageProduct_BLService {
             filterSE.addClause(WhereClause.eq(Products.Fields.category_id, req.getCategory_id()));
         }
 
-        List<SubCategory> mappableSubCategories = null;
         if (req.getGroup_id() != null) {
 //            if (!CollectionUtils.isEmpty(req.getFilters())) {
 //                SEFilter filterG = new SEFilter(SEFilterType.AND);
