@@ -41,7 +41,7 @@ public class EducationDetailsValidationService {
         Map<String, List<String>> map = educationDetails.getFields().stream().collect(Collectors.toMap(
                 EducationCategoryField::getAlias, EducationCategoryField::getOptions));
 
-        for (EducationCategoryField field : fields) {
+        for (EducationCategoryField field : educationDetails.getFields()) {
             boolean mandatory = field.isMandatory();
             boolean containsKey = map.containsKey(field.getAlias());
             if (mandatory) {
