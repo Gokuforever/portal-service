@@ -36,7 +36,7 @@ public class StoreProductService {
         if (StringUtils.hasText(req.getCategory_id())) {
             filterSE.addClause(AggregationFilter.WhereClause.eq(Products.Fields.category_id, req.getCategory_id()));
         }
-        if (req.getGroup_id() != null) {
+        if (req.getGroup_id() != null && req.getGroup_id() > 0) {
             filterSE.addClause(AggregationFilter.WhereClause.eq(Products.Fields.group_id, req.getGroup_id()));
         }
 
