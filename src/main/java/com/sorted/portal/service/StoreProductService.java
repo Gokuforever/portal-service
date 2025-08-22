@@ -39,7 +39,6 @@ public class StoreProductService {
         if (req.getGroup_id() != null && req.getGroup_id() > 0) {
             filterSE.addClause(AggregationFilter.WhereClause.eq(Products.Fields.group_id, req.getGroup_id()));
         }
-
         if (!CollectionUtils.isEmpty(req.getFilters())) {
             for (Map.Entry<String, List<String>> entry : req.getFilters().entrySet()) {
                 entry.getValue().removeIf(e -> !StringUtils.hasText(e));
