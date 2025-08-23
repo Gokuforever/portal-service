@@ -711,7 +711,7 @@ public class ManageProduct_BLService {
             if (!map.isEmpty()) {
                 filterRI.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
             }
-            filterRI.addClause(WhereClause.eq("groups.group_id", product.getGroup_id()));
+            filterRI.addClause(WhereClause.eq(Products.Fields.group_id, product.getGroup_id()));
             filterRI.addClause(WhereClause.notEq(BaseMongoEntity.Fields.id, product.getId()));
             filterRI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
@@ -824,7 +824,6 @@ public class ManageProduct_BLService {
         if (StringUtils.hasText(req.getName())) {
             filterSE.addClause(WhereClause.like(Products.Fields.name, req.getName()));
         }
-        // TODO: 2 endpoints for store and customer
         if (StringUtils.hasText(req.getCategory_id())) {
             filterSE.addClause(WhereClause.eq(Products.Fields.category_id, req.getCategory_id()));
         }
