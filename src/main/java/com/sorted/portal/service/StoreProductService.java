@@ -45,15 +45,19 @@ public class StoreProductService {
             filterSE.addClause(AggregationFilter.WhereClause.eq(Products.Fields.group_id, req.getGroup_id()));
         }
         if (!CollectionUtils.isEmpty(req.getFilters())) {
+            List<AggregationFilter.SEFilterNode> filterNodes = new ArrayList<>();
             for (Map.Entry<String, List<String>> entry : req.getFilters().entrySet()) {
                 entry.getValue().removeIf(e -> !StringUtils.hasText(e));
                 if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
+                    AggregationFilter.SEFilterNode node = new AggregationFilter.SEFilterNode(AggregationFilter.SEFilterType.OR);
                     Map<String, Object> map = new HashMap<>();
                     map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
                     map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
-                    filterSE.addClause(AggregationFilter.WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+                    node.addClause(AggregationFilter.WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+                    filterNodes.add(node);
                 }
             }
+            filterSE.addNodes(filterNodes);
         }
         filterSE.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         if (StringUtils.hasText(req.getSort_by())) {
@@ -100,21 +104,20 @@ public class StoreProductService {
                     relatedFilters.get(s.getSub_category()).addAll(s.getSelected_attributes());
                 });
 
-        this.makeValuesUnique(relatedFilters);
-
-        if (CollectionUtils.isEmpty(relatedFilters)) {
-            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-        }
         AggregationFilter.SEFilter filterRI = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-        Map<String, Object> map = new HashMap<>();
-        for (Map.Entry<String, List<String>> entry : relatedFilters.entrySet()) {
-            if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
-                map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
-                map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
+        if (!CollectionUtils.isEmpty(relatedFilters)) {
+            this.makeValuesUnique(relatedFilters);
+
+            Map<String, Object> map = new HashMap<>();
+            for (Map.Entry<String, List<String>> entry : relatedFilters.entrySet()) {
+                if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
+                    map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
+                    map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
+                }
             }
-        }
-        if (!map.isEmpty()) {
-            filterRI.addClause(AggregationFilter.WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+            if (!map.isEmpty()) {
+                filterRI.addClause(AggregationFilter.WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+            }
         }
         filterRI.addClause(AggregationFilter.WhereClause.eq(Products.Fields.group_id, product.getGroup_id()));
         filterRI.addClause(AggregationFilter.WhereClause.notEq(BaseMongoEntity.Fields.id, product.getId()));
