@@ -1,6 +1,6 @@
 package com.sorted.portal.service;
 
-import com.sorted.commons.beans.SelectedSubCatagories;
+import com.sorted.commons.beans.SelectedSubCategories;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Products;
@@ -44,8 +44,8 @@ public class StoreProductService {
                 entry.getValue().removeIf(e -> !StringUtils.hasText(e));
                 if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
                     Map<String, Object> map = new HashMap<>();
-                    map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
-                    map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
+                    map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
+                    map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
                     filterSE.addClause(AggregationFilter.WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
                 }
             }

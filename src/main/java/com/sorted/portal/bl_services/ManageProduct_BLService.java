@@ -124,8 +124,8 @@ public class ManageProduct_BLService {
             List<EducationCategoryField> fields = educationDetails.getFields();
             for (EducationCategoryField field : fields) {
                 Map<String, Object> map = new HashMap<>();
-                map.put(SelectedSubCatagories.Fields.sub_category, field.getAlias());
-                map.put(SelectedSubCatagories.Fields.selected_attributes, field.getOptions());
+                map.put(SelectedSubCategories.Fields.sub_category, field.getAlias());
+                map.put(SelectedSubCategories.Fields.selected_attributes, field.getOptions());
                 filter.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
             }
         }
@@ -237,7 +237,7 @@ public class ManageProduct_BLService {
                         }
                         Category_Master category_Master = mapC.get(productReqBean.getCategory_id());
                         Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, productReqBean.getGroup_id());
-                        List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(productReqBean, mapSC);
+                        List<SelectedSubCategories> listSC = this.buildSelectedSubCategories(productReqBean, mapSC);
                         this.validateMandatorySubCategories(category_Master, listSC, productReqBean.getGroup_id());
                         BigDecimal mrp = new BigDecimal(productReqBean.getMrp());
                         BigDecimal sp = new BigDecimal(productReqBean.getSelling_price());
@@ -325,7 +325,7 @@ public class ManageProduct_BLService {
 
             Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, req.getGroup_id());
 
-            List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(req, mapSC);
+            List<SelectedSubCategories> listSC = this.buildSelectedSubCategories(req, mapSC);
 
             this.validateMandatorySubCategories(category_Master, listSC, req.getGroup_id());
 
@@ -447,7 +447,7 @@ public class ManageProduct_BLService {
                     Category_Master category_Master = mapC.get(product.getCategory_id());
                     Products products1 = mapP.get(product.getProduct_id());
                     Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, products1.getGroup_id());
-                    List<SelectedSubCatagories> listSC = this.buildSelectedSubCategories(product, mapSC);
+                    List<SelectedSubCategories> listSC = this.buildSelectedSubCategories(product, mapSC);
                     this.validateMandatorySubCategories(category_Master, listSC, product.getGroup_id());
 
                     BigDecimal mrp = new BigDecimal(product.getMrp());
@@ -704,8 +704,8 @@ public class ManageProduct_BLService {
             Map<String, Object> map = new HashMap<>();
             for (Entry<String, List<String>> entry : relatedFilters.entrySet()) {
                 if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
-                    map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
-                    map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
+                    map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
+                    map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
                 }
             }
             if (!map.isEmpty()) {
@@ -847,7 +847,7 @@ public class ManageProduct_BLService {
             for (Entry<String, List<String>> entry : req.getFilters().entrySet()) {
                 if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
                     Map<String, Object> map = new HashMap<>();
-                    map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
+                    map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
 //                    if (mappableSubCategories != null) {
 //                        for (SubCategory subCategory : mappableSubCategories) {
 //                            if (subCategory.getName().equals(entry.getKey())) {
@@ -856,11 +856,11 @@ public class ManageProduct_BLService {
 //                                for (String attribute : entry.getValue()) {
 //                                    attributes.addAll(mapping.getOrDefault(attribute, List.of(attribute)));
 //                                }
-//                                map.put(SelectedSubCatagories.Fields.selected_attributes, attributes);
+//                                map.put(SelectedSubCategories.Fields.selected_attributes, attributes);
 //                            }
 //                        }
 //                    } else {
-                    map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
+                    map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
 //                    }
                     filterSE.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
                 }
@@ -1113,9 +1113,9 @@ public class ManageProduct_BLService {
                 e -> CollectionUtils.isEmpty(e.getAttributes()) ? new ArrayList<>() : e.getAttributes()));
     }
 
-    private List<SelectedSubCatagories> buildSelectedSubCategories(ProductReqBean req,
+    private List<SelectedSubCategories> buildSelectedSubCategories(ProductReqBean req,
                                                                    Map<String, List<String>> mapSC) {
-        List<SelectedSubCatagories> listSC = new ArrayList<>();
+        List<SelectedSubCategories> listSC = new ArrayList<>();
         req.getSub_categories().forEach((key, val) -> {
             if (!StringUtils.hasText(key)) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SUB_CATEGORY);
@@ -1135,7 +1135,7 @@ public class ManageProduct_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY);
             }
 
-            SelectedSubCatagories subCategories = new SelectedSubCatagories();
+            SelectedSubCategories subCategories = new SelectedSubCategories();
             subCategories.setSub_category(key);
             subCategories.setSelected_attributes(val);
             listSC.add(subCategories);
@@ -1143,9 +1143,9 @@ public class ManageProduct_BLService {
         return listSC;
     }
 
-    private void validateMandatorySubCategories(Category_Master categoryMaster, List<SelectedSubCatagories> listSC, Integer groupId) {
+    private void validateMandatorySubCategories(Category_Master categoryMaster, List<SelectedSubCategories> listSC, Integer groupId) {
         Map<String, List<String>> mapSC = listSC.stream()
-                .collect(Collectors.toMap(SelectedSubCatagories::getSub_category, SelectedSubCatagories::getSelected_attributes));
+                .collect(Collectors.toMap(SelectedSubCategories::getSub_category, SelectedSubCategories::getSelected_attributes));
         List<SubCategory> sub_categories = categoryMaster.getSub_categories_by_group().getOrDefault(groupId, new ArrayList<>());
         List<SubCategory> sorted = sub_categories.stream()
                 .sorted(Comparator.comparingInt(SubCategory::getOrder))

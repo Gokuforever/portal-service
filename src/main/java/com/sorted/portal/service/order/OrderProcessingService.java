@@ -2,7 +2,6 @@ package com.sorted.portal.service.order;
 
 import com.phonepe.sdk.pg.common.models.response.RefundResponse;
 import com.razorpay.RazorpayException;
-import com.razorpay.Refund;
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.beans.UsersBean;
@@ -12,7 +11,6 @@ import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Order_Item_Service;
 import com.sorted.commons.enums.OrderStatus;
-import com.sorted.commons.enums.RazorpayRefundStatus;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.SEResponse;
@@ -25,7 +23,6 @@ import com.sorted.portal.request.beans.CreateDeliveryBean;
 import com.sorted.portal.request.beans.OrderAcceptRejectRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -205,44 +202,6 @@ public class OrderProcessingService {
         // TODO: notify customer about rejection and pending refund request
         orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
 
-        return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
-    }
-
-    /**
-     * Handle refund response from Razorpay
-     */
-    private SEResponse handleRefundResponse(Order_Details orderDetails, Refund refund, String userId) {
-        JSONObject json = refund.toJson();
-        String status = json.get("status").toString();
-        RazorpayRefundStatus refundStatus;
-
-        try {
-            refundStatus = RazorpayRefundStatus.valueOf(status);
-        } catch (Exception e) {
-            log.error("Invalid refund status from Razorpay: {}", status, e);
-            throw new RuntimeException(e);
-        }
-
-        switch (refundStatus) {
-            case failed:
-                // TODO: trigger email to studeaze informing about this failure
-                orderDetails.setStatus(OrderStatus.REFUND_FAILED, userId);
-                break;
-
-            case pending:
-                // TODO: trigger email and text message to customer informing about 5-7 business days.
-                orderDetails.setStatus(OrderStatus.REFUND_REQUESTED, userId);
-                orderDetails.setRefund_transaction_id(json.get("id").toString());
-                break;
-
-            case processed:
-                // TODO: trigger email and text to customer informing refund is processed
-                orderDetails.setStatus(OrderStatus.FULLY_REFUNDED, userId);
-                orderDetails.setRefund_transaction_id(json.get("id").toString());
-                break;
-        }
-
-        orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
         return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
     }
 

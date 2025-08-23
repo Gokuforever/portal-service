@@ -2,7 +2,7 @@ package com.sorted.portal.bl_services;
 
 import com.sorted.commons.beans.GroupComponent;
 import com.sorted.commons.beans.ProductCarousel;
-import com.sorted.commons.beans.SelectedSubCatagories;
+import com.sorted.commons.beans.SelectedSubCategories;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.Category_MasterService;
@@ -41,7 +41,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @RestController
@@ -54,21 +53,35 @@ public class ManageMetaData_BLService {
     private final ProductRepository productRepository;
     private final HomeConfigService homeConfigService;
 
-    private final Map<String, List<Category_Master>> categoryCache = new ConcurrentHashMap<>();
-    private final Map<String, List<Product_Master>> productCache = new ConcurrentHashMap<>();
-    private static final String CM_CACHE_KEY = "CM_DATA";
-    private static final String PM_CACHE_KEY = "PM_DATA";
+    // Cache for /preferences response
+    private volatile Config preferencesCache = null;
+    private volatile long preferencesCacheTime = 0;
+    private static final long CACHE_TTL_MS = 3600000; // 1 hour TTL
+
+    // Cache for /getMetaData response
+    private volatile SEResponse metaDataCache = null;
+    private volatile long metaDataCacheTime = 0;
 
 
     @PostMapping("/cache/clear")
     public void clearCache() {
-        categoryCache.clear();
-        productCache.clear();
+        preferencesCache = null;
+        preferencesCacheTime = 0;
+        metaDataCache = null;
+        metaDataCacheTime = 0;
+        log.info("All caches cleared successfully");
     }
 
     @GetMapping("/preferences")
     public Config getPreferences() {
         log.info("getPreferences:: API started");
+
+        // Check if cache is valid
+        if (preferencesCache != null && (System.currentTimeMillis() - preferencesCacheTime) < CACHE_TTL_MS) {
+            log.info("Returning cached preferences response");
+            return preferencesCache;
+        }
+
         List<Category_Master> categoryMasterData = this.getCategoryMasterData();
 
         HomeProductsBean.HomeProductsBeanBuilder homeProductsBeanBuilder = HomeProductsBean.builder();
@@ -121,8 +134,8 @@ public class ManageMetaData_BLService {
                     for (Map.Entry<String, List<String>> entry : group.getFilters().entrySet()) {
                         if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
                             Map<String, Object> map = new HashMap<>();
-                            map.put(SelectedSubCatagories.Fields.sub_category, entry.getKey());
-                            map.put(SelectedSubCatagories.Fields.selected_attributes, entry.getValue());
+                            map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
+                            map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
                             filterPM.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
                         }
                     }
@@ -144,10 +157,17 @@ public class ManageMetaData_BLService {
         }
 
 
-        return Config.builder()
+        Config config = Config.builder()
                 .categories(categoryMasterData)
                 .homeProducts(homeProductsBeans)
                 .build();
+
+        // Update cache
+        preferencesCache = config;
+        preferencesCacheTime = System.currentTimeMillis();
+        log.info("Preferences response cached");
+
+        return config;
     }
 
     @NotNull
@@ -171,12 +191,18 @@ public class ManageMetaData_BLService {
     public SEResponse getMetaData(@RequestBody SERequest request) {
 
         log.info("getMetaData:: API started");
+
+        // Check if cache is valid
+        if (metaDataCache != null && (System.currentTimeMillis() - metaDataCacheTime) < CACHE_TTL_MS) {
+            log.info("Returning cached metadata response");
+            return metaDataCache;
+        }
+
         MetaDataReq req = request.getGenericRequestDataObject(MetaDataReq.class);
         List<String> ids = req.getIds();
         MetaData data = new MetaData();
 
         List<Category_Master> categoryMasterData = this.getCategoryMasterData();
-//        List<Category_Master> categoryMasterData = categoryCache.computeIfAbsent(CM_CACHE_KEY, key -> this.getCategoryMasterData());
         if (!CollectionUtils.isEmpty(categoryMasterData)) {
             data.setCatagories(categoryMasterData);
         }
@@ -188,7 +214,14 @@ public class ManageMetaData_BLService {
         data.setUpdated_at(LocalDateTime.now());
 
         log.info("getMetaData:: API ended");
-        return SEResponse.getBasicSuccessResponseObject(data, ResponseCode.SUCCESSFUL);
+        SEResponse response = SEResponse.getBasicSuccessResponseObject(data, ResponseCode.SUCCESSFUL);
+
+        // Update cache
+        metaDataCache = response;
+        metaDataCacheTime = System.currentTimeMillis();
+        log.info("Metadata response cached");
+
+        return response;
     }
 
     private List<Product_Master> getProductMasters() {

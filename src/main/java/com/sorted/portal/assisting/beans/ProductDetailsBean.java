@@ -1,7 +1,7 @@
 package com.sorted.portal.assisting.beans;
 
 import com.sorted.commons.beans.Media;
-import com.sorted.commons.beans.SelectedSubCatagories;
+import com.sorted.commons.beans.SelectedSubCategories;
 import lombok.Builder;
 import lombok.Data;
 
@@ -18,7 +18,7 @@ public class ProductDetailsBean {
     private BigDecimal selling_price;
     private String description;
     private int quantity;
-    private List<SelectedSubCatagories> selected_sub_catagories;
+    private List<SelectedSubCategories> selected_sub_catagories;
     private List<ProductDetailsBean> varients;
     private List<ProductDetailsBean> related_products;
     private List<Media> media;
