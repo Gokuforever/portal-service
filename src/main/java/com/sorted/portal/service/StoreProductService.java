@@ -13,7 +13,6 @@ import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
-import com.sorted.portal.assisting.beans.ProductFindOneResBean;
 import com.sorted.portal.request.beans.FindProductBean;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -85,14 +84,7 @@ public class StoreProductService {
         return list;
     }
 
-    public ProductFindOneResBean getProductDetails(FindProductBean req) {
-        Optional<Products> productsOptional = productService.findById(req.getId());
-        if (productsOptional.isEmpty()) {
-            return null;
-        }
-
-        Products product = productsOptional.get();
-
+    public List<ProductDetailsBeanList> getRelatedProducts(Products product) {
 
         Category_Master category_Master = category_MasterService.findById(product.getCategory_id()).orElseThrow();
         List<String> list_filterable = category_Master.getGroups().stream()
@@ -129,19 +121,15 @@ public class StoreProductService {
         filterRI.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         List<Products> listRI = productService.repoFind(filterRI);
-
-        ProductFindOneResBean.ProductFindOneResBeanBuilder findOneResBeanBuilder = ProductFindOneResBean.builder()
-                .product(getResponseBean(product));
-        ProductDetailsBeanList productDetailsBeanList = getResponseBean(product);
-        if (!CollectionUtils.isEmpty(listRI)) {
-            List<ProductDetailsBeanList> list = new ArrayList<>();
-            for (Products p : listRI) {
-                list.add(getResponseBean(p));
-            }
-            findOneResBeanBuilder.relatedProducts(list);
+        if (CollectionUtils.isEmpty(listRI)) {
+            return null;
         }
-        return findOneResBeanBuilder.build();
 
+        List<ProductDetailsBeanList> list = new ArrayList<>();
+        for (Products p : listRI) {
+            list.add(getResponseBean(p));
+        }
+        return list;
 
     }
 

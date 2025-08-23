@@ -21,6 +21,7 @@ import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDetailsBuilder;
+import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
 import com.sorted.portal.enums.ReportType;
@@ -32,6 +33,7 @@ import com.sorted.portal.response.beans.OrderItemReportsDTO;
 import com.sorted.portal.response.beans.OrderReportDTO;
 import com.sorted.portal.service.ExcelGenerationUtility;
 import com.sorted.portal.service.FileGeneratorUtil;
+import com.sorted.portal.service.StoreProductService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -75,6 +77,7 @@ public class ManageProduct_BLService {
     private String defaultSeller;
     private final StoreActivityService storeActivityService;
     private final ProductRepository productRepository;
+    private final StoreProductService storeProductService;
     private final EducationCategoriesService educationCategoriesService;
 
 
@@ -681,43 +684,7 @@ public class ManageProduct_BLService {
                 return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
             }
 
-            Category_Master category_Master = getCategoryMaster(product.getCategory_id());
-            List<String> list_filterable = category_Master.getGroups().stream()
-                    .flatMap(e -> e.getSub_categories().stream()).filter(SubCategory::isFilterable).map(SubCategory::getName)
-                    .toList();
-            Map<String, List<String>> relatedFilters = new HashMap<>();
-
-            product.getSelected_sub_catagories().stream().filter(e -> list_filterable.contains(e.getSub_category()))
-                    .forEach(s -> {
-                        if (!relatedFilters.containsKey(s.getSub_category())) {
-                            relatedFilters.put(s.getSub_category(), new ArrayList<>());
-                        }
-                        relatedFilters.get(s.getSub_category()).addAll(s.getSelected_attributes());
-                    });
-
-            this.makeValuesUnique(relatedFilters);
-
-            if (CollectionUtils.isEmpty(relatedFilters)) {
-                throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-            }
-            SEFilter filterRI = new SEFilter(SEFilterType.AND);
-            Map<String, Object> map = new HashMap<>();
-            for (Entry<String, List<String>> entry : relatedFilters.entrySet()) {
-                if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
-                    map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
-                    map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
-                }
-            }
-            if (!map.isEmpty()) {
-                filterRI.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
-            }
-            filterRI.addClause(WhereClause.eq(Products.Fields.group_id, product.getGroup_id()));
-            filterRI.addClause(WhereClause.notEq(BaseMongoEntity.Fields.id, product.getId()));
-            filterRI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-            List<Products> listRI = productService.repoFind(filterRI);
-
-            ProductDetailsBean resBean = this.productToBean(listRI, product);
+            ProductDetailsBean resBean = this.productToBean(product);
             if (usersBean.getRole().getUser_type() == UserType.CUSTOMER
                     || usersBean.getRole().getUser_type() == UserType.GUEST) {
                 SEFilter filterC = new SEFilter(SEFilterType.AND);
@@ -748,6 +715,7 @@ public class ManageProduct_BLService {
                     }
                 }
                 resBean.setCart_info(cartDetailsBuilder.build());
+                resBean.setRelated_products(storeProductService.getRelatedProducts(product));
             }
             return SEResponse.getBasicSuccessResponseObject(resBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
@@ -892,20 +860,8 @@ public class ManageProduct_BLService {
         }
     }
 
-    private ProductDetailsBean productToBean(List<Products> relatedProducts, Products product) {
-        ProductDetailsBean mainProductDetails = this.convertToBean(Collections.singletonList(product)).get(0);
-        if (!CollectionUtils.isEmpty(relatedProducts)) {
-            List<String> category_ids = new ArrayList<>();
-            List<ProductDetailsBean> relatedProductDetailsList = new ArrayList<>();
-            Map<String, Category_Master> mapCM = this.getCategoryMaster(relatedProducts, category_ids);
-            for (Products temp : relatedProducts) {
-                Category_Master category_Master = mapCM.get(temp.getCategory_id());
-                relatedProductDetailsList.add(this.convertProductToBean(temp, category_Master));
-            }
-            mainProductDetails.setRelated_products(relatedProductDetailsList);
-        }
-
-        return mainProductDetails;
+    private ProductDetailsBean productToBean(Products product) {
+        return this.convertToBean(Collections.singletonList(product)).get(0);
     }
 
     private List<ProductDetailsBean> convertToBean(List<Products> products) {

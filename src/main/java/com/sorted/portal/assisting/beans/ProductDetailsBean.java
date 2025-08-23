@@ -20,7 +20,7 @@ public class ProductDetailsBean {
     private int quantity;
     private List<SelectedSubCategories> selected_sub_catagories;
     private List<ProductDetailsBean> varients;
-    private List<ProductDetailsBean> related_products;
+    private List<ProductDetailsBeanList> related_products;
     private List<Media> media;
     private String category_id;
     private String category_name;
