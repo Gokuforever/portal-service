@@ -20,6 +20,7 @@ import com.sorted.portal.response.beans.OrderItemResponse;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -55,46 +56,50 @@ public class OrderStatusCheckService {
         if (isPaid) {
             // TODO: send mail and sms to seller to accept or reject the order
 
-            AggregationFilter.SEFilter filterU = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-            filterU.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-            filterU.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getUser_id()));
-
-            Users user = usersService.repoFindOne(filterU);
-            if (user == null) {
-                throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-            }
-            String userName = user.getFirst_name() + " " + user.getLast_name();
-            String orderTemplateTable = orderTemplateService.getOrderTemplateTable(order_Details);
-            String mailContent = userName + "|" + orderTemplateTable;
-
-            MailBuilder builder = new MailBuilder();
-            builder.setTo(user.getEmail_id());
-            builder.setContent(mailContent);
-            builder.setTemplate(MailTemplate.DIRECT_ORDER_CONFIRMATION);
-            emailSenderImpl.sendEmailHtmlTemplate(builder);
-
-            AggregationFilter.SEFilter filterS = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-            filterS.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getSeller_id()));
-            filterS.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-            Seller seller = seller_Service.repoFindOne(filterS);
-            if (seller != null) {
-                Optional<Spoc_Details> first = seller.getSpoc_details().stream().filter(e -> e.isPrimary()).findFirst();
-                if (first.isPresent()) {
-                    Spoc_Details spocDetails = first.get();
-                    String mailId = spocDetails.getEmail_id();
-                    String firstName = spocDetails.getFirst_name();
-                    mailContent = firstName + "|" + orderTemplateTable;
-                    MailBuilder mailBuilder = new MailBuilder();
-                    mailBuilder.setTo(mailId);
-                    mailBuilder.setContent(mailContent);
-                    mailBuilder.setTemplate(MailTemplate.NEW_ORDER_ARRIVED);
-                    emailSenderImpl.sendEmailHtmlTemplate(mailBuilder);
-                }
-            }
+            newOrderNotificationToSeller(order_Details);
         }
 
         return orderItemResponseList;
+    }
+
+    private void newOrderNotificationToSeller(@NotNull Order_Details order_Details) {
+        AggregationFilter.SEFilter filterU = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
+        filterU.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterU.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getUser_id()));
+
+        Users user = usersService.repoFindOne(filterU);
+        if (user == null) {
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+        String userName = user.getFirst_name() + " " + user.getLast_name();
+        String orderTemplateTable = orderTemplateService.getOrderTemplateTable(order_Details);
+        String mailContent = userName + "|" + orderTemplateTable;
+
+        MailBuilder builder = new MailBuilder();
+        builder.setTo(user.getEmail_id());
+        builder.setContent(mailContent);
+        builder.setTemplate(MailTemplate.DIRECT_ORDER_CONFIRMATION);
+        emailSenderImpl.sendEmailHtmlTemplate(builder);
+
+        AggregationFilter.SEFilter filterS = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
+        filterS.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getSeller_id()));
+        filterS.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        Seller seller = seller_Service.repoFindOne(filterS);
+        if (seller != null) {
+            Optional<Spoc_Details> first = seller.getSpoc_details().stream().filter(Spoc_Details::isPrimary).findFirst();
+            if (first.isPresent()) {
+                Spoc_Details spocDetails = first.get();
+                String mailId = spocDetails.getEmail_id();
+                String firstName = spocDetails.getFirst_name();
+                mailContent = firstName + "|" + orderTemplateTable;
+                MailBuilder mailBuilder = new MailBuilder();
+                mailBuilder.setTo(mailId);
+                mailBuilder.setContent(mailContent);
+                mailBuilder.setTemplate(MailTemplate.NEW_ORDER_ARRIVED);
+                emailSenderImpl.sendEmailHtmlTemplate(mailBuilder);
+            }
+        }
     }
 
     private boolean processPaymentStatus(Order_Details order_Details) {

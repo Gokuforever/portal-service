@@ -216,11 +216,14 @@ public class OrderValidationService {
             throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
         }
 
-        if (!orderDetails.getStatus().equals(OrderStatus.TRANSACTION_PROCESSED)) {
-            log.warn("Invalid order status: {} for accept/reject operation", orderDetails.getStatus());
-            throw new CustomIllegalArgumentsException(ResponseCode.INVALID_ORDER_STATUS);
+        switch (orderDetails.getStatus()) {
+            case TRANSACTION_PROCESSED:
+            case STORE_NOT_OPERATIONAL:
+                break;
+            default:
+                log.warn("Invalid order status: {} for accept/reject operation", orderDetails.getStatus());
+                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_ORDER_STATUS);
         }
-
         return orderDetails;
     }
 

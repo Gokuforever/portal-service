@@ -2,19 +2,24 @@ package com.sorted.portal.crons;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sorted.commons.beans.BusinessHours;
+import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Seller_Service;
 import com.sorted.commons.entity.service.StoreActivityService;
+import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
+import com.sorted.commons.helper.MailBuilder;
+import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.porter.res.beans.FetchOrderRes;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.service.order.OrderStatusCheckService;
+import com.sorted.portal.service.order.OrderTemplateService;
 import com.sorted.portal.service.secure.SecureReturnDataService;
 import com.sorted.portal.service.secure.SecureReturnService;
 import lombok.RequiredArgsConstructor;
@@ -30,13 +35,15 @@ import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class ManageCrons_BLService {
 
-
+    private final OrderTemplateService orderTemplateService;
     private final Order_Details_Service order_Details_Service;
     private final PorterUtility porterUtility;
     private final OrderStatusCheckService orderStatusCheckService;
@@ -44,8 +51,10 @@ public class ManageCrons_BLService {
     private final StoreActivityService storeActivityService;
     private final SecureReturnDataService secureReturnDataService;
     private final SecureReturnService secureReturnService;
+    private final Users_Service usersService;
+    private final EmailSenderImpl emailSenderImpl;
 
-//    @Scheduled(fixedRate = 10000) // Executes every 5000ms (5 seconds)
+    //    @Scheduled(fixedRate = 10000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
@@ -191,7 +200,7 @@ public class ManageCrons_BLService {
     }
 
 
-    @Scheduled(cron = "0 0 9,12,15,18 * * *")
+    //    @Scheduled(cron = "0 0 9,12,15,18 * * *")
     public void initiatePickUpForSecureReturn() throws JsonProcessingException {
         TimeSlot timeSlot = TimeSlot.getCurrentTimeSlot();
         if (timeSlot == null) return;
@@ -210,5 +219,55 @@ public class ManageCrons_BLService {
         }
     }
 
-}
+    @Scheduled(cron = "0 0 10 * * ?")
+    public void sendReminderToSellers() {
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filter.addClause(WhereClause.eq(Order_Details.Fields.status_id, OrderStatus.STORE_NOT_OPERATIONAL.getId()));
 
+        List<Order_Details> orderDetails = order_Details_Service.repoFind(filter);
+
+        if (CollectionUtils.isEmpty(orderDetails)) {
+            return;
+        }
+        List<String> userIds = orderDetails.stream().map(Order_Details::getUser_id).distinct().toList();
+
+        SEFilter filterU = new SEFilter(SEFilterType.AND);
+        filterU.addClause(WhereClause.in(BaseMongoEntity.Fields.id, userIds));
+        filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Users> users = usersService.repoFind(filterU);
+        Map<String, Users> usersMap = users.stream().collect(Collectors.toMap(Users::getId, u -> u));
+
+        List<String> sellerIds = orderDetails.stream().map(Order_Details::getSeller_id).distinct().toList();
+
+        SEFilter filterS = new SEFilter(SEFilterType.AND);
+        filterS.addClause(WhereClause.in(BaseMongoEntity.Fields.id, sellerIds));
+        filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Seller> sellers = seller_Service.repoFind(filterS);
+        Map<String, Seller> sellerMap = sellers.stream().collect(Collectors.toMap(Seller::getId, s -> s));
+
+
+        for (Order_Details order : orderDetails) {
+            Users user = usersMap.getOrDefault(order.getUser_id(), null);
+            Seller seller = sellerMap.getOrDefault(order.getSeller_id(), null);
+            if (user == null || seller == null) {
+                continue;
+            }
+            String orderTemplateTable = orderTemplateService.getOrderTemplateTable(order);
+            Optional<Spoc_Details> first = seller.getSpoc_details().stream().filter(Spoc_Details::isPrimary).findFirst();
+            if (first.isPresent()) {
+                Spoc_Details spocDetails = first.get();
+                String mailId = spocDetails.getEmail_id();
+                String firstName = spocDetails.getFirst_name();
+                String mailContent = firstName + "|" + orderTemplateTable;
+                MailBuilder mailBuilder = new MailBuilder();
+                mailBuilder.setTo(mailId);
+                mailBuilder.setContent(mailContent);
+                mailBuilder.setTemplate(MailTemplate.NEW_ORDER_ARRIVED);
+                emailSenderImpl.sendEmailHtmlTemplate(mailBuilder);
+            }
+        }
+    }
+}

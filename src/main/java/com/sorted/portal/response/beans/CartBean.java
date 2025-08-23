@@ -14,4 +14,5 @@ public class CartBean {
     private boolean is_free_delivery = false;
     private long total_count;
     private List<CartItems> cart_items;
+    private boolean isStoreOperational = true;
 }
