@@ -1,21 +1,11 @@
 package com.sorted.portal.assisting.beans;
 
 import lombok.Builder;
-import lombok.Data;
 
 import java.math.BigDecimal;
 
-@Data
 @Builder
-public class ProductDetailsBeanList {
+public record ProductDetailsBeanList(String name, String id, BigDecimal mrp, BigDecimal sellingPrice, Long quantity,
+                                     String image, String categoryId, Boolean secure, Integer groupId) {
 
-    private String name;
-    private String id;
-    private BigDecimal mrp;
-    private BigDecimal sellingPrice;
-    private Long quantity;
-    private String image;
-    private String categoryId;
-    private Boolean secure;
-    private Integer groupId;
 }

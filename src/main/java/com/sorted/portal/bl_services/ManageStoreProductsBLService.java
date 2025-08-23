@@ -7,6 +7,7 @@ import com.sorted.commons.exceptions.AccessDeniedException;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
+import com.sorted.portal.assisting.beans.ProductFindOneResBean;
 import com.sorted.portal.request.beans.FindProductBean;
 import com.sorted.portal.service.StoreProductService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,5 +41,21 @@ public class ManageStoreProductsBLService {
         }
 
         return storeProductService.getProductDetailsBeanLists(req, usersBean);
+    }
+
+    @PostMapping("/findOne")
+    public ProductFindOneResBean findOne(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+
+        FindProductBean req = request.getGenericRequestDataObject(FindProductBean.class);
+        CommonUtils.extractHeaders(httpServletRequest, req);
+        UsersBean usersBean = usersService.validateUserForActivity(req.getReq_user_id(), Activity.PRODUCTS,
+                Activity.INVENTORY_MANAGEMENT);
+        switch (usersBean.getRole().getUser_type()) {
+            case CUSTOMER, GUEST:
+                break;
+            default:
+                throw new AccessDeniedException();
+        }
+        return storeProductService.getProductDetails(req);
     }
 }

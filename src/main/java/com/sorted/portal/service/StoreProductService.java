@@ -3,12 +3,17 @@ package com.sorted.portal.service;
 import com.sorted.commons.beans.SelectedSubCategories;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
+import com.sorted.commons.entity.mongo.Category_Master;
 import com.sorted.commons.entity.mongo.Products;
+import com.sorted.commons.entity.service.Category_MasterService;
 import com.sorted.commons.entity.service.ProductService;
+import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
+import com.sorted.portal.assisting.beans.ProductFindOneResBean;
 import com.sorted.portal.request.beans.FindProductBean;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +31,7 @@ public class StoreProductService {
     @Value("${se.default.seller:68711a63a2dcdf55ed170972}")
     private String defaultSeller;
     private final SearchHistoryAsyncHelper searchHistoryAsyncHelper;
+    private final Category_MasterService category_MasterService;
 
     public List<ProductDetailsBeanList> getProductDetailsBeanLists(FindProductBean req, UsersBean usersBean) {
         AggregationFilter.SEFilter filterSE = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
@@ -79,6 +85,66 @@ public class StoreProductService {
         return list;
     }
 
+    public ProductFindOneResBean getProductDetails(FindProductBean req) {
+        Optional<Products> productsOptional = productService.findById(req.getId());
+        if (productsOptional.isEmpty()) {
+            return null;
+        }
+
+        Products product = productsOptional.get();
+
+
+        Category_Master category_Master = category_MasterService.findById(product.getCategory_id()).orElseThrow();
+        List<String> list_filterable = category_Master.getGroups().stream()
+                .flatMap(e -> e.getSub_categories().stream()).filter(Category_Master.SubCategory::isFilterable).map(Category_Master.SubCategory::getName)
+                .toList();
+        Map<String, List<String>> relatedFilters = new HashMap<>();
+
+        product.getSelected_sub_catagories().stream().filter(e -> list_filterable.contains(e.getSub_category()))
+                .forEach(s -> {
+                    if (!relatedFilters.containsKey(s.getSub_category())) {
+                        relatedFilters.put(s.getSub_category(), new ArrayList<>());
+                    }
+                    relatedFilters.get(s.getSub_category()).addAll(s.getSelected_attributes());
+                });
+
+        this.makeValuesUnique(relatedFilters);
+
+        if (CollectionUtils.isEmpty(relatedFilters)) {
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+        AggregationFilter.SEFilter filterRI = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
+        Map<String, Object> map = new HashMap<>();
+        for (Map.Entry<String, List<String>> entry : relatedFilters.entrySet()) {
+            if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
+                map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
+                map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
+            }
+        }
+        if (!map.isEmpty()) {
+            filterRI.addClause(AggregationFilter.WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+        }
+        filterRI.addClause(AggregationFilter.WhereClause.eq(Products.Fields.group_id, product.getGroup_id()));
+        filterRI.addClause(AggregationFilter.WhereClause.notEq(BaseMongoEntity.Fields.id, product.getId()));
+        filterRI.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Products> listRI = productService.repoFind(filterRI);
+
+        ProductFindOneResBean.ProductFindOneResBeanBuilder findOneResBeanBuilder = ProductFindOneResBean.builder()
+                .product(getResponseBean(product));
+        ProductDetailsBeanList productDetailsBeanList = getResponseBean(product);
+        if (!CollectionUtils.isEmpty(listRI)) {
+            List<ProductDetailsBeanList> list = new ArrayList<>();
+            for (Products p : listRI) {
+                list.add(getResponseBean(p));
+            }
+            findOneResBeanBuilder.relatedProducts(list);
+        }
+        return findOneResBeanBuilder.build();
+
+
+    }
+
     private static ProductDetailsBeanList getResponseBean(Products p) {
         return ProductDetailsBeanList.builder()
                 .name(p.getName())
@@ -91,5 +157,12 @@ public class StoreProductService {
                 .groupId(p.getGroup_id())
                 .secure(p.getIs_secure())
                 .build();
+    }
+
+    private void makeValuesUnique(Map<String, List<String>> map) {
+        for (Map.Entry<String, List<String>> entry : map.entrySet()) {
+            List<String> uniqueList = new ArrayList<>(new HashSet<>(entry.getValue()));
+            entry.setValue(uniqueList);
+        }
     }
 }
