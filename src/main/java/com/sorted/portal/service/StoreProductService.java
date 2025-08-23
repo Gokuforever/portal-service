@@ -93,7 +93,7 @@ public class StoreProductService {
 
         Category_Master category_Master = category_MasterService.findById(product.getCategory_id()).orElseThrow();
         List<String> list_filterable = category_Master.getGroups().stream()
-                .flatMap(e -> e.getSub_categories().stream()).filter(Category_Master.SubCategory::isFilterable).map(Category_Master.SubCategory::getName)
+                .flatMap(e -> e.getSub_categories().stream()).filter(Category_Master.SubCategory::isRelated_filterable).map(Category_Master.SubCategory::getName)
                 .toList();
         Map<String, List<String>> relatedFilters = new HashMap<>();
 

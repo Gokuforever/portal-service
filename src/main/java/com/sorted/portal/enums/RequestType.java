@@ -5,5 +5,6 @@ public enum RequestType {
     RZ_REFUND,
     PP_CREATE_ORDER,
     PP_CHECK_STATUS,
-    PP_REFUND
+    PP_REFUND,
+    PP_REFUND_STATUS
 }
