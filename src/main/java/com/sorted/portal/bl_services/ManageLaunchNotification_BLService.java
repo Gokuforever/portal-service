@@ -2,7 +2,9 @@ package com.sorted.portal.bl_services;
 
 import com.sorted.commons.entity.mongo.LaunchingEmail;
 import com.sorted.commons.entity.service.LaunchingEmailService;
+import com.sorted.commons.enums.MailTemplate;
 import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.helper.MailBuilder;
 import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.utils.Preconditions;
 import com.sorted.portal.request.beans.NotifyOnLaunch;
@@ -42,9 +44,18 @@ public class ManageLaunchNotification_BLService {
         if (launchingEmails.isEmpty()) {
             return;
         }
-        Set<String> emailIds = launchingEmails.stream().filter(e -> !e.isSent()).map(LaunchingEmail::getMail).collect(Collectors.toSet());
-        if (emailIds.isEmpty()) {
+        List<LaunchingEmail> list = launchingEmails.stream().filter(e -> !e.isSent()).toList();
+        if (list.isEmpty()) {
             return;
+        }
+        for (LaunchingEmail email : list) {
+            MailBuilder mailBuilder = new MailBuilder();
+            mailBuilder.setTo(email.getMail());
+            mailBuilder.setSubject(MailTemplate.LAUNCHING_MAIL.getSubject());
+            mailBuilder.setTemplate(MailTemplate.LAUNCHING_MAIL);
+            emailSenderImpl.sendEmailHtmlTemplate(mailBuilder);
+            email.setSent(true);
+            launchingEmailService.update(email.getId(), email, SYSTEM_ADMIN);
         }
     }
 }
