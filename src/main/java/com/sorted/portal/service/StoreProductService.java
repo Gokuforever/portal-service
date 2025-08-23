@@ -10,6 +10,7 @@ import com.sorted.commons.entity.service.ProductService;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter;
+import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
@@ -122,6 +123,9 @@ public class StoreProductService {
         filterRI.addClause(AggregationFilter.WhereClause.eq(Products.Fields.group_id, product.getGroup_id()));
         filterRI.addClause(AggregationFilter.WhereClause.notEq(BaseMongoEntity.Fields.id, product.getId()));
         filterRI.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        Pagination pagination = new Pagination(0, 12);
+        filterRI.setPagination(pagination);
 
         List<Products> listRI = productService.repoFind(filterRI);
         if (CollectionUtils.isEmpty(listRI)) {
