@@ -149,16 +149,33 @@ public class OrderStatusCheckService {
             log.info("status:: Order status updated to {} for order ID: {}", status, order_Details.getId());
 
             order_Details_Service.update(order_Details.getId(), order_Details, Defaults.SYSTEM_ADMIN);
+
+            updateOrderItems(order_Details, status);
             return isPaid;
         } else if (order_Details.getStatus().equals(OrderStatus.STORE_NOT_OPERATIONAL)) {
             boolean storeOperational = storeActivityService.isStoreOperational(order_Details.getSeller_id());
             if (storeOperational) {
                 order_Details.setStatus(OrderStatus.TRANSACTION_PROCESSED, Defaults.SYSTEM_ADMIN);
                 order_Details_Service.update(order_Details.getId(), order_Details, Defaults.SYSTEM_ADMIN);
+                updateOrderItems(order_Details, OrderStatus.TRANSACTION_PROCESSED);
                 return true;
             }
         }
         return false;
+    }
+
+    private void updateOrderItems(Order_Details order_Details, OrderStatus status) {
+        AggregationFilter.SEFilter filterOI = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
+        filterOI.addClause(AggregationFilter.WhereClause.eq(Order_Item.Fields.order_id, order_Details.getId()));
+        filterOI.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Order_Item> orderItems = order_Item_Service.repoFind(filterOI);
+        if (!CollectionUtils.isEmpty(orderItems)) {
+            for (Order_Item orderItem : orderItems) {
+                orderItem.setStatus(status, Defaults.SYSTEM_ADMIN);
+                order_Item_Service.update(orderItem.getId(), orderItem, Defaults.SYSTEM_ADMIN);
+            }
+        }
     }
 
     private List<OrderItemResponse> getOrderItemResponses(Order_Details order_Details) {
