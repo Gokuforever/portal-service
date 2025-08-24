@@ -278,7 +278,7 @@ public class OrderSearchService {
         }
 
         SEFilter filterI = new SEFilter(AggregationFilter.SEFilterType.AND);
-        filterI.addClause(AggregationFilter.WhereClause.eq(Invoice.Fields.orderId, orderDetails.getId()));
+        filterI.addClause(AggregationFilter.WhereClause.eq(Invoice.Fields.orderCode, orderDetails.getCode()));
         filterI.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         Invoice invoice = invoiceService.repoFindOne(filterI);
