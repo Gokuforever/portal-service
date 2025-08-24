@@ -1,6 +1,7 @@
 package com.sorted.portal.bl_services;
 
 import com.sorted.commons.beans.UsersBean;
+import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Order_Details;
 import com.sorted.commons.entity.mongo.Order_Item;
 import com.sorted.commons.entity.service.Order_Details_Service;
@@ -48,8 +49,10 @@ public class ManageStoreActivity_BLService {
         List<Order_Details> orderDetails = orderDetailsService.repoFind(filter);
         if (!CollectionUtils.isEmpty(orderDetails)) {
 
+            List<String> orderIds = orderDetails.stream().map(BaseMongoEntity::getId).collect(Collectors.toList());
+
             SEFilter filterOI = new SEFilter(SEFilterType.AND);
-            filterOI.addClause(WhereClause.eq(Order_Item.Fields.order_id, orderDetails.stream().map(Order_Details::getId).toList()));
+            filterOI.addClause(WhereClause.in(Order_Item.Fields.order_id, orderIds));
 
             List<Order_Item> orderItems = orderItemService.repoFind(filterOI);
             Map<String, List<Order_Item>> orderItemMap = orderItems.stream().collect(Collectors.groupingBy(Order_Item::getOrder_id));
