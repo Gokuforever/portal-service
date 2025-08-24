@@ -176,7 +176,7 @@ public class ManageTransaction_BLService {
             if (totalSum < 1) {
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_AMOUNT);
             }
-            if (minCartValueInPaise <= totalSum) {
+            if (minCartValueInPaise >= totalSum) {
                 if (cart.getDelivery_charges() == null || cart.getDelivery_charges() <= 0) {
 
                     GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address.getId(), seller.getAddress_id(), usersBean.getMobile_no(), usersBean.getFirst_name() + " " + usersBean.getLast_name());
