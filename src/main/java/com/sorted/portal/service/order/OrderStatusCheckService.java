@@ -8,9 +8,7 @@ import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
-import com.sorted.commons.enums.MailTemplate;
-import com.sorted.commons.enums.OrderStatus;
-import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.MailBuilder;
@@ -174,6 +172,27 @@ public class OrderStatusCheckService {
             for (Order_Item orderItem : orderItems) {
                 orderItem.setStatus(status, Defaults.SYSTEM_ADMIN);
                 order_Item_Service.update(orderItem.getId(), orderItem, Defaults.SYSTEM_ADMIN);
+            }
+        }
+
+        if (status.equals(OrderStatus.TRANSACTION_FAILED)) {
+            AggregationFilter.SEFilter filterC = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
+            filterC.addClause(AggregationFilter.WhereClause.eq(Cart.Fields.user_id, order_Details.getUser_id()));
+            filterC.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+            Cart cart = cart_Service.repoFindOne(filterC);
+            if (cart != null) {
+                List<Item> cartItems = cart.getCart_items();
+                for (Order_Item orderItem : orderItems) {
+                    Item item = new Item();
+                    item.setProduct_id(orderItem.getProduct_id());
+                    item.setQuantity(orderItem.getQuantity());
+                    item.setProduct_code(orderItem.getProduct_code());
+                    item.set_secure(orderItem.getType().equals(PurchaseType.SECURE));
+                    cartItems.add(item);
+                }
+                cart.setCart_items(cartItems);
+                cart_Service.update(cart.getId(), cart, Defaults.SYSTEM_ADMIN);
             }
         }
     }
