@@ -297,7 +297,6 @@ public class OrderSearchService {
                 .status(orderDetails.getStatus().getCustomer_status())
                 .transactionId(orderDetails.getTransaction_id())
                 .totalAmount(CommonUtils.paiseToRupee(orderDetails.getTotal_amount()))
-                .pickupAddress(orderDetails.getPickup_address().getFullAddress())
                 .deliveryAddress(orderDetails.getDelivery_address().getFullAddress())
                 .paymentMode(orderDetails.getPayment_mode())
                 .orderItems(orderItemsResBean)

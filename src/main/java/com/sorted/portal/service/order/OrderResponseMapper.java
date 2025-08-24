@@ -49,10 +49,7 @@ public class OrderResponseMapper {
                 .id(orderDetails.getId())
                 .code(orderDetails.getCode())
                 .status(orderDetails.getStatus().getInternal_status())
-                .transaction_id(orderDetails.getTransaction_id())
                 .total_amount(orderDetails.getTotal_amount())
-                .pickup_address(orderDetails.getPickup_address())
-                .delivery_address(orderDetails.getDelivery_address())
                 .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap))
                 .creation_date_str(orderDetails.getCreation_date_str())
                 .build();
@@ -63,7 +60,7 @@ public class OrderResponseMapper {
      *
      * @param orderDetails  Order details entity
      * @param orderItemsMap Map of order items by order ID
-     * @param mapS Map of sellers
+     * @param mapS          Map of sellers
      * @return FindOrderResBean
      */
     public FindOrderResBean mapToCustomerResponse(

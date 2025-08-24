@@ -17,8 +17,6 @@ public record FindOneOrderResBean(
         String transactionId,
         @JsonProperty("total_amount")
         BigDecimal totalAmount,
-        @JsonProperty("pickup_address")
-        String pickupAddress,
         @JsonProperty("delivery_address")
         String deliveryAddress,
         @JsonProperty("payment_mode")
