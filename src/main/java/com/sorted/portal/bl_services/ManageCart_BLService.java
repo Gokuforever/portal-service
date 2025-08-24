@@ -190,16 +190,7 @@ public class ManageCart_BLService {
                     throw new CustomIllegalArgumentsException(message);
                 }
 
-                SEFilter filterCM = new SEFilter(SEFilterType.AND);
-                filterCM.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, product.getCategory_id()));
-                filterCM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-                Category_Master category_Master = category_MasterService.repoFindOne(filterCM);
-                if (category_Master == null) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.MISSING_CATAGORY);
-                }
-
-                boolean secure_item = category_Master.isSecure_item();
+                boolean secure_item = product.getIs_secure();
                 boolean is_secure_item = itemBean.isSecure_item();
                 if (is_secure_item && !secure_item) {
                     throw new CustomIllegalArgumentsException(ResponseCode.CANNOT_SECURE);
