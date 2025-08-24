@@ -1,7 +1,6 @@
 package com.sorted.portal.service.order;
 
 import com.phonepe.sdk.pg.common.models.response.RefundResponse;
-import com.razorpay.RazorpayException;
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.beans.UsersBean;
@@ -17,8 +16,8 @@ import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.res.beans.CreateOrderResBean;
 import com.sorted.commons.porter.res.beans.FetchOrderRes.FareDetails;
 import com.sorted.commons.utils.CommonUtils;
+import com.sorted.commons.utils.InternalMailService;
 import com.sorted.portal.PhonePe.PhonePeUtility;
-import com.sorted.portal.razorpay.RazorpayUtility;
 import com.sorted.portal.request.beans.CreateDeliveryBean;
 import com.sorted.portal.request.beans.OrderAcceptRejectRequest;
 import lombok.RequiredArgsConstructor;
@@ -42,8 +41,8 @@ public class OrderProcessingService {
     private final Order_Item_Service orderItemService;
     private final OrderValidationService validationService;
     private final OrderDeliveryService deliveryService;
-    private final RazorpayUtility razorpayUtility;
     private final PhonePeUtility phonePeUtility;
+    private final InternalMailService internalMailService;
 
     /**
      * Process ready for pickup operation
@@ -100,7 +99,7 @@ public class OrderProcessingService {
      * @param req Request bean
      * @return SEResponse indicating success or failure
      */
-    public SEResponse processAcceptReject(OrderAcceptRejectRequest req) throws RazorpayException {
+    public SEResponse processAcceptReject(OrderAcceptRejectRequest req) {
         log.info("Processing order accept/reject for order ID: {}", req.getOrderId());
 
         // Validate user
@@ -130,8 +129,6 @@ public class OrderProcessingService {
         orderDetails.setStatus(OrderStatus.ORDER_ACCEPTED, userId);
         orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
 
-        //TODO: send notification mail and sms to seller
-
         log.info("Order accepted successfully: {}", orderDetails.getId());
         return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
     }
@@ -144,8 +141,7 @@ public class OrderProcessingService {
      * @param userId       User ID
      * @return SEResponse indicating success
      */
-    private SEResponse processOrderReject(Order_Details orderDetails, String remarks, String userId)
-            throws RazorpayException {
+    private SEResponse processOrderReject(Order_Details orderDetails, String remarks, String userId) {
         log.info("Processing order rejection for order ID: {}", orderDetails.getId());
 
         orderDetails.setStatus(OrderStatus.ORDER_REJECTED, userId);
@@ -182,8 +178,8 @@ public class OrderProcessingService {
             // TODO: amount refunded
         } else if (orderStatus == OrderStatus.REFUND_FAILED) {
             // TODO: refund initiated
-            // TODO: trigger internal mail for refund failure
             // TODO: create cron job for retry
+            internalMailService.sendMailOnError("Refund failed for order ID: " + orderDetails.getId(), "Refund failed for order ID: " + orderDetails.getId(), null);
         } else {
             // TODO: refund initiated
         }

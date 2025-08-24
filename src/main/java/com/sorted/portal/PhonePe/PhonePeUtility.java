@@ -5,6 +5,7 @@ import com.phonepe.sdk.pg.common.exception.PhonePeException;
 import com.phonepe.sdk.pg.common.models.request.RefundRequest;
 import com.phonepe.sdk.pg.common.models.response.OrderStatusResponse;
 import com.phonepe.sdk.pg.common.models.response.RefundResponse;
+import com.phonepe.sdk.pg.common.models.response.RefundStatusResponse;
 import com.phonepe.sdk.pg.payments.v2.StandardCheckoutClient;
 import com.phonepe.sdk.pg.payments.v2.models.request.StandardCheckoutPayRequest;
 import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayResponse;
@@ -89,6 +90,30 @@ public class PhonePeUtility {
             thirdPartyRequestResponseService.registerException(register, message);
             return Optional.empty();
         }
+    }
+
+    public Optional<String> refundStatus(String refundId) {
+        Third_Party_Api register = thirdPartyRequestResponseService.register(refundId, RequestType.PP_REFUND_STATUS);
+
+        try {
+            RefundStatusResponse refundStatus = client.getRefundStatus(refundId);
+            return Optional.of(refundStatus.getState());
+        } catch (PhonePeException phonePeException) {
+            Integer httpStatusCode = phonePeException.getHttpStatusCode();
+            String message = phonePeException.getMessage();
+            Map<String, Object> data = phonePeException.getData();
+            String code = phonePeException.getCode();
+
+            logger.error("PhonePe refund status check failed - Code: {}, Message: {}, Status: {}, RefundId: {}",
+                    code, message, httpStatusCode, refundId);
+            thirdPartyRequestResponseService.registerException(register, message);
+            return Optional.empty();
+        } catch (Exception e) {
+            logger.error("PhonePe refund status check failed - Code: {}, Message: {}, Status: {}, RefundId: {}",
+                    "500", e.getMessage(), 500, refundId);
+            throw new RuntimeException(e);
+        }
+
     }
 
     public Optional<OrderStatusResponse> checkStatus(String orderId) {

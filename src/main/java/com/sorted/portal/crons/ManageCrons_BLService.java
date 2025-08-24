@@ -17,6 +17,7 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.MailBuilder;
 import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.porter.res.beans.FetchOrderRes;
+import com.sorted.commons.utils.InternalMailService;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.service.order.OrderStatusCheckService;
 import com.sorted.portal.service.order.OrderTemplateService;
@@ -28,6 +29,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.security.InvalidParameterException;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -53,6 +55,7 @@ public class ManageCrons_BLService {
     private final SecureReturnService secureReturnService;
     private final Users_Service usersService;
     private final EmailSenderImpl emailSenderImpl;
+    private final InternalMailService internalMailService;
 
     //    @Scheduled(fixedRate = 10000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
@@ -111,7 +114,7 @@ public class ManageCrons_BLService {
     private void updateOrderStatus(Order_Details details) {
         FetchOrderRes fetchOrderRes = porterUtility.getOrder(details.getDp_order_id());
         if (!details.getDp_order_id().equals(fetchOrderRes.getOrder_id())) {
-            // TODO:: send mail to Studeaze team
+            internalMailService.sendMailOnError("Order id mismatch from porter.", details.getDp_order_id(), new InvalidParameterException("Order id mismatch from porter."));
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
         porterUtility.updateOrderStatus(details, fetchOrderRes.getStatus(), fetchOrderRes.getFare_details());

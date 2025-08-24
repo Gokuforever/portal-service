@@ -2,7 +2,6 @@ package com.sorted.portal.bl_services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayResponse;
-import com.razorpay.RazorpayException;
 import com.sorted.commons.beans.*;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.*;
@@ -13,15 +12,16 @@ import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
-import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.GsonUtils;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.PhonePe.PhonePeUtility;
-import com.sorted.portal.razorpay.RazorpayUtility;
 import com.sorted.portal.request.beans.PayNowBean;
-import com.sorted.portal.response.beans.*;
+import com.sorted.portal.response.beans.AddressResponse;
+import com.sorted.portal.response.beans.FindOneOrder;
+import com.sorted.portal.response.beans.OrderItemResponse;
+import com.sorted.portal.response.beans.PayNowResponse;
 import com.sorted.portal.service.OrderService;
 import com.sorted.portal.service.order.OrderStatusCheckService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,9 +34,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.ws.rs.NotFoundException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -50,8 +48,6 @@ public class ManageTransaction_BLService {
     private final ProductService productService;
     private final Address_Service address_Service;
     private final Order_Details_Service order_Details_Service;
-    private final Order_Item_Service order_Item_Service;
-    private final RazorpayUtility razorpayUtility;
     private final Seller_Service seller_Service;
     private final Order_Dump_Service orderDumpService;
     private final OrderService orderService;
@@ -300,23 +296,6 @@ public class ManageTransaction_BLService {
         return cart;
     }
 
-    private LocalDateTime validateCartItems(List<Item> cart_items, PayNowBean req) {
-        LocalDateTime return_date = null;
-        boolean has_secure = cart_items.stream().anyMatch(Item::is_secure);
-        if (has_secure) {
-            if (!StringUtils.hasText(req.getReturn_date())) {
-                throw new CustomIllegalArgumentsException(ResponseCode.MISSING_RETURN_DATE);
-            }
-            try {
-                return_date = LocalDate.parse(req.getReturn_date()).atTime(LocalTime.MAX);
-            } catch (Exception e) {
-                log.error("pay:: Exception occurred:: {}", e.getMessage());
-                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_RETURN_DATE);
-            }
-        }
-        return return_date;
-    }
-
     private List<Products> getProductsForCart(List<Item> cart_items) {
         Set<String> product_ids = cart_items.stream().map(Item::getProduct_id).collect(Collectors.toSet());
 
@@ -457,133 +436,4 @@ public class ManageTransaction_BLService {
         return order_Item;
     }
 
-    @PostMapping("/saveResponse")
-    public SEResponse saveResponse(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
-        try {
-            log.info("/saveResponse:: API started!");
-            PGResponseBean req = request.getGenericRequestDataObject(PGResponseBean.class);
-
-            // Validate request parameters
-            validatePGResponse(req);
-
-            // Find order details
-            Order_Details order_details = findOrderDetailsByPgOrderId(req.getRazorpay_order_id());
-
-            // Find order items
-            List<Order_Item> items = findOrderItems(order_details.getId());
-
-            // Extract product IDs
-            List<String> product_ids = items.stream().map(Order_Item::getProduct_id).toList();
-
-            // Determine order status and process payment
-            OrderStatus orderStatus = processPaymentVerification(req, order_details, product_ids);
-
-            // Update order items status
-            updateOrderItemsStatus(items, orderStatus);
-
-            // Update order status
-            order_details.setStatus(orderStatus, Defaults.SYSTEM_ADMIN);
-            order_Details_Service.update(order_details.getId(), order_details, Defaults.SYSTEM_ADMIN);
-
-            log.info("/saveResponse:: API ended!");
-            return SEResponse.getEmptySuccessResponse(ResponseCode.ORDER_PLACED);
-        } catch (CustomIllegalArgumentsException ex) {
-            throw ex;
-        } catch (Exception e) {
-            log.error("/saveResponse:: exception occurred");
-            log.error("/saveResponse:: {}", e.getMessage());
-            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-        }
-    }
-
-    private void validatePGResponse(PGResponseBean req) {
-        if (!StringUtils.hasText(req.getRazorpay_order_id()) ||
-                !StringUtils.hasText(req.getRazorpay_payment_id()) ||
-                !StringUtils.hasText(req.getRazorpay_signature())) {
-            throw new CustomIllegalArgumentsException(ResponseCode.PG_BAD_REQ);
-        }
-    }
-
-    private Order_Details findOrderDetailsByPgOrderId(String pgOrderId) {
-        SEFilter filterO = new SEFilter(SEFilterType.AND);
-        filterO.addClause(WhereClause.eq(Order_Details.Fields.pg_order_id, pgOrderId));
-        filterO.addClause(WhereClause.eq(Order_Details.Fields.status, OrderStatus.ORDER_PLACED.name()));
-        filterO.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-        Order_Details order_details = order_Details_Service.repoFindOne(filterO);
-        if (order_details == null) {
-            throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
-        }
-        return order_details;
-    }
-
-    private List<Order_Item> findOrderItems(String orderId) {
-        SEFilter filterOD = new SEFilter(SEFilterType.AND);
-        filterOD.addClause(WhereClause.eq(Order_Item.Fields.order_id, orderId));
-        filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-        List<Order_Item> items = order_Item_Service.repoFind(filterOD);
-        if (CollectionUtils.isEmpty(items)) {
-            throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
-        }
-        return items;
-    }
-
-    private OrderStatus processPaymentVerification(PGResponseBean req, Order_Details order_details, List<String> product_ids) throws RazorpayException {
-        OrderStatus orderStatus;
-
-        if (!StringUtils.hasText(req.getRazorpay_payment_id())) {
-            orderStatus = OrderStatus.TRANSACTION_FAILED;
-            // Note: Consider increasing product quantity for failed transactions
-        } else {
-            boolean verified = razorpayUtility.verifySignature(
-                    req.getRazorpay_order_id(),
-                    req.getRazorpay_payment_id(),
-                    req.getRazorpay_signature()
-            );
-
-            if (!verified) {
-                throw new CustomIllegalArgumentsException(ResponseCode.UNTRUSTED_RESPONSE);
-            }
-
-            // Update cart by removing purchased items
-            updateCartAfterSuccessfulPayment(order_details.getUser_id(), product_ids);
-
-            // Set transaction ID and update status
-            order_details.setTransaction_id(req.getRazorpay_payment_id());
-            orderStatus = OrderStatus.TRANSACTION_PROCESSED;
-        }
-
-        return orderStatus;
-    }
-
-    private void updateCartAfterSuccessfulPayment(String userId, List<String> product_ids) {
-        SEFilter filterC = new SEFilter(SEFilterType.AND);
-        filterC.addClause(WhereClause.eq(Cart.Fields.user_id, userId));
-        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-        Cart cart = cart_Service.repoFindOne(filterC);
-        if (cart == null) {
-            throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
-        }
-
-        List<Item> remainingItems = cart.getCart_items().stream()
-                .filter(e -> !product_ids.contains(e.getProduct_id()))
-                .toList();
-
-        if (!CollectionUtils.isEmpty(remainingItems)) {
-            cart.setCart_items(remainingItems);
-        } else {
-            cart.setCart_items(null);
-        }
-
-        cart_Service.update(cart.getId(), cart, Defaults.SYSTEM_ADMIN);
-    }
-
-    private void updateOrderItemsStatus(List<Order_Item> items, OrderStatus orderStatus) {
-        for (Order_Item item : items) {
-            item.setStatus(orderStatus, Defaults.SYSTEM_ADMIN);
-            order_Item_Service.update(item.getId(), item, Defaults.SYSTEM_ADMIN);
-        }
-    }
 }

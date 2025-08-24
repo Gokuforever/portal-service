@@ -30,7 +30,7 @@
         <dependency>
             <groupId>com.sorted</groupId>
             <artifactId>se-commons</artifactId>
-            <version>25.08.27-SNAPSHOT</version>
+            <version>25.08.28-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -72,13 +72,7 @@
             <artifactId>pg-sdk-java</artifactId>
             <version>2.1.0</version>
         </dependency>
-        
-<!-- For async logging -->
-        <dependency>
-            <groupId>com.lmax</groupId>
-            <artifactId>disruptor</artifactId>
-            <version>3.4.4</version>
-        </dependency>
+
     </dependencies>
 
     <repositories>

@@ -2,7 +2,6 @@ package com.sorted.portal.bl_services;
 
 // Java standard imports
 
-import com.razorpay.RazorpayException;
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.entity.mongo.Order_Details;
@@ -95,7 +94,7 @@ public class ManageOrder_BLService {
      * @return A response indicating the success or failure of the operation
      */
     @PostMapping("/order/accept-or-reject")
-    public SEResponse acceptOrReject(@RequestBody SERequest request, HttpServletRequest httpServletRequest) throws RazorpayException {
+    public SEResponse acceptOrReject(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("acceptOrReject:: API started!");
         OrderAcceptRejectRequest req = request.getGenericRequestDataObject(OrderAcceptRejectRequest.class);
         CommonUtils.extractHeaders(httpServletRequest, req);

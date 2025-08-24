@@ -13,6 +13,7 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -31,6 +32,8 @@ public class SecureReturnDataService {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         filter.addClause(WhereClause.eq(Order_Details.Fields.secured_time_slot, timeSlot.name()));
+        filter.addClause(WhereClause.eq(Order_Details.Fields.secured_time_slot, timeSlot.name()));
+        filter.addClause(WhereClause.eq(Order_Details.Fields.secured_date, LocalDate.now()));
         filter.addClause(WhereClause.eq(Order_Details.Fields.status_id, OrderStatus.SECURE_RETURN_INITIATED.getId()));
         return orderDetailsService.repoFind(filter);
     }
