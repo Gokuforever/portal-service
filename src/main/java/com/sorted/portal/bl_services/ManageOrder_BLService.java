@@ -18,10 +18,7 @@ import com.sorted.portal.enums.OrderProperties;
 import com.sorted.portal.request.beans.CreateDeliveryBean;
 import com.sorted.portal.request.beans.FindOrderReqBean;
 import com.sorted.portal.request.beans.OrderAcceptRejectRequest;
-import com.sorted.portal.response.beans.FindOrderResBean;
-import com.sorted.portal.response.beans.OrderItemDTO;
-import com.sorted.portal.response.beans.OrderItemReportsDTO;
-import com.sorted.portal.response.beans.OrderReportDTO;
+import com.sorted.portal.response.beans.*;
 import com.sorted.portal.service.FileGeneratorUtil;
 import com.sorted.portal.service.order.OrderProcessingService;
 import com.sorted.portal.service.order.OrderSearchService;
@@ -133,6 +130,13 @@ public class ManageOrder_BLService {
         log.info("find:: API started for customer order search");
         FindOrderReqBean req = request.getGenericRequestDataObject(FindOrderReqBean.class);
         return orderSearchService.findOrdersForCustomer(req, httpServletRequest);
+    }
+
+    @PostMapping("/order/store/findOne")
+    public FindOneOrderResBean findOne(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+        log.info("findOne:: API started for customer order search");
+        FindOrderReqBean req = request.getGenericRequestDataObject(FindOrderReqBean.class);
+        return orderSearchService.findOne(req, httpServletRequest);
     }
 
     /**

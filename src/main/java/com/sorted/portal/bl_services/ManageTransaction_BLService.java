@@ -194,7 +194,7 @@ public class ManageTransaction_BLService {
 //            }
 
             // Create order
-            Order_Details order = createOrder(usersBean, seller.getId(), totalSum, address, sellerAddress);
+            Order_Details order = createOrder(usersBean, seller.getId(), totalSum, address, sellerAddress, cart.getDelivery_charges() == null ? 0L : cart.getDelivery_charges());
 
             // Reduce product quantity
             orderService.reduceProductQuantity(mapP.values().stream().toList(), mapSecurePQ);
@@ -361,7 +361,7 @@ public class ManageTransaction_BLService {
         return listOI;
     }
 
-    private Order_Details createOrder(UsersBean usersBean, String seller_id, long totalSum, Address deliveryAddress, Address sellerAddress) {
+    private Order_Details createOrder(UsersBean usersBean, String seller_id, long totalSum, Address deliveryAddress, Address sellerAddress, long deliveryCharges) {
         Order_Details order = new Order_Details();
 
         if (StringUtils.hasText(usersBean.getId())) {
@@ -370,15 +370,12 @@ public class ManageTransaction_BLService {
         order.setSeller_id(seller_id);
         order.setTotal_amount(totalSum);
         order.setStatus(OrderStatus.ORDER_PLACED, usersBean.getId());
-        Order_Status_History order_history = Order_Status_History.builder().status(OrderStatus.ORDER_PLACED)
-                .modification_date(LocalDateTime.now()).modified_by(usersBean.getId()).build();
-        order.setOrder_status_history(Collections.singletonList(order_history));
-
         AddressDTO del_address = createAddressDTOFromAddress(deliveryAddress);
         AddressDTO pickup_address = createAddressDTOFromAddress(sellerAddress);
 
         order.setPickup_address(pickup_address);
         order.setDelivery_address(del_address);
+        order.setEstimated_delivery_charges(deliveryCharges);
 
         return order;
     }

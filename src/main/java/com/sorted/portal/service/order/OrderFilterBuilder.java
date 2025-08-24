@@ -81,6 +81,24 @@ public class OrderFilterBuilder {
         return filterOD;
     }
 
+    public SEFilter buildOrderFindOneFilter(FindOrderReqBean req, UsersBean usersBean) {
+        log.debug("Building order fineOne filter with search criteria for user: {}", req.getReq_user_id());
+
+        SEFilter filterOD = new SEFilter(SEFilterType.AND);
+
+        // Apply user-specific filters based on role
+        applyUserRoleFilters(filterOD, usersBean, req);
+
+        // Apply optional filters based on request parameters
+        applyCodeFilter(filterOD, req);
+
+        // Always filter out deleted records
+        filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        return filterOD;
+    }
+
+
     /**
      * Build filter for order items by order IDs
      *
@@ -97,12 +115,24 @@ public class OrderFilterBuilder {
         return filterOI;
     }
 
-    /**
-     * Build filter for products by IDs
-     *
-     * @param productIds List of product IDs
-     * @return SEFilter for products
-     */
+    public SEFilter buildOrderItemsFilter(String orderId) {
+        log.debug("Building find order items for order id {}", orderId);
+
+        SEFilter filterOI = new SEFilter(SEFilterType.AND);
+        filterOI.addClause(WhereClause.eq(Order_Item.Fields.order_id, orderId));
+        filterOI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        return filterOI;
+    }
+
+
+
+        /**
+         * Build filter for products by IDs
+         *
+         * @param productIds List of product IDs
+         * @return SEFilter for products
+         */
     public SEFilter buildProductFilter(List<String> productIds) {
         log.debug("Building products filter for {} products", productIds.size());
 
