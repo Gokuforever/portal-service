@@ -235,35 +235,28 @@ public class OrderFilterBuilder {
     private List<OrderStatus> getByCustomerStatus(String customerStatus) {
         log.debug("Getting order statuses for customer status: {}", customerStatus);
 
-        switch (customerStatus.toUpperCase()) {
-            case "PENDING":
-                return List.of(
-                        OrderStatus.TRANSACTION_PROCESSED,
-                        OrderStatus.ORDER_ACCEPTED
-                );
-
-            case "PROCESSING":
-                return List.of(
-                        OrderStatus.READY_FOR_PICK_UP,
-                        OrderStatus.RIDER_ASSIGNED,
-                        OrderStatus.OUT_FOR_DELIVERY
-                );
-
-            case "DELIVERED":
-                return List.of(OrderStatus.DELIVERED);
-
-            case "CANCELLED":
-                return List.of(
-                        OrderStatus.ORDER_REJECTED,
-                        OrderStatus.PENDING_REFUND,
-                        OrderStatus.REFUND_REQUESTED,
-                        OrderStatus.REFUND_FAILED,
-                        OrderStatus.FULLY_REFUNDED
-                );
-
-            default:
+        return switch (customerStatus.toUpperCase()) {
+            case "PENDING" -> List.of(
+                    OrderStatus.TRANSACTION_PROCESSED,
+                    OrderStatus.ORDER_ACCEPTED
+            );
+            case "PROCESSING" -> List.of(
+                    OrderStatus.READY_FOR_PICK_UP,
+                    OrderStatus.RIDER_ASSIGNED,
+                    OrderStatus.OUT_FOR_DELIVERY
+            );
+            case "DELIVERED" -> List.of(OrderStatus.DELIVERED);
+            case "CANCELLED" -> List.of(
+                    OrderStatus.ORDER_REJECTED,
+                    OrderStatus.PENDING_REFUND,
+                    OrderStatus.REFUND_REQUESTED,
+                    OrderStatus.REFUND_FAILED,
+                    OrderStatus.FULLY_REFUNDED
+            );
+            default -> {
                 log.warn("Unknown customer status: {}", customerStatus);
-                return List.of();
-        }
+                yield List.of();
+            }
+        };
     }
 } 
