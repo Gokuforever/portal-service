@@ -795,6 +795,7 @@ public class ManageProduct_BLService {
         if (StringUtils.hasText(req.getCategory_id())) {
             filterSE.addClause(WhereClause.eq(Products.Fields.category_id, req.getCategory_id()));
         }
+        filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, "68711a63a2dcdf55ed170972"));
 
         if (req.getGroup_id() != null) {
 //            if (!CollectionUtils.isEmpty(req.getFilters())) {
