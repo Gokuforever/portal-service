@@ -268,8 +268,6 @@ public class ManageOrder_BLService {
     private FindOrderResBean entToBean(Order_Details order_Details, Map<String, List<Order_Item>> mapOI, Map<String, Products> mapP) {
         return FindOrderResBean.builder().id(order_Details.getId()).code(order_Details.getCode())
                 .status(order_Details.getStatus().getInternal_status())
-                .transaction_id(order_Details.getTransaction_id()).total_amount(order_Details.getTotal_amount())
-                .pickup_address(order_Details.getPickup_address()).delivery_address(order_Details.getDelivery_address())
                 .orderItems(mapOI.get(order_Details.getId()).stream().map(orderItem -> this.entToBean(orderItem, mapP)).toList())
                 .creation_date_str(order_Details.getCreation_date_str())
                 .build();
