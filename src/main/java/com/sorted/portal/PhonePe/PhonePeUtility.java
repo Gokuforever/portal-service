@@ -46,7 +46,6 @@ public class PhonePeUtility {
 
     @PostConstruct
     public void init() {
-        // Initialize after Spring injection is complete
         Env env = Env.valueOf(phonePeEnv);
         Integer clientVersion = 1;
         client = StandardCheckoutClient.getInstance(clientId, clientSecret, clientVersion, env);
