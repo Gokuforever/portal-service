@@ -86,6 +86,7 @@ public class PortalServiceInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, @NotNull HttpServletResponse response, @NotNull Object handler)
             throws Exception {
+        log.info("Intercepting request: {}", request.getRequestURI());
 
         String requestUri = request.getRequestURI();
         String origin = request.getHeader("Origin");
