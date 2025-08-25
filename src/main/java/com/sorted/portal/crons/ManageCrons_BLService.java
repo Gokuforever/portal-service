@@ -57,7 +57,7 @@ public class ManageCrons_BLService {
     private final EmailSenderImpl emailSenderImpl;
     private final InternalMailService internalMailService;
 
-    //    @Scheduled(fixedRate = 10000) // Executes every 5000ms (5 seconds)
+    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
@@ -84,7 +84,7 @@ public class ManageCrons_BLService {
 
     }
 
-    //	@Scheduled(fixedRate = 5000) // Executes every 5000ms (5 seconds)
+    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheckForCancelledOrders() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));

@@ -12,6 +12,7 @@ import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayRespons
 import com.sorted.commons.entity.mongo.Third_Party_Api;
 import com.sorted.portal.enums.RequestType;
 import com.sorted.portal.service.ThirdPartyRequestResponseService;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,15 +31,27 @@ public class PhonePeUtility {
     @Value("${se.front.end.base_url}")
     private String baseUrl;
 
-    String clientId = "TEST-M22E4KYKJXIAV_25050";
-    String clientSecret = "NGQxNzFmMWYtMjljYy00MzI2LWIxYjAtNzFjMzIxMTJiNTY1";
-    Integer clientVersion = 1;  //insert your client version here
-    Env env = Env.SANDBOX;      //change to Env.PRODUCTION when you go live
+    @Value("${se.phone.pe.client.id}")
+    private String clientId;
 
-    StandardCheckoutClient client = StandardCheckoutClient.getInstance(clientId, clientSecret,
-            clientVersion, env);
+    @Value("${se.phone.pe.client.secret}")
+    private String clientSecret;
+
+    @Value("${se.phone.pe.env}")
+    private String phonePeEnv;
+
+    private StandardCheckoutClient client;
 
     private final ThirdPartyRequestResponseService thirdPartyRequestResponseService;
+
+    @PostConstruct
+    public void init() {
+        // Initialize after Spring injection is complete
+        Env env = Env.valueOf(phonePeEnv);
+        Integer clientVersion = 1;
+        client = StandardCheckoutClient.getInstance(clientId, clientSecret, clientVersion, env);
+        logger.info("PhonePe client initialized with environment: {}", phonePeEnv);
+    }
 
     public Optional<StandardCheckoutPayResponse> createOrder(String orderId, long amount) {
         StandardCheckoutPayRequest standardCheckoutPayRequest = StandardCheckoutPayRequest.builder()
