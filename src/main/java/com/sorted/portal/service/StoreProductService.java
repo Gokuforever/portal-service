@@ -61,6 +61,7 @@ public class StoreProductService {
             filterSE.addNodes(filterNodes);
         }
         filterSE.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterSE.addClause(AggregationFilter.WhereClause.isNotEmpty("media.cdn_url"));
         if (StringUtils.hasText(req.getSort_by())) {
             AggregationFilter.OrderBy sort = switch (req.getSort_by()) {
                 case "price_low_to_high" ->
