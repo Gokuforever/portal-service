@@ -116,6 +116,8 @@ jobs:
             -e SE_ENV=/app/config \
             -e SPRING_PROFILES_ACTIVE=dev \
             -e LOG_DIR=/app/logs \
+            -e TZ=Asia/Kolkata \
+            -e JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Kolkata" \
             --mount type=bind,source=/home/ubuntu/studeaze/config,target=/app/config \
             --mount type=bind,source=/home/ubuntu/studeaze/logs,target=/app/logs \
             --mount type=bind,source=/home/ubuntu/api.studeaze.in.keystore.p12,target=/app/ssl/api.studeaze.in.keystore.p12 \
