@@ -835,6 +835,7 @@ public class ManageProduct_BLService {
             }
         }
         filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterSE.addClause(WhereClause.isNotEmpty("media.cdn_url"));
         if (StringUtils.hasText(req.getSort_by())) {
             OrderBy sort = switch (req.getSort_by()) {
                 case "price_low_to_high" -> new OrderBy(Products.Fields.selling_price, SortOrder.ASC);
@@ -875,6 +876,9 @@ public class ManageProduct_BLService {
 //        }
         Map<String, Category_Master> mapCM = this.getCategoryMaster(products, category_ids);
         for (Products product : products) {
+            if(CollectionUtils.isEmpty(product.getMedia())) {
+                continue;
+            }
             Category_Master category_Master = mapCM.get(product.getCategory_id());
             ProductDetailsBean productDetailsBean = this.convertProductToBean(product, category_Master);
 //            if (StringUtils.hasText(product.getVarient_mapping_id()) && !CollectionUtils.isEmpty(variantMap)
