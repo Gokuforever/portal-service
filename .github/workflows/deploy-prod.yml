@@ -118,7 +118,7 @@ jobs:
             -e LOG_DIR=/app/logs \
             --mount type=bind,source=/home/ubuntu/studeaze/config,target=/app/config \
             --mount type=bind,source=/home/ubuntu/studeaze/logs,target=/app/logs \
-            --mount type=bind,source=/home/ubuntu/prod-api.studeaze.in.p12,target=/app/ssl/prod-api.studeaze.in.p12 \
+            --mount type=bind,source=/home/ubuntu/portal-api.studeaze.in.p12,target=/app/ssl/portal-api.studeaze.in.p12 \
             ghcr.io/gokuforever/portal-service:latest
           
           echo "*** Verifying deployment ***"
