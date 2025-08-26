@@ -207,6 +207,7 @@ public class ManageTransaction_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_AMOUNT);
             }
 
+            long deliveryCharge = 0L;
             // Handle delivery charges
             if (minCartValueInPaise >= totalSum) {
                 log.info("pay:: Cart value {} is below minimum {}, checking delivery charges",
@@ -224,10 +225,10 @@ public class ManageTransaction_BLService {
                         throw new CustomIllegalArgumentsException(ResponseCode.NOT_DELIVERIBLE);
                     }
 
-                    long deliveryCharges = quote.getVehicle().getFare().getMinor_amount();
-                    log.info("pay:: Delivery charges calculated: {} paise", deliveryCharges);
+                    deliveryCharge = quote.getVehicle().getFare().getMinor_amount();
+                    log.info("pay:: Delivery charges calculated: {} paise", deliveryCharge);
 
-                    cart.setDelivery_charges(deliveryCharges);
+                    cart.setDelivery_charges(deliveryCharge);
                     cart_Service.update(cart.getId(), cart, usersBean.getId());
                     log.debug("pay:: Cart updated with delivery charges");
                 }
@@ -241,7 +242,7 @@ public class ManageTransaction_BLService {
             // Create order
             log.debug("pay:: Creating order entity");
             Order_Details order = createOrder(usersBean, seller.getId(), totalSum, address, sellerAddress,
-                    cart.getDelivery_charges() == null ? 0L : cart.getDelivery_charges());
+                    deliveryCharge);
             log.info("pay:: Order entity created with total amount: {} paise", totalSum);
 
             // Reduce product quantity
@@ -510,6 +511,8 @@ public class ManageTransaction_BLService {
 
         order.setPickup_address(pickup_address);
         order.setDelivery_address(del_address);
+        order.setDelivery_charges(deliveryCharges);
+        order.setTotal_items_cost(totalSum - deliveryCharges);
         order.setEstimated_delivery_charges(deliveryCharges);
 
         return order;
