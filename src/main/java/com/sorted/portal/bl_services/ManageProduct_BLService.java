@@ -835,7 +835,6 @@ public class ManageProduct_BLService {
             }
         }
         filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        filterSE.addClause(WhereClause.isNotEmpty("media.cdn_url"));
         if (StringUtils.hasText(req.getSort_by())) {
             OrderBy sort = switch (req.getSort_by()) {
                 case "price_low_to_high" -> new OrderBy(Products.Fields.selling_price, SortOrder.ASC);
