@@ -122,6 +122,7 @@ public class ManageCrons_BLService {
 
     @Scheduled(fixedRate = 30000) // Executes every 60000ms (1 minute)
     public void phonePeStatusCheckForPendingTransactions() {
+        log.info("PhonePe Status Check For Pending Transactions");
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         filterOD.addClause(

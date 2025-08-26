@@ -758,32 +758,32 @@ public class ManageProduct_BLService {
                 filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, usersBean.getRole().getSeller_id()));
                 break;
             case CUSTOMER, GUEST:
-                String nearest_seller_id;
-                boolean storeOperational = false;
-                String nearest_seller = usersBean.getNearestSeller();
-                if (StringUtils.hasText(nearest_seller)) {
-                    storeOperational = storeActivityService.isStoreOperational(nearest_seller);
-                }
-                if (StringUtils.hasText(usersBean.getNearestPincode()) && (!storeOperational || !StringUtils.hasText(nearest_seller))) {
-                    NearestSellerRes nearestSeller = porterUtility.getNearestSeller(usersBean.getNearestPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
-                    nearest_seller_id = nearestSeller.getSeller_id();
-                    if (!nearest_seller_id.equals(nearest_seller)) {
-                        String user_id = usersBean.getId();
-                        SEFilter filterU = new SEFilter(SEFilterType.AND);
-                        filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, user_id));
-                        filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-                        Users users = users_Service.repoFindOne(filterU);
-                        users.setNearestSeller(nearest_seller_id);
-
-                        users_Service.update(user_id, users, user_id);
-                    }
-                } else {
-                    nearest_seller_id = defaultSeller;
-                }
-                if (StringUtils.hasText(nearest_seller_id)) {
-                    filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, nearest_seller_id));
-                }
+//                String nearest_seller_id;
+//                boolean storeOperational = false;
+//                String nearest_seller = usersBean.getNearestSeller();
+//                if (StringUtils.hasText(nearest_seller)) {
+//                    storeOperational = storeActivityService.isStoreOperational(nearest_seller);
+//                }
+//                if (StringUtils.hasText(usersBean.getNearestPincode()) && (!storeOperational || !StringUtils.hasText(nearest_seller))) {
+//                    NearestSellerRes nearestSeller = porterUtility.getNearestSeller(usersBean.getNearestPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
+//                    nearest_seller_id = nearestSeller.getSeller_id();
+//                    if (!nearest_seller_id.equals(nearest_seller)) {
+//                        String user_id = usersBean.getId();
+//                        SEFilter filterU = new SEFilter(SEFilterType.AND);
+//                        filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, user_id));
+//                        filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//
+//                        Users users = users_Service.repoFindOne(filterU);
+//                        users.setNearestSeller(nearest_seller_id);
+//
+//                        users_Service.update(user_id, users, user_id);
+//                    }
+//                } else {
+//                    nearest_seller_id = defaultSeller;
+//                }
+//                if (StringUtils.hasText(nearest_seller_id)) {
+//                    filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, nearest_seller_id));
+//                }
                 break;
 
             default:
