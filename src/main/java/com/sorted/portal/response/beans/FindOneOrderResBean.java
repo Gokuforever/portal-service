@@ -27,6 +27,8 @@ public record FindOneOrderResBean(
         String invoiceUrl,
         @JsonProperty("delivery_charge")
         BigDecimal deliveryCharge,
+        @JsonProperty("total_item_cost")
+        BigDecimal totalItemCost,
         @JsonProperty("order_placed_at")
         String orderPlacedAt,
         @JsonProperty("delivered_at")

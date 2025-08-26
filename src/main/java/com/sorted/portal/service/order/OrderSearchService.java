@@ -291,12 +291,16 @@ public class OrderSearchService {
             deliveredAt = modificationDate.format(pattern);
         }
 
+        Long deliveryCharges = orderDetails.getDelivery_charges() == null ? 0L : orderDetails.getDelivery_charges();
+        Long totalItemsCost = orderDetails.getTotal_items_cost() == null ? orderDetails.getTotal_amount() - deliveryCharges : orderDetails.getTotal_items_cost();
+
         return FindOneOrderResBean.builder()
                 .id(orderDetails.getId())
                 .code(orderDetails.getCode())
                 .status(orderDetails.getStatus().getCustomer_status())
                 .transactionId(orderDetails.getTransaction_id())
                 .totalAmount(CommonUtils.paiseToRupee(orderDetails.getTotal_amount()))
+                .totalItemCost(CommonUtils.paiseToRupee(totalItemsCost))
                 .deliveryAddress(orderDetails.getDelivery_address().getFullAddress())
                 .paymentMode(orderDetails.getPayment_mode())
                 .orderItems(orderItemsResBean)
