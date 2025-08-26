@@ -120,7 +120,7 @@ public class ManageCrons_BLService {
         porterUtility.updateOrderStatus(details, fetchOrderRes.getStatus(), fetchOrderRes.getFare_details());
     }
 
-    @Scheduled(fixedRate = 60000) // Executes every 60000ms (1 minute)
+    @Scheduled(fixedRate = 30000) // Executes every 60000ms (1 minute)
     public void phonePeStatusCheckForPendingTransactions() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
