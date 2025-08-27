@@ -286,7 +286,7 @@ public class ManageAddress_BLService {
 
             if (Boolean.TRUE.equals(address.getIs_default())) {
                 SEFilter filter = new SEFilter(SEFilterType.AND);
-                filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, addressDTO.getId()));
+                filter.addClause(WhereClause.eq(Address.Fields.entity_id, usersBean.getId()));
                 filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
                 Address address1 = address_Service.repoFindOne(filter);
