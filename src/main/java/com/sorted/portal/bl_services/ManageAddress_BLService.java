@@ -148,6 +148,7 @@ public class ManageAddress_BLService {
 
         SEFilter filterA = new SEFilter(SEFilterType.AND);
         filterA.addClause(WhereClause.eq(Address.Fields.entity_id, user_id));
+        filterA.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         filterA.addClause(WhereClause.eq(Address.Fields.user_type, user_type.name()));
         if (isEdit) {
             filterA.addClause(WhereClause.notEq(BaseMongoEntity.Fields.id, addressDTO.getId()));
@@ -187,6 +188,10 @@ public class ManageAddress_BLService {
         if (getQuoteResponse == null) {
             throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
         }
+
+//        if(CollectionUtils.isEmpty(getQuoteResponse.getVehicle())){
+//
+//        }
 
         address.setUser_type(user_type);
         address.setEntity_id(usersBean.getId());
