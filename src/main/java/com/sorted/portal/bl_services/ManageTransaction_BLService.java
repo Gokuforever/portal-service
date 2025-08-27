@@ -544,6 +544,9 @@ public class ManageTransaction_BLService {
         if (StringUtils.hasText(address.getAddress_type_desc())) {
             addressDTO.setAddress_type_desc(address.getAddress_type_desc());
         }
+        if (StringUtils.hasText(address.getPhone_no())) {
+            addressDTO.setPhone_no(address.getPhone_no());
+        }
         addressDTO.setLat(address.getLat());
         addressDTO.setLng(address.getLng());
 

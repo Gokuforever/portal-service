@@ -1,5 +1,6 @@
 package com.sorted.portal.bl_services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.*;
@@ -11,7 +12,10 @@ import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
+import com.sorted.commons.porter.req.beans.GetQuoteRequest;
+import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
+import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.ValidationUtil;
 import com.sorted.portal.request.beans.AddressBean;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,6 +43,7 @@ public class ManageAddress_BLService {
     private final Address_Service address_Service;
     private final Pincode_Master_Service pincode_Master_Service;
     private final DemandingPincodeService demandingPincodeService;
+    private final PorterUtility porterUtility;
 
     @PostMapping("/add")
     public SEResponse add(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
@@ -66,7 +71,7 @@ public class ManageAddress_BLService {
         }
     }
 
-    private SEResponse createOrUpdateAddress(SERequest request, HttpServletRequest httpServletRequest, boolean isEdit) {
+    private SEResponse createOrUpdateAddress(SERequest request, HttpServletRequest httpServletRequest, boolean isEdit) throws JsonProcessingException {
         log.info("createOrUpdateAddress:: method started");
         log.info("createOrUpdateAddress:: request: {}, isEdit: {}", request, isEdit);
         AddressBean req = request.getGenericRequestDataObject(AddressBean.class);
@@ -108,7 +113,6 @@ public class ManageAddress_BLService {
         if (addressDTO == null) {
             throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ADDRESS);
         }
-
 
         Address address;
         if (isEdit) {
@@ -158,6 +162,30 @@ public class ManageAddress_BLService {
                 throw new CustomIllegalArgumentsException("If you havel multiple " + address.getAddress_type().getType()
                         + " address, please use other address type");
             }
+        }
+
+        // @formatter:off
+        GetQuoteRequest quoteRequest = GetQuoteRequest.builder()
+                .pickup_details(GetQuoteRequest.PickupDetails.builder()
+                        .lat(address.getLat().doubleValue())
+                        .lng(address.getLng().doubleValue())
+                        .build())
+                .drop_details(GetQuoteRequest.DropDetails.builder()
+                        .lat(pincode_Master.getLatitude())
+                        .lng(pincode_Master.getLongitude())
+                        .build())
+                .customer(GetQuoteRequest.Customer.builder()
+                        .name(StringUtils.hasText(usersBean.getFirst_name()) ? usersBean.getFirst_name() : "Studeaze")
+                        .mobile(GetQuoteRequest.Customer.Mobile.builder()
+                                .country_code("+91")
+                                .number(StringUtils.hasText(usersBean.getMobile_no()) ? usersBean.getMobile_no() : "9867292392")
+                                .build())
+                        .build())
+                .build();
+        // @formatter:on
+        GetQuoteResponse getQuoteResponse = porterUtility.getQuote(quoteRequest, user_id);
+        if (getQuoteResponse == null) {
+            throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
         }
 
         address.setUser_type(user_type);
