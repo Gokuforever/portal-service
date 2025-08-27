@@ -216,7 +216,7 @@ public class ManageTransaction_BLService {
                 if (cart.getDelivery_charges() == null || cart.getDelivery_charges() <= 0) {
                     log.debug("pay:: Fetching delivery quote from Porter");
                     GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(
-                            address.getId(), seller.getAddress_id(), usersBean.getMobile_no(),
+                            address.getId(), seller.getAddress_id(),
                             usersBean.getFirst_name() + " " + usersBean.getLast_name());
 
                     if (quote == null) {

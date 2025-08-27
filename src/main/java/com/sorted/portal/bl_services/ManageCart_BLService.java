@@ -125,7 +125,7 @@ public class ManageCart_BLService {
                 cart.setUser_id(usersBean.getId());
                 cart = cart_Service.create(cart, usersBean.getId());
             }
-            CartBean cartBean = this.getCartBean(cart, address_id, usersBean.getMobile_no(), usersBean.getFirst_name() + " " + usersBean.getLast_name());
+            CartBean cartBean = this.getCartBean(cart, address_id, usersBean.getFirst_name() + " " + usersBean.getLast_name());
             return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
@@ -238,10 +238,10 @@ public class ManageCart_BLService {
     }
 
     private CartBean getCartBean(Cart cart) throws JsonProcessingException {
-        return this.getCartBean(cart, null, null, null);
+        return this.getCartBean(cart, null, null);
     }
 
-    private CartBean getCartBean(Cart cart, String address_id, String mobile, String customerName) throws JsonProcessingException {
+    private CartBean getCartBean(Cart cart, String address_id, String customerName) throws JsonProcessingException {
         CartBean cartBean = new CartBean();
         List<CartItems> cartItems = new ArrayList<>();
         List<Long> total_price_in_paise = new ArrayList<>();
@@ -294,7 +294,7 @@ public class ManageCart_BLService {
         long deliveryChargeInPaise = cart.getDelivery_charges() == null ? 0 : cart.getDelivery_charges();
         if (addressPresent) {
             Seller seller = sellerService.findById(seller_id).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND));
-            GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address_id, seller.getAddress_id(), mobile, customerName);
+            GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address_id, seller.getAddress_id(), customerName);
             if (quote != null) {
                 deliveryChargeInPaise = quote.getVehicle().getFare().getMinor_amount();
                 cart.setDelivery_charges(deliveryChargeInPaise);
