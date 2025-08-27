@@ -304,13 +304,13 @@ public class ManageCart_BLService {
                         demandingPincodeService.storeDemandingPincode(address.getPincode(), cart.getUser_id()));
             }
         }
-
-        cartBean.setTotal_amount(CommonUtils.paiseToRupee(summed + fixedDeliveryCharge));
+        boolean freeDelivery = minCartValueInPaise <= summed;
         cartBean.setItem_total(CommonUtils.paiseToRupee(summed));
         cartBean.setTotal_count(total_items);
         cartBean.setCart_items(cartItems);
         cartBean.setDelivery_charge(CommonUtils.paiseToRupee(fixedDeliveryCharge));
-        cartBean.set_free_delivery(minCartValueInPaise <= summed);
+        cartBean.setTotal_amount(freeDelivery ? CommonUtils.paiseToRupee(summed) : CommonUtils.paiseToRupee(summed + fixedDeliveryCharge));
+        cartBean.set_free_delivery(freeDelivery);
         cartBean.setStoreOperational(storeActivityService.isStoreOperational(seller_id));
 
         return cartBean;
