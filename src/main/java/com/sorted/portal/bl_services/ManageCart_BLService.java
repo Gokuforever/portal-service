@@ -38,7 +38,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +63,9 @@ public class ManageCart_BLService {
 
     @Value("${se.minimum-cart-value.in-paise:10000}")
     private long minCartValueInPaise;
+
+    @Value("${se.fixed-delivery-charge.in-paise:5900}")
+    private long fixedDeliveryCharge;
 
     @PostMapping("/clear")
     public SEResponse clear(HttpServletRequest httpServletRequest) {
@@ -291,13 +293,11 @@ public class ManageCart_BLService {
         long summed = total_price_in_paise.stream().mapToLong(Long::longValue).sum();
         long total_items = total_cart_items.stream().mapToLong(Long::longValue).sum();
         boolean addressPresent = StringUtils.hasText(address_id);
-        long deliveryChargeInPaise = addressPresent ? cart.getDelivery_charges() == null ? 0L : cart.getDelivery_charges() : 0L;
         if (addressPresent) {
             Seller seller = sellerService.findById(seller_id).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND));
             GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address_id, seller.getAddress_id(), customerName);
             if (quote != null) {
-                deliveryChargeInPaise = quote.getVehicle().getFare().getMinor_amount();
-                cart.setDelivery_charges(deliveryChargeInPaise);
+                cart.setDelivery_charges(fixedDeliveryCharge);
                 cart_Service.update(cart.getId(), cart, cart.getModified_by());
             } else {
                 addressService.findById(address_id).ifPresent(address ->
@@ -305,11 +305,11 @@ public class ManageCart_BLService {
             }
         }
 
-        cartBean.setTotal_amount(CommonUtils.paiseToRupee(summed + deliveryChargeInPaise));
+        cartBean.setTotal_amount(CommonUtils.paiseToRupee(summed + fixedDeliveryCharge));
         cartBean.setItem_total(CommonUtils.paiseToRupee(summed));
         cartBean.setTotal_count(total_items);
         cartBean.setCart_items(cartItems);
-        cartBean.setDelivery_charge(addressPresent ? CommonUtils.paiseToRupee(deliveryChargeInPaise) : BigDecimal.ZERO);
+        cartBean.setDelivery_charge(CommonUtils.paiseToRupee(fixedDeliveryCharge));
         cartBean.set_free_delivery(minCartValueInPaise <= summed);
         cartBean.setStoreOperational(storeActivityService.isStoreOperational(seller_id));
 
