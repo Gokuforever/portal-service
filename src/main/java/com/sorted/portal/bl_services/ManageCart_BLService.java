@@ -4,10 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sorted.commons.beans.Item;
 import com.sorted.commons.beans.Media;
 import com.sorted.commons.beans.UsersBean;
-import com.sorted.commons.entity.mongo.BaseMongoEntity;
-import com.sorted.commons.entity.mongo.Cart;
-import com.sorted.commons.entity.mongo.Products;
-import com.sorted.commons.entity.mongo.Seller;
+import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.All_Status.ProductCurrentStatus;
@@ -25,7 +22,6 @@ import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.assisting.beans.CartItems;
 import com.sorted.portal.assisting.beans.CartItemsBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
-import com.sorted.portal.request.beans.CartFetchReqBean;
 import com.sorted.portal.response.beans.CartBean;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -33,10 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -101,12 +94,11 @@ public class ManageCart_BLService {
     }
 
     @PostMapping("/fetch")
-    public SEResponse fetch(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+    public SEResponse fetch(HttpServletRequest httpServletRequest,
+                            @RequestParam(name = "address_id", required = false) String address_id) {
         try {
-            CartFetchReqBean fetchReqBean = request.getGenericRequestDataObject(CartFetchReqBean.class);
-            CommonUtils.extractHeaders(httpServletRequest, fetchReqBean);
-            String address_id = StringUtils.hasText(fetchReqBean.getAddressId()) ? fetchReqBean.getAddressId() : null;
-            UsersBean usersBean = users_Service.validateUserForActivity(fetchReqBean.getReq_user_id(), Permission.VIEW,
+            String req_user_id = httpServletRequest.getHeader("req_user_id");
+            UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Permission.VIEW,
                     Activity.CART_MANAGEMENT);
             switch (usersBean.getRole().getUser_type()) {
                 case CUSTOMER, GUEST:
@@ -115,14 +107,14 @@ public class ManageCart_BLService {
                     throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
             }
             SEFilter filterC = new SEFilter(SEFilterType.AND);
-            filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
+            filterC.addClause(WhereClause.eq(Cart.Fields.user_id, req_user_id));
             filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
             Cart cart = cart_Service.repoFindOne(filterC);
             if (cart == null) {
                 cart = new Cart();
-                cart.setUser_id(usersBean.getId());
-                cart = cart_Service.create(cart, usersBean.getId());
+                cart.setUser_id(req_user_id);
+                cart = cart_Service.create(cart, req_user_id);
             }
             CartBean cartBean = this.getCartBean(cart, address_id, usersBean.getMobile_no(), usersBean.getFirst_name() + " " + usersBean.getLast_name());
             return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
