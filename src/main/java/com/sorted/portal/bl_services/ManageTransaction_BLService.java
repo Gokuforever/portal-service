@@ -61,6 +61,9 @@ public class ManageTransaction_BLService {
     @Value("${se.minimum-cart-value.in-paise:10000}")
     private long minCartValueInPaise;
 
+    @Value("${se.fixed-delivery-charge.in-paise:5900}")
+    private long fixedDeliveryCharge;
+
     @GetMapping("/status")
     public FindOneOrder status(@RequestParam("orderId") String orderId, HttpServletRequest httpServletRequest) {
         if (!StringUtils.hasText(orderId)) {
@@ -207,37 +210,39 @@ public class ManageTransaction_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_AMOUNT);
             }
 
-            long deliveryCharge = 0L;
+            long deliveryCharge = minCartValueInPaise >= totalSum ? fixedDeliveryCharge : 0;
+            cart.setDelivery_charges(deliveryCharge);
+            cart_Service.update(cart.getId(), cart, usersBean.getId());
             // Handle delivery charges
-            if (minCartValueInPaise >= totalSum) {
-                log.info("pay:: Cart value {} is below minimum {}, checking delivery charges",
-                        totalSum, minCartValueInPaise);
-
-                if (cart.getDelivery_charges() == null || cart.getDelivery_charges() <= 0) {
-                    log.debug("pay:: Fetching delivery quote from Porter");
-                    GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(
-                            address.getId(), seller.getAddress_id(),
-                            usersBean.getFirst_name() + " " + usersBean.getLast_name());
-
-                    if (quote == null) {
-                        log.warn("pay:: No delivery quote available for pincode: {}", address.getPincode());
-                        demandingPincodeService.storeDemandingPincode(address.getPincode(), usersBean.getId());
-                        throw new CustomIllegalArgumentsException(ResponseCode.NOT_DELIVERIBLE);
-                    }
-
-                    deliveryCharge = quote.getVehicle().getFare().getMinor_amount();
-                    log.info("pay:: Delivery charges calculated: {} paise", deliveryCharge);
-
-                    cart.setDelivery_charges(deliveryCharge);
-                    cart_Service.update(cart.getId(), cart, usersBean.getId());
-                    log.debug("pay:: Cart updated with delivery charges");
-                }
-
-                totalSum += cart.getDelivery_charges();
-                log.info("pay:: Final total with delivery charges: {} paise", totalSum);
-            } else {
-                log.info("pay:: Cart value {} meets minimum threshold, no delivery charges needed", totalSum);
-            }
+//            if (minCartValueInPaise >= totalSum) {
+//                log.info("pay:: Cart value {} is below minimum {}, checking delivery charges",
+//                        totalSum, minCartValueInPaise);
+//
+//                if (cart.getDelivery_charges() == null || cart.getDelivery_charges() <= 0) {
+//                    log.debug("pay:: Fetching delivery quote from Porter");
+//                    GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(
+//                            address.getId(), seller.getAddress_id(),
+//                            usersBean.getFirst_name() + " " + usersBean.getLast_name());
+//
+//                    if (quote == null) {
+//                        log.warn("pay:: No delivery quote available for pincode: {}", address.getPincode());
+//                        demandingPincodeService.storeDemandingPincode(address.getPincode(), usersBean.getId());
+//                        throw new CustomIllegalArgumentsException(ResponseCode.NOT_DELIVERIBLE);
+//                    }
+//
+//                    deliveryCharge = quote.getVehicle().getFare().getMinor_amount();
+//                    log.info("pay:: Delivery charges calculated: {} paise", deliveryCharge);
+//
+//                    cart.setDelivery_charges(deliveryCharge);
+//                    cart_Service.update(cart.getId(), cart, usersBean.getId());
+//                    log.debug("pay:: Cart updated with delivery charges");
+//                }
+//
+//                totalSum += cart.getDelivery_charges();
+//                log.info("pay:: Final total with delivery charges: {} paise", totalSum);
+//            } else {
+//                log.info("pay:: Cart value {} meets minimum threshold, no delivery charges needed", totalSum);
+//            }
 
             // Create order
             log.debug("pay:: Creating order entity");
