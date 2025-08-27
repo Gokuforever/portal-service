@@ -283,6 +283,17 @@ public class ManageAddress_BLService {
             }
             address.setDeleted(true);
             address_Service.deleteOne(address.getId(), usersBean.getId());
+
+            if (Boolean.TRUE.equals(address.getIs_default())) {
+                SEFilter filter = new SEFilter(SEFilterType.AND);
+                filter.addClause(WhereClause.eq(Address.Fields.entity_id, usersBean.getId()));
+                filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+                Address address1 = address_Service.repoFindOne(filter);
+                if (address1 != null) {
+                    address_Service.markDefault(address1, usersBean.getId());
+                }
+            }
             return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;

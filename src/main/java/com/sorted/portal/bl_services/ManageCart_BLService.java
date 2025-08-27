@@ -4,7 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sorted.commons.beans.Item;
 import com.sorted.commons.beans.Media;
 import com.sorted.commons.beans.UsersBean;
-import com.sorted.commons.entity.mongo.*;
+import com.sorted.commons.entity.mongo.BaseMongoEntity;
+import com.sorted.commons.entity.mongo.Cart;
+import com.sorted.commons.entity.mongo.Products;
+import com.sorted.commons.entity.mongo.Seller;
 import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.All_Status.ProductCurrentStatus;
@@ -22,6 +25,7 @@ import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.assisting.beans.CartItems;
 import com.sorted.portal.assisting.beans.CartItemsBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
+import com.sorted.portal.request.beans.CartFetchReqBean;
 import com.sorted.portal.response.beans.CartBean;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +33,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +63,9 @@ public class ManageCart_BLService {
 
     @Value("${se.minimum-cart-value.in-paise:10000}")
     private long minCartValueInPaise;
+
+    @Value("${se.fixed-delivery-charge.in-paise:5900}")
+    private long fixedDeliveryCharge;
 
     @PostMapping("/clear")
     public SEResponse clear(HttpServletRequest httpServletRequest) {
@@ -94,11 +104,12 @@ public class ManageCart_BLService {
     }
 
     @PostMapping("/fetch")
-    public SEResponse fetch(HttpServletRequest httpServletRequest,
-                            @RequestParam(name = "address_id", required = false) String address_id) {
+    public SEResponse fetch(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
-            String req_user_id = httpServletRequest.getHeader("req_user_id");
-            UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Permission.VIEW,
+            CartFetchReqBean fetchReqBean = request.getGenericRequestDataObject(CartFetchReqBean.class);
+            CommonUtils.extractHeaders(httpServletRequest, fetchReqBean);
+            String address_id = StringUtils.hasText(fetchReqBean.getAddress_id()) ? fetchReqBean.getAddress_id() : null;
+            UsersBean usersBean = users_Service.validateUserForActivity(fetchReqBean.getReq_user_id(), Permission.VIEW,
                     Activity.CART_MANAGEMENT);
             switch (usersBean.getRole().getUser_type()) {
                 case CUSTOMER, GUEST:
@@ -107,16 +118,16 @@ public class ManageCart_BLService {
                     throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
             }
             SEFilter filterC = new SEFilter(SEFilterType.AND);
-            filterC.addClause(WhereClause.eq(Cart.Fields.user_id, req_user_id));
+            filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
             filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
             Cart cart = cart_Service.repoFindOne(filterC);
             if (cart == null) {
                 cart = new Cart();
-                cart.setUser_id(req_user_id);
-                cart = cart_Service.create(cart, req_user_id);
+                cart.setUser_id(usersBean.getId());
+                cart = cart_Service.create(cart, usersBean.getId());
             }
-            CartBean cartBean = this.getCartBean(cart, address_id, usersBean.getMobile_no(), usersBean.getFirst_name() + " " + usersBean.getLast_name());
+            CartBean cartBean = this.getCartBean(cart, address_id, usersBean.getFirst_name() + " " + usersBean.getLast_name());
             return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
@@ -229,10 +240,10 @@ public class ManageCart_BLService {
     }
 
     private CartBean getCartBean(Cart cart) throws JsonProcessingException {
-        return this.getCartBean(cart, null, null, null);
+        return this.getCartBean(cart, null, null);
     }
 
-    private CartBean getCartBean(Cart cart, String address_id, String mobile, String customerName) throws JsonProcessingException {
+    private CartBean getCartBean(Cart cart, String address_id, String customerName) throws JsonProcessingException {
         CartBean cartBean = new CartBean();
         List<CartItems> cartItems = new ArrayList<>();
         List<Long> total_price_in_paise = new ArrayList<>();
@@ -281,25 +292,25 @@ public class ManageCart_BLService {
         }
         long summed = total_price_in_paise.stream().mapToLong(Long::longValue).sum();
         long total_items = total_cart_items.stream().mapToLong(Long::longValue).sum();
-        long deliveryChargeInPaise = cart.getDelivery_charges() == null ? 0 : cart.getDelivery_charges();
-        if (StringUtils.hasText(address_id) && deliveryChargeInPaise > 0) {
+        boolean addressPresent = StringUtils.hasText(address_id);
+        if (addressPresent) {
             Seller seller = sellerService.findById(seller_id).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND));
-            GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address_id, seller.getAddress_id(), mobile, customerName);
+            GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address_id, seller.getAddress_id(), customerName);
             if (quote != null) {
-                deliveryChargeInPaise = quote.getVehicle().getFare().getMinor_amount();
-                cart.setDelivery_charges(deliveryChargeInPaise);
+                cart.setDelivery_charges(fixedDeliveryCharge);
                 cart_Service.update(cart.getId(), cart, cart.getModified_by());
-            } else if (StringUtils.hasText(address_id)) {
+            } else {
                 addressService.findById(address_id).ifPresent(address ->
                         demandingPincodeService.storeDemandingPincode(address.getPincode(), cart.getUser_id()));
             }
         }
-
-        cartBean.setTotal_amount(CommonUtils.paiseToRupee(summed));
+        boolean freeDelivery = minCartValueInPaise <= summed;
+        cartBean.setItem_total(CommonUtils.paiseToRupee(summed));
         cartBean.setTotal_count(total_items);
         cartBean.setCart_items(cartItems);
-        cartBean.setDelivery_charge(CommonUtils.paiseToRupee(deliveryChargeInPaise));
-        cartBean.set_free_delivery(minCartValueInPaise <= summed);
+        cartBean.setDelivery_charge(CommonUtils.paiseToRupee(fixedDeliveryCharge));
+        cartBean.setTotal_amount(freeDelivery ? CommonUtils.paiseToRupee(summed) : CommonUtils.paiseToRupee(summed + fixedDeliveryCharge));
+        cartBean.set_free_delivery(freeDelivery);
         cartBean.setStoreOperational(storeActivityService.isStoreOperational(seller_id));
 
         return cartBean;
