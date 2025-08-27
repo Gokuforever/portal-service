@@ -199,7 +199,6 @@ public class ManageSignUp_BLService {
                 filterGU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
                 Users guestUser = users_Service.repoFindOne(filterGU);
                 if (guestUser != null) {
-                    users.setProperties(guestUser.getProperties());
                     users_Service.update(guest_user_id, users, users.getId());
                     signUpService.migrateCart(guest_user_id, users.getId());
                     signUpService.migrateAddressForCustomer(guest_user_id, users.getId());
