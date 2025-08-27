@@ -306,6 +306,7 @@ public class ManageCart_BLService {
         }
 
         cartBean.setTotal_amount(CommonUtils.paiseToRupee(summed));
+        cartBean.setItem_total(CommonUtils.paiseToRupee(summed - deliveryChargeInPaise));
         cartBean.setTotal_count(total_items);
         cartBean.setCart_items(cartItems);
         cartBean.setDelivery_charge(addressPresent ? CommonUtils.paiseToRupee(deliveryChargeInPaise) : BigDecimal.ZERO);
