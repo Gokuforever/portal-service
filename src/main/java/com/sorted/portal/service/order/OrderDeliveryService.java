@@ -12,6 +12,7 @@ import com.sorted.commons.utils.PorterUtility;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.Collections;
 
@@ -101,7 +102,7 @@ public class OrderDeliveryService {
         Address dropAddressObj = buildAddress(
                 deliveryAddress,
                 user.getFirst_name() + " " + user.getLast_name(),
-                user.getMobile_no());
+                StringUtils.hasText(deliveryAddress.getPhone_no()) ? deliveryAddress.getPhone_no() : user.getMobile_no());
 
         Drop_Details dropDetails = Drop_Details.builder()
                 .address(dropAddressObj)
