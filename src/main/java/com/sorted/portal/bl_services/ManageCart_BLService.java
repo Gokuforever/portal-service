@@ -105,7 +105,7 @@ public class ManageCart_BLService {
         try {
             CartFetchReqBean fetchReqBean = request.getGenericRequestDataObject(CartFetchReqBean.class);
             CommonUtils.extractHeaders(httpServletRequest, fetchReqBean);
-            String address_id = StringUtils.hasText(fetchReqBean.getAddressId()) ? fetchReqBean.getAddressId() : null;
+            String address_id = StringUtils.hasText(fetchReqBean.getAddress_id()) ? fetchReqBean.getAddress_id() : null;
             UsersBean usersBean = users_Service.validateUserForActivity(fetchReqBean.getReq_user_id(), Permission.VIEW,
                     Activity.CART_MANAGEMENT);
             switch (usersBean.getRole().getUser_type()) {
