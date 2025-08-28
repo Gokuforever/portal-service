@@ -310,7 +310,7 @@ public class ManageCart_BLService {
         cartBean.setTotal_count(total_items);
         cartBean.setCart_items(cartItems);
         cartBean.setDelivery_charge(total_items > 0 ? CommonUtils.paiseToRupee(fixedDeliveryCharge) : BigDecimal.ZERO);
-        cartBean.setTotal_amount(freeDelivery ? CommonUtils.paiseToRupee(summed) : CommonUtils.paiseToRupee(summed + fixedDeliveryCharge));
+        cartBean.setTotal_amount(summed > 0 ? freeDelivery ? CommonUtils.paiseToRupee(summed) : CommonUtils.paiseToRupee(summed + fixedDeliveryCharge) : BigDecimal.ZERO);
         cartBean.set_free_delivery(freeDelivery);
         cartBean.setStoreOperational(storeActivityService.isStoreOperational(seller_id));
 
