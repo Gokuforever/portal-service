@@ -71,7 +71,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: prod-runner  # ✅ This targets only your prod EC2
+    runs-on: production-runner  # ✅ This targets only your prod EC2
     environment: production
     permissions:
       contents: read
@@ -120,7 +120,7 @@ jobs:
             -e JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Kolkata" \
             --mount type=bind,source=/home/ubuntu/studeaze/config,target=/app/config \
             --mount type=bind,source=/home/ubuntu/studeaze/logs,target=/app/logs \
-            --mount type=bind,source=/home/ubuntu/portal-api.studeaze.in.p12,target=/app/ssl/portal-api.studeaze.in.p12 \
+            --mount type=bind,source=/home/ubuntu/prod.api.studeaze.in.p12,target=/app/ssl/prod.api-prod.studeaze.in.p12 \
             ghcr.io/gokuforever/portal-service:latest
           
           echo "*** Verifying deployment ***"
