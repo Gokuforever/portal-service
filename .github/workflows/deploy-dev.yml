@@ -71,7 +71,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: portal-ec2
+    runs-on: production-runner
     environment: development
     permissions:
       contents: read
