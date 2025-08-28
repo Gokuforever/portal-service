@@ -71,7 +71,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: production-runner
+    runs-on: portal-ec2
     environment: development
     permissions:
       contents: read
@@ -120,7 +120,7 @@ jobs:
             -e JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Kolkata" \
             --mount type=bind,source=/home/ubuntu/studeaze/config,target=/app/config \
             --mount type=bind,source=/home/ubuntu/studeaze/logs,target=/app/logs \
-            --mount type=bind,source=/home/ubuntu/prod.api.studeaze.in.keystore.p12,target=/app/ssl/prod.api.studeaze.in.keystore.p12 \
+            --mount type=bind,source=/home/ubuntu/api.studeaze.in.keystore.p12,target=/app/ssl/api.studeaze.in.keystore.p12 \
             ghcr.io/gokuforever/portal-service:latest
           
           echo "*** Verifying deployment ***"
