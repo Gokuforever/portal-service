@@ -96,6 +96,7 @@ public class CategoryFilterService {
         filteredCategory.setCategory_code(originalCategory.getCategory_code());
         filteredCategory.setName(originalCategory.getName());
         filteredCategory.setDeleted(false);
+        filteredCategory.setId(originalCategory.getId());
 
         List<Category_Master.Groups> filteredGroups = new ArrayList<>();
 
