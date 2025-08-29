@@ -84,7 +84,8 @@ public class ManageMetaData_BLService {
             return preferencesCache;
         }
 
-        List<Category_Master> categoryMasterData = categoryFilterService.getFilters();
+//        List<Category_Master> categoryMasterData = categoryFilterService.getFilters();
+        List<Category_Master> categoryMasterData = this.getCategoryMasterData();
 
         HomeProductsBean.HomeProductsBeanBuilder homeProductsBeanBuilder = HomeProductsBean.builder();
 
