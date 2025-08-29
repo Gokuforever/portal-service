@@ -294,7 +294,7 @@ public class ManageCart_BLService {
         long summed = total_price_in_paise.stream().mapToLong(Long::longValue).sum();
         long total_items = total_cart_items.stream().mapToLong(Long::longValue).sum();
         boolean addressPresent = StringUtils.hasText(address_id);
-        if (addressPresent) {
+        if (addressPresent && summed > 0) {
             Seller seller = sellerService.findById(seller_id).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND));
             GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address_id, seller.getAddress_id(), customerName);
             if (quote != null) {
