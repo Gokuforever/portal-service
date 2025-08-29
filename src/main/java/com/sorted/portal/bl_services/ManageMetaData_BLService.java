@@ -25,6 +25,7 @@ import com.sorted.portal.assisting.beans.config.ProductCarouselBean;
 import com.sorted.portal.request.beans.MetaDataReq;
 import com.sorted.portal.response.beans.Config;
 import com.sorted.portal.response.beans.MetaData;
+import com.sorted.portal.service.CategoryFilterService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +53,7 @@ public class ManageMetaData_BLService {
     private final Product_Master_Service productMasterService;
     private final ProductRepository productRepository;
     private final HomeConfigService homeConfigService;
+    private final CategoryFilterService categoryFilterService;
 
     // Cache for /preferences response
     private volatile Config preferencesCache = null;
@@ -82,7 +84,7 @@ public class ManageMetaData_BLService {
             return preferencesCache;
         }
 
-        List<Category_Master> categoryMasterData = this.getCategoryMasterData();
+        List<Category_Master> categoryMasterData = categoryFilterService.getFilters();
 
         HomeProductsBean.HomeProductsBeanBuilder homeProductsBeanBuilder = HomeProductsBean.builder();
 
