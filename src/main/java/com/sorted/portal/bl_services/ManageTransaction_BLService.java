@@ -245,6 +245,8 @@ public class ManageTransaction_BLService {
 //            }
 
             // Create order
+            totalSum = totalSum + deliveryCharge;
+
             log.debug("pay:: Creating order entity");
             Order_Details order = createOrder(usersBean, seller.getId(), totalSum, address, sellerAddress,
                     deliveryCharge);
@@ -517,7 +519,7 @@ public class ManageTransaction_BLService {
         order.setPickup_address(pickup_address);
         order.setDelivery_address(del_address);
         order.setDelivery_charges(deliveryCharges);
-        order.setTotal_items_cost(totalSum + deliveryCharges);
+        order.setTotal_items_cost(totalSum - deliveryCharges);
         order.setEstimated_delivery_charges(deliveryCharges);
 
         return order;
