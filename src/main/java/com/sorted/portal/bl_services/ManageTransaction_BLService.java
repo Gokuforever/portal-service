@@ -245,6 +245,8 @@ public class ManageTransaction_BLService {
 //            }
 
             // Create order
+            totalSum = totalSum + deliveryCharge;
+
             log.debug("pay:: Creating order entity");
             Order_Details order = createOrder(usersBean, seller.getId(), totalSum, address, sellerAddress,
                     deliveryCharge);
