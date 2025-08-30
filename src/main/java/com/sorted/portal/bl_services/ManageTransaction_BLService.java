@@ -371,23 +371,23 @@ public class ManageTransaction_BLService {
         log.debug("validateDeliveryAddress:: Address found, checking nearest seller");
         String nearestSeller = usersBean.getNearestSeller();
 
-        if (nearestSeller == null) {
-            log.info("validateDeliveryAddress:: Finding nearest seller for pincode: {}", address.getPincode());
-            NearestSellerRes nearestSellerRes = porterUtility.getNearestSeller(
-                    address.getPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
-
-            nearestSeller = nearestSellerRes.getSeller_id();
-            log.info("validateDeliveryAddress:: Nearest seller found: {}", nearestSeller);
-
-            Users users = users_Service.findById(usersBean.getId())
-                    .orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.NO_RECORD));
-            users.setNearestSeller(nearestSeller);
-            users_Service.update(users.getId(), users, Defaults.SYSTEM_ADMIN);
-            usersBean.setNearestSeller(nearestSeller);
-            log.debug("validateDeliveryAddress:: User updated with nearest seller");
-        } else {
-            log.debug("validateDeliveryAddress:: Using existing nearest seller: {}", nearestSeller);
-        }
+//        if (nearestSeller == null) {
+//            log.info("validateDeliveryAddress:: Finding nearest seller for pincode: {}", address.getPincode());
+//            NearestSellerRes nearestSellerRes = porterUtility.getNearestSeller(
+//                    address.getPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
+//
+//            nearestSeller = nearestSellerRes.getSeller_id();
+//            log.info("validateDeliveryAddress:: Nearest seller found: {}", nearestSeller);
+//
+//            Users users = users_Service.findById(usersBean.getId())
+//                    .orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.NO_RECORD));
+//            users.setNearestSeller(nearestSeller);
+//            users_Service.update(users.getId(), users, Defaults.SYSTEM_ADMIN);
+//            usersBean.setNearestSeller(nearestSeller);
+//            log.debug("validateDeliveryAddress:: User updated with nearest seller");
+//        } else {
+//            log.debug("validateDeliveryAddress:: Using existing nearest seller: {}", nearestSeller);
+//        }
 
         return address;
     }
