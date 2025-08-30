@@ -44,6 +44,7 @@ public class ManageAddress_BLService {
     private final Pincode_Master_Service pincode_Master_Service;
     private final DemandingPincodeService demandingPincodeService;
     private final PorterUtility porterUtility;
+    private final Seller_Service seller_Service;
 
     @PostMapping("/add")
     public SEResponse add(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
@@ -165,15 +166,19 @@ public class ManageAddress_BLService {
             }
         }
 
+        Seller seller = seller_Service.findById("68711a63a2dcdf55ed170972").orElseThrow();
+
+        Address pickUpAddress = address_Service.findById(seller.getAddress_id()).orElseThrow();
+
         // @formatter:off
         GetQuoteRequest quoteRequest = GetQuoteRequest.builder()
                 .pickup_details(GetQuoteRequest.PickupDetails.builder()
-                        .lat(address.getLat().doubleValue())
-                        .lng(address.getLng().doubleValue())
+                        .lat(pickUpAddress.getLat().doubleValue())
+                        .lng(pickUpAddress.getLng().doubleValue())
                         .build())
                 .drop_details(GetQuoteRequest.DropDetails.builder()
-                        .lat(pincode_Master.getLatitude())
-                        .lng(pincode_Master.getLongitude())
+                        .lat(address.getLat().doubleValue())
+                        .lng(address.getLng().doubleValue())
                         .build())
                 .customer(GetQuoteRequest.Customer.builder()
                         .name(StringUtils.hasText(usersBean.getFirst_name()) ? usersBean.getFirst_name() : "Studeaze")
