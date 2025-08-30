@@ -24,6 +24,12 @@ public class OrderService {
     private final Order_Item_Service orderItemService;
     private final Cart_Service cartService;
 
+    public void increaseProductQuantity(Products product, Long quantity) {
+        quantity = product.getQuantity() + quantity;
+        product.setQuantity(quantity);
+        productService.update(product.getId(), product, Defaults.SYSTEM_ADMIN);
+    }
+
     @Async
     public void reduceProductQuantity(List<Products> listP, Map<String, Long> mapPQ) {
         for (Products product : listP) {
