@@ -86,6 +86,7 @@ public class OrderResponseMapper {
                 .non_operational_days(nonWorkingDays)
                 .max_return_days(maxReturnDays)
                 .creation_date_str(orderDetails.getCreation_date_str())
+                .delivery_partner_id(orderDetails.getDp_order_id())
                 .build();
     }
 

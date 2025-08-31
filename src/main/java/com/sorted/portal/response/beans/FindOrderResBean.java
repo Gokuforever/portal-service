@@ -19,5 +19,6 @@ public class FindOrderResBean {
     private List<OrderItemDTO> orderItems;
     private int max_return_days;
     private String creation_date_str;
+    private String delivery_partner_id;
 
 }
