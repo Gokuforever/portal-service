@@ -23,9 +23,8 @@ public class ManageUsers_BLService {
     private final RoleService roleService;
 
 
-
     @GetMapping("/verified/users")
-    public List<VerifiedUsersResBean> getAllVerifiedUsers(){
+    public List<VerifiedUsersResBean> getAllVerifiedUsers() {
 
         SEFilter filterR = new SEFilter(SEFilterType.AND);
         filterR.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -38,6 +37,11 @@ public class ManageUsers_BLService {
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         filter.addClause(WhereClause.eq(Users.Fields.is_verified, true));
         filter.addClause(WhereClause.eq(Users.Fields.role_id, role.getId()));
+
+        OrderBy orderBy = new OrderBy(BaseMongoEntity.Fields.creation_date, SortOrder.DESC);
+
+        filter.setOrderBy(orderBy);
+
         List<Users> users = usersService.repoFind(filter);
 
         List<VerifiedUsersResBean> verifiedUsersResBeans = new ArrayList<>();
