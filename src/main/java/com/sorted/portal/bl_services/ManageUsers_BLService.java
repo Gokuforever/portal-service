@@ -51,7 +51,7 @@ public class ManageUsers_BLService {
                     .firstName(user.getFirst_name())
                     .lastName(user.getLast_name())
                     .email(user.getEmail_id())
-                    .mobile(user.getMobile_no())
+                    .mobile("91" + user.getMobile_no())
                     .createdAt(user.getCreation_date_str())
                     .build();
 
