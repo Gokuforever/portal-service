@@ -1088,7 +1088,7 @@ public class ManageProduct_BLService {
             }
 
             List<String> attributes = mapSC.get(key);
-            if (!CollectionUtils.isEmpty(attributes) && val.stream().anyMatch(x -> !attributes.contains(x))) {
+            if (!CollectionUtils.isEmpty(attributes) && val.stream().noneMatch(attributes::contains)) {
                 throw new CustomIllegalArgumentsException(ResponseCode.INVALID_SUB_CATEGORY);
             }
 
