@@ -89,6 +89,9 @@ public class ManageSignUp_BLService {
             user = users_Service.create(user, Defaults.AUTH);
         }
 
+        user.setIs_verified(true);
+        users_Service.update(user.getId(), user, Defaults.AUTH);
+
         UsersBean usersBean = users_Service.validateAndGetUserInfo(user.getId());
         return AuthV2Response.builder()
                 .usersBean(usersBean)
