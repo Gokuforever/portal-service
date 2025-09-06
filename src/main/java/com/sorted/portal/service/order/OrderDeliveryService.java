@@ -41,7 +41,7 @@ public class OrderDeliveryService {
             Spoc_Details spocDetails,
             AddressDTO deliveryAddress,
             AddressDTO pickupAddress,
-            Users user) throws JsonProcessingException {
+            Users user) {
 
         log.debug("Creating Porter delivery order for order ID: {}", orderDetails.getId());
 
@@ -137,7 +137,7 @@ public class OrderDeliveryService {
                 .lat(addressDTO.getLat())
                 .lng(addressDTO.getLng())
                 .contact_details(Contact_Details.builder()
-                        .name(contactName)
+                        .name(StringUtils.hasText(addressDTO.getFullAddress()) ? addressDTO.getFullAddress() : StringUtils.hasText(contactName) ? contactName : "Customer")
                         .phone_number("+91" + contactPhone)
                         .build())
                 .build();

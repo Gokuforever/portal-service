@@ -77,8 +77,7 @@ public class ManageAddress_BLService {
         log.info("createOrUpdateAddress:: request: {}, isEdit: {}", request, isEdit);
         AddressBean req = request.getGenericRequestDataObject(AddressBean.class);
         CommonUtils.extractHeaders(httpServletRequest, req);
-        UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT,
-                Activity.MANAGE_ADDRESS);
+        UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Permission.EDIT, Activity.MANAGE_ADDRESS);
         String user_id;
         UserType user_type = usersBean.getRole().getUser_type();
         switch (user_type) {
@@ -193,10 +192,6 @@ public class ManageAddress_BLService {
         if (getQuoteResponse == null) {
             throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
         }
-
-//        if(CollectionUtils.isEmpty(getQuoteResponse.getVehicle())){
-//
-//        }
 
         address.setUser_type(user_type);
         address.setEntity_id(usersBean.getId());

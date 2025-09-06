@@ -4,9 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayResponse;
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Item;
-import com.sorted.commons.beans.NearestSellerRes;
 import com.sorted.commons.beans.UsersBean;
-import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.*;
@@ -15,7 +13,6 @@ import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
-import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.GsonUtils;
 import com.sorted.commons.utils.PorterUtility;
@@ -556,6 +553,9 @@ public class ManageTransaction_BLService {
         }
         addressDTO.setLat(address.getLat());
         addressDTO.setLng(address.getLng());
+        addressDTO.setFirst_name(address.getFirstName());
+        addressDTO.setLast_name(address.getLastName());
+
 
         return addressDTO;
     }
