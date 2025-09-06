@@ -88,7 +88,7 @@ public class ManageSignUp_BLService {
             user.setMobile_no(auth.mobileNo());
             user = users_Service.create(user, Defaults.AUTH);
         }
-
+        user.setRole_id(customer_signup_role);
         user.setIs_verified(true);
         users_Service.update(user.getId(), user, Defaults.AUTH);
 
