@@ -27,16 +27,14 @@ import com.sorted.portal.assisting.beans.CartItemsBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
 import com.sorted.portal.request.beans.CartFetchReqBean;
 import com.sorted.portal.response.beans.CartBean;
+import com.sorted.portal.response.beans.FetchCartV2;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -67,6 +65,67 @@ public class ManageCart_BLService {
 
     @Value("${se.fixed-delivery-charge.in-paise:5900}")
     private long fixedDeliveryCharge;
+
+    @GetMapping("/v2/fetch")
+    public FetchCartV2 fetchV2(HttpServletRequest httpServletRequest) {
+        String req_user_id = httpServletRequest.getHeader("req_user_id");
+        UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Permission.VIEW,
+                Activity.CART_MANAGEMENT);
+        switch (usersBean.getRole().getUser_type()) {
+            case CUSTOMER, GUEST:
+                break;
+            default:
+                throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+        }
+
+        SEFilter filterC = new SEFilter(SEFilterType.AND);
+        filterC.addClause(WhereClause.eq(Cart.Fields.user_id, req_user_id));
+        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        Cart cart = cart_Service.repoFindOne(filterC);
+        if (cart == null) {
+            cart = new Cart();
+            cart.setUser_id(req_user_id);
+            cart_Service.create(cart, req_user_id);
+        }
+
+        BigDecimal totalCartValue = BigDecimal.ZERO;
+        BigDecimal freeDeliveryDiff = BigDecimal.ZERO;
+        long totalCartValueInPaise = 0L;
+
+
+        List<Item> cartItems = cart.getCart_items();
+        if (!CollectionUtils.isEmpty(cartItems)) {
+            List<String> productIds = cartItems.stream().map(Item::getProduct_id).toList();
+
+            SEFilter filterP = new SEFilter(SEFilterType.AND);
+            filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productIds));
+            filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+            List<Products> products = productService.repoFind(filterP);
+            Map<String, Products> productsMap = products.stream().collect(Collectors.toMap(Products::getId, product -> product));
+
+
+            for (Item item : cartItems) {
+                Products product = productsMap.get(item.getProduct_id());
+                if (product != null) {
+                    totalCartValueInPaise += product.getSelling_price() * item.getQuantity();
+                }
+            }
+            totalCartValue = CommonUtils.paiseToRupee(totalCartValueInPaise);
+            if (totalCartValueInPaise < minCartValueInPaise) {
+                freeDeliveryDiff = CommonUtils.paiseToRupee(minCartValueInPaise - totalCartValueInPaise);
+            }
+        }
+
+        return FetchCartV2.builder()
+                .totalCount(cartItems.size())
+                .totalAmount(totalCartValue)
+                .freeDeliveryDiff(freeDeliveryDiff)
+                .deliveryFree(totalCartValueInPaise > minCartValueInPaise)
+                .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
+                .build();
+    }
 
     @PostMapping("/clear")
     public SEResponse clear(HttpServletRequest httpServletRequest) {

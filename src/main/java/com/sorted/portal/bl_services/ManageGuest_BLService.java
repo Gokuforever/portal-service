@@ -44,8 +44,8 @@ public class ManageGuest_BLService {
     public SEResponse createGuest(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
         try {
             Users user = new Users();
-            user.setFirst_name(guest_first_name);
-            user.setLast_name(guest_last_name);
+//            user.setFirst_name(guest_first_name);
+//            user.setLast_name(guest_last_name);
             user.setRole_id(guest_role_id);
             user.setIs_verified(true);
 

@@ -64,8 +64,6 @@ public class ManageSignUp_BLService {
     public String sendOpt(@RequestBody String mobileNo) {
         Preconditions.check(StringUtils.hasText(mobileNo), ResponseCode.MISSING_MN);
         Preconditions.check(SERegExpUtils.isMobileNo(mobileNo), ResponseCode.INVALID_MN);
-
-
         return manageOtp.send(mobileNo, ProcessType.AUTH, Defaults.AUTH);
     }
 
@@ -146,6 +144,7 @@ public class ManageSignUp_BLService {
 //        setCookies(httpServletRequest, httpServletResponse, usersBean);
 //        return usersBean;
 //    }
+
 
     @PostMapping("/signup")
     public SEResponse signUp(@RequestBody SERequest request) {
