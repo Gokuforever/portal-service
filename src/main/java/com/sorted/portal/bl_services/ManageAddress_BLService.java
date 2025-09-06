@@ -189,7 +189,7 @@ public class ManageAddress_BLService {
                         .build())
                 .build();
         // @formatter:on
-        GetQuoteResponse getQuoteResponse = porterUtility.getQuote(quoteRequest, user_id);
+        GetQuoteResponse getQuoteResponse = porterUtility.getDeliveryQuote(quoteRequest);
         if (getQuoteResponse == null) {
             throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
         }

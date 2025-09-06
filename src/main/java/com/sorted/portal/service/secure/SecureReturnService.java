@@ -257,7 +257,7 @@ public class SecureReturnService {
         orderDetailsService.update(order.getId(), order, Defaults.INITIATE_SECURE_RETURN_CRON);
 
         CreateOrderBean createOrderRequest = buildCreateOrderRequest(order, items, seller, user, secureOrderId);
-        CreateOrderResBean response = porterUtility.createOrder(createOrderRequest);
+        CreateOrderResBean response = porterUtility.createOrderForPickup(createOrderRequest);
 
         order.setSecure_dp_order_id(response.getOrder_id());
         order.setStatus(OrderStatus.SECURE_RETURN_INITIATED, Defaults.INITIATE_SECURE_RETURN_CRON);

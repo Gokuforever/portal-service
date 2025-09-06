@@ -21,13 +21,13 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
-import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.assisting.beans.CartItems;
 import com.sorted.portal.assisting.beans.CartItemsBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
 import com.sorted.portal.request.beans.CartFetchReqBean;
 import com.sorted.portal.response.beans.CartBean;
 import com.sorted.portal.response.beans.FetchCartV2;
+import com.sorted.portal.service.EstimateDeliveryService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,8 +53,7 @@ public class ManageCart_BLService {
     private final Cart_Service cart_Service;
     private final ProductService productService;
     private final Users_Service users_Service;
-    private final Category_MasterService category_MasterService;
-    private final PorterUtility porterUtility;
+    private final EstimateDeliveryService estimateDeliveryService;
     private final StoreActivityService storeActivityService;
     private final Seller_Service sellerService;
     private final DemandingPincodeService demandingPincodeService;
@@ -355,7 +354,7 @@ public class ManageCart_BLService {
         boolean addressPresent = StringUtils.hasText(address_id);
         if (addressPresent && summed > 0) {
             Seller seller = sellerService.findById(seller_id).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND));
-            GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address_id, seller.getAddress_id(), customerName);
+            GetQuoteResponse quote = estimateDeliveryService.getEstimateDeliveryAmount(address_id, seller.getAddress_id(), customerName);
             if (quote != null) {
                 cart.setDelivery_charges(fixedDeliveryCharge);
                 cart_Service.update(cart.getId(), cart, cart.getModified_by());

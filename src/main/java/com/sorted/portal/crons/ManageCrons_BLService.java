@@ -112,7 +112,7 @@ public class ManageCrons_BLService {
     }
 
     private void updateOrderStatus(Order_Details details) {
-        FetchOrderRes fetchOrderRes = porterUtility.getOrder(details.getDp_order_id());
+        FetchOrderRes fetchOrderRes = porterUtility.getOrderStatus(details.getDp_order_id());
         if (!details.getDp_order_id().equals(fetchOrderRes.getOrder_id())) {
             internalMailService.sendMailOnError("Order id mismatch from porter.", details.getDp_order_id(), new InvalidParameterException("Order id mismatch from porter."));
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);

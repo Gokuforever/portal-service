@@ -7,7 +7,9 @@ public record AuthV2Bean(
         String referenceId,
         String otp,
         @JsonProperty("mobile_no")
-        String mobileNo
+        String mobileNo,
+        @JsonProperty("redirect_to_cart")
+        boolean redirectToCart
 ) {
 
 }

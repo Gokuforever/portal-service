@@ -28,6 +28,7 @@ import com.sorted.portal.annotation.RateLimited;
 import com.sorted.portal.request.beans.AuthV2Bean;
 import com.sorted.portal.request.beans.SignUpRequest;
 import com.sorted.portal.request.beans.VerifyOtpBean;
+import com.sorted.portal.response.beans.AuthV2Response;
 import com.sorted.portal.service.EducationDetailsValidationService;
 import com.sorted.portal.service.SignUpService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -68,7 +69,7 @@ public class ManageSignUp_BLService {
     }
 
     @PostMapping("v2/auth")
-    public UsersBean signUpV2(@RequestBody AuthV2Bean auth) {
+    public AuthV2Response signUpV2(@RequestBody AuthV2Bean auth) {
         Preconditions.check(StringUtils.hasText(auth.mobileNo()), ResponseCode.MISSING_MN);
         Preconditions.check(SERegExpUtils.isMobileNo(auth.mobileNo()), ResponseCode.INVALID_MN);
         Preconditions.check(StringUtils.hasText(auth.referenceId()), ResponseCode.MISSING_REF_ID);
@@ -86,8 +87,12 @@ public class ManageSignUp_BLService {
             user = users_Service.create(user, Defaults.AUTH);
         }
 
-        return users_Service.validateAndGetUserInfo(user.getId());
-    }
+        UsersBean usersBean = users_Service.validateAndGetUserInfo(user.getId());
+        return AuthV2Response.builder()
+                .usersBean(usersBean)
+                .redirectionUrl(auth.redirectToCart() ? "/order/bag" : "/")
+                .build();
+        }
 
 //    @PostMapping("/signup/verifyOtp/v2")
 //    public UsersBean verifyOtpV2(@RequestBody VerifyOtpBean verifyOtpBean, HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {

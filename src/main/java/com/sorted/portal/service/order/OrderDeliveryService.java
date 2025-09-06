@@ -53,7 +53,7 @@ public class OrderDeliveryService {
                 user);
 
         log.debug("Sending order creation request to Porter");
-        CreateOrderResBean response = porterUtility.createOrder(orderRequest);
+        CreateOrderResBean response = porterUtility.createOrderForPickup(orderRequest);
 
         log.info("Successfully created Porter delivery order with ID: {} for order: {}",
                 response.getOrder_id(), orderDetails.getId());
