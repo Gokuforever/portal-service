@@ -29,6 +29,7 @@ import com.sorted.portal.request.beans.AuthV2Bean;
 import com.sorted.portal.request.beans.SignUpRequest;
 import com.sorted.portal.request.beans.VerifyOtpBean;
 import com.sorted.portal.response.beans.AuthV2Response;
+import com.sorted.portal.response.beans.SendOtpReq;
 import com.sorted.portal.service.EducationDetailsValidationService;
 import com.sorted.portal.service.SignUpService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -62,7 +63,8 @@ public class ManageSignUp_BLService {
 
     @RateLimited(5)
     @PostMapping("/otp")
-    public String sendOpt(@RequestBody String mobileNo) {
+    public String sendOpt(@RequestBody SendOtpReq request) {
+        String mobileNo = request.mobileNo();
         Preconditions.check(StringUtils.hasText(mobileNo), ResponseCode.MISSING_MN);
         Preconditions.check(SERegExpUtils.isMobileNo(mobileNo), ResponseCode.INVALID_MN);
         return manageOtp.send(mobileNo, ProcessType.AUTH, Defaults.AUTH);
