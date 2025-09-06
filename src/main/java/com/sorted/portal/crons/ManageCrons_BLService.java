@@ -57,7 +57,7 @@ public class ManageCrons_BLService {
     private final EmailSenderImpl emailSenderImpl;
     private final InternalMailService internalMailService;
 
-    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
+//    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
@@ -84,7 +84,7 @@ public class ManageCrons_BLService {
 
     }
 
-    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
+//    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheckForCancelledOrders() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
@@ -120,7 +120,7 @@ public class ManageCrons_BLService {
         porterUtility.updateOrderStatus(details, fetchOrderRes.getStatus(), fetchOrderRes.getFare_details());
     }
 
-    @Scheduled(fixedRate = 60000) // Executes every 60000ms (1 minute)
+//    @Scheduled(fixedRate = 60000) // Executes every 60000ms (1 minute)
     public void phonePeStatusCheckForPendingTransactions() {
         log.info("PhonePe Status Check For Pending Transactions");
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
@@ -223,7 +223,7 @@ public class ManageCrons_BLService {
         }
     }
 
-    @Scheduled(cron = "0 0 10 * * ?")
+//    @Scheduled(cron = "0 0 10 * * ?")
     public void sendReminderToSellers() {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
