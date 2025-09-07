@@ -16,6 +16,7 @@ public record FetchCartV2(
         @JsonProperty("is_delivery_free")
         Boolean deliveryFree,
         @JsonProperty("minimum_cart_value")
-        BigDecimal minimumCartValue
+        BigDecimal minimumCartValue,
+        BigDecimal savings
 ) {
 }

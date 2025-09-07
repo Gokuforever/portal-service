@@ -37,7 +37,7 @@ public class EducationDetailsValidationService {
                     log.error("Education category not found for ID: {}", educationDetails.getId());
                     return new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
                 });
-        Map<String, List<String>> map = educationDetails.getFields().stream().collect(Collectors.toMap(
+        Map<String, List<String>> map = educationCategory.getFields().stream().collect(Collectors.toMap(
                 EducationCategoryField::getAlias, EducationCategoryField::getOptions));
 
         for (EducationCategoryField field : educationDetails.getFields()) {

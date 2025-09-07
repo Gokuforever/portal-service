@@ -61,7 +61,7 @@ public class ManageSignUp_BLService {
     private final EmailSenderImpl emailSenderImpl;
     private final EducationDetailsValidationService validationService;
 
-    @RateLimited(5)
+    @RateLimited(50)
     @PostMapping("/otp")
     public String sendOpt(@RequestBody SendOtpReq request) {
         String mobileNo = request.mobileNo();

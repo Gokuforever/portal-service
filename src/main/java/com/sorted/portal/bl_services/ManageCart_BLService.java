@@ -91,6 +91,7 @@ public class ManageCart_BLService {
         BigDecimal totalCartValue = BigDecimal.ZERO;
         BigDecimal freeDeliveryDiff = BigDecimal.ZERO;
         long totalCartValueInPaise = 0L;
+        long totalMrpInPaise = 0L;
 
 
         List<Item> cartItems = cart.getCart_items();
@@ -109,6 +110,7 @@ public class ManageCart_BLService {
                 Products product = productsMap.get(item.getProduct_id());
                 if (product != null) {
                     totalCartValueInPaise += product.getSelling_price() * item.getQuantity();
+                    totalMrpInPaise += product.getMrp() * item.getQuantity();
                 }
             }
             totalCartValue = CommonUtils.paiseToRupee(totalCartValueInPaise);
@@ -117,11 +119,19 @@ public class ManageCart_BLService {
             }
         }
 
+        long moneySavedInPaise = totalMrpInPaise - totalCartValueInPaise;
+
+        boolean isDeliveryFree = totalCartValueInPaise > minCartValueInPaise;
+        if (isDeliveryFree) {
+            moneySavedInPaise += fixedDeliveryCharge;
+        }
+
         return FetchCartV2.builder()
                 .totalCount(cartItems.size())
                 .totalAmount(totalCartValue)
                 .freeDeliveryDiff(freeDeliveryDiff)
-                .deliveryFree(totalCartValueInPaise > minCartValueInPaise)
+                .deliveryFree(isDeliveryFree)
+                .savings(CommonUtils.paiseToRupee(moneySavedInPaise))
                 .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
                 .build();
     }
