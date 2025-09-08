@@ -8,14 +8,13 @@ import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
-import com.sorted.commons.enums.MailTemplate;
-import com.sorted.commons.enums.OrderStatus;
-import com.sorted.commons.enums.PurchaseType;
-import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.MailBuilder;
 import com.sorted.commons.notifications.EmailSenderImpl;
+import com.sorted.commons.notifications.SMSService;
+import com.sorted.commons.notifications.helper.SmsTraceHelper;
 import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.response.beans.OrderItemResponse;
 import com.sorted.portal.service.OrderService;
@@ -23,6 +22,7 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -46,6 +46,10 @@ public class OrderStatusCheckService {
     private final Seller_Service seller_Service;
     private final StoreActivityService storeActivityService;
     private final OrderService orderService;
+    private final SmsTraceHelper smsTraceHelper;
+    private final SMSService smsService;
+    @Value("${se.enable.sms:false}")
+    private boolean enableSms;
 
     public List<OrderItemResponse> checkOrderStatus(@NonNull Order_Details order_Details) {
 //        boolean cartAndProductUpdated = status.equals(OrderStatus.TRANSACTION_PENDING) || status.equals(OrderStatus.TRANSACTION_PROCESSED);
@@ -101,6 +105,19 @@ public class OrderStatusCheckService {
                 mailBuilder.setContent(mailContent);
                 mailBuilder.setTemplate(MailTemplate.NEW_ORDER_ARRIVED);
                 emailSenderImpl.sendEmailHtmlTemplate(mailBuilder);
+
+                String mobileNo = spocDetails.getMobile_no();
+
+                String content = firstName + "|" + order_Details.getCode() + "|" + "https://seller.studeaze.in/orders";
+
+                if (enableSms) {
+                    smsTraceHelper.runWithTrace(List.of(mobileNo),
+                            content,
+                            SmsTemplate.NEW_ORDER,
+                            Defaults.AUTO,
+                            () -> smsService.sendSMS(List.of(mobileNo), content, SmsTemplate.NEW_ORDER)
+                    );
+                }
             }
         }
     }
