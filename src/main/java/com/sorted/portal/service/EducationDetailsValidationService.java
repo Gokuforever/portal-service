@@ -37,24 +37,43 @@ public class EducationDetailsValidationService {
                     log.error("Education category not found for ID: {}", educationDetails.getId());
                     return new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
                 });
-        Map<String, List<String>> map = educationCategory.getFields().stream().collect(Collectors.toMap(
-                EducationCategoryField::getAlias, EducationCategoryField::getOptions));
+        Map<String, EducationCategoryField> fieldsmap = educationDetails.getFields().stream().collect(Collectors.toMap(
+                EducationCategoryField::getAlias, e -> e));
 
-        for (EducationCategoryField field : educationDetails.getFields()) {
+
+        for (EducationCategoryField field : educationCategory.getFields()) {
             boolean mandatory = field.isMandatory();
-            boolean containsKey = map.containsKey(field.getAlias());
-            if (mandatory) {
-                Preconditions.check(containsKey, ResponseCode.MISSING_MANDATE_EDUCATION_DETAILS);
+            boolean containsKey = fieldsmap.containsKey(field.getAlias());
+            if (mandatory && !containsKey) {
+                throw new CustomIllegalArgumentsException(ResponseCode.MISSING_MANDATE_EDUCATION_DETAILS);
             }
-            if (!containsKey)
-                continue;
-            List<String> options = map.get(field.getAlias());
+            EducationCategoryField educationCategoryField = fieldsmap.get(field.getAlias());
+            List<String> options = educationCategoryField.getOptions();
             Preconditions.check(CollectionUtils.isNotEmpty(options), ResponseCode.MISSING_MANDATE_EDUCATION_DETAILS);
+            options.remove("");
+            Preconditions.check(CollectionUtils.isNotEmpty(options), ResponseCode.MISSING_MANDATE_EDUCATION_DETAILS);
+
             Preconditions.check(new HashSet<>(field.getOptions()).containsAll(options), ResponseCode.ERR_0001);
             if (options.contains("Other")) {
-                Preconditions.check(StringUtils.hasText(field.getDescription()), ResponseCode.MISSING_DESCRIPTION);
+                Preconditions.check(StringUtils.hasText(educationCategoryField.getDescription()), ResponseCode.MISSING_DESCRIPTION);
             }
         }
+
+//        for (EducationCategoryField field : educationDetails.getFields()) {
+//            boolean containsKey = map.containsKey(field.getAlias());
+//            boolean mandatory = field.isMandatory();
+//            if (mandatory) {
+//                Preconditions.check(containsKey, ResponseCode.MISSING_MANDATE_EDUCATION_DETAILS);
+//            }
+//            if (!containsKey)
+//                continue;
+//            List<String> options = map.get(field.getAlias());
+//            Preconditions.check(CollectionUtils.isNotEmpty(options), ResponseCode.MISSING_MANDATE_EDUCATION_DETAILS);
+//            Preconditions.check(new HashSet<>(field.getOptions()).containsAll(options), ResponseCode.ERR_0001);
+//            if (options.contains("Other")) {
+//                Preconditions.check(StringUtils.hasText(field.getDescription()), ResponseCode.MISSING_DESCRIPTION);
+//            }
+//        }
     }
 
 }

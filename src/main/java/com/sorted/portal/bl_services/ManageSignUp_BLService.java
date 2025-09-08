@@ -30,6 +30,7 @@ import com.sorted.portal.request.beans.SignUpRequest;
 import com.sorted.portal.request.beans.VerifyOtpBean;
 import com.sorted.portal.response.beans.AuthV2Response;
 import com.sorted.portal.response.beans.SendOtpReq;
+import com.sorted.portal.service.AuthService;
 import com.sorted.portal.service.EducationDetailsValidationService;
 import com.sorted.portal.service.SignUpService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,14 +53,15 @@ import static com.sorted.portal.service.CookieService.setCookies;
 public class ManageSignUp_BLService {
 
     private final ManageOtp manageOtp;
+    private final AuthService authService;
     private final Users_Service users_Service;
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-    @Value("${se.portal.customer.signup.role}")
-    private String customer_signup_role;
     private final SignUpService signUpService;
     private final EmailSenderImpl emailSenderImpl;
     private final EducationDetailsValidationService validationService;
+    @Value("${se.portal.customer.signup.role}")
+    private String customer_signup_role;
 
     @RateLimited(50)
     @PostMapping("/otp")
@@ -71,33 +73,15 @@ public class ManageSignUp_BLService {
     }
 
     @PostMapping("v2/auth")
-    public AuthV2Response signUpV2(@RequestBody AuthV2Bean auth) {
-        Preconditions.check(StringUtils.hasText(auth.mobileNo()), ResponseCode.MISSING_MN);
-        Preconditions.check(SERegExpUtils.isMobileNo(auth.mobileNo()), ResponseCode.INVALID_MN);
-        Preconditions.check(StringUtils.hasText(auth.referenceId()), ResponseCode.MISSING_REF_ID);
-        Preconditions.check(StringUtils.hasText(auth.otp()), ResponseCode.MISSING_OTP);
-        Preconditions.check(SERegExpUtils.isOtp(auth.otp()), ResponseCode.INVALID_OTP);
-
-        manageOtp.verify(auth.mobileNo(), auth.referenceId(), auth.otp(), ProcessType.AUTH, Defaults.AUTH);
-        SEFilter filter = new SEFilter(SEFilterType.AND);
-        filter.addClause(WhereClause.eq(Users.Fields.mobile_no, auth.mobileNo()));
-        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        Users user = users_Service.repoFindOne(filter);
-        if (user == null) {
-            user = new Users();
-            user.setMobile_no(auth.mobileNo());
-            user = users_Service.create(user, Defaults.AUTH);
-        }
-        user.setRole_id(customer_signup_role);
-        user.setIs_verified(true);
-        users_Service.update(user.getId(), user, Defaults.AUTH);
+    public AuthV2Response signUpV2(@RequestBody AuthV2Bean auth, HttpServletRequest httpServletRequest) {
+        Users user = authService.verifyAuth(auth, ProcessType.AUTH, httpServletRequest);
 
         UsersBean usersBean = users_Service.validateAndGetUserInfo(user.getId());
         return AuthV2Response.builder()
                 .usersBean(usersBean)
                 .redirectionUrl(auth.redirectToCart() ? "/order/bag" : "/")
                 .build();
-        }
+    }
 
 //    @PostMapping("/signup/verifyOtp/v2")
 //    public UsersBean verifyOtpV2(@RequestBody VerifyOtpBean verifyOtpBean, HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
