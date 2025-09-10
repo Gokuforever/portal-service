@@ -117,7 +117,7 @@ public class ManageCrons_BLService {
             internalMailService.sendMailOnError("Order id mismatch from porter.", details.getDp_order_id(), new InvalidParameterException("Order id mismatch from porter."));
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
-        porterUtility.updateOrderStatus(details, fetchOrderRes.getStatus(), fetchOrderRes.getFare_details());
+        porterUtility.updateOrderStatus(details, fetchOrderRes);
     }
 
 //    @Scheduled(fixedRate = 60000) // Executes every 60000ms (1 minute)
