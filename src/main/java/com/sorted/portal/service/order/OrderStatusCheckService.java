@@ -70,6 +70,7 @@ public class OrderStatusCheckService {
     }
 
     private void newOrderNotificationToSeller(@NotNull Order_Details order_Details) {
+
         AggregationFilter.SEFilter filterU = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
         filterU.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         filterU.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getUser_id()));
@@ -78,15 +79,31 @@ public class OrderStatusCheckService {
         if (user == null) {
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
-        String userName = user.getFirst_name() + " " + user.getLast_name();
-        String orderTemplateTable = orderTemplateService.getOrderTemplateTable(order_Details);
-        String mailContent = userName + "|" + orderTemplateTable;
+        if (StringUtils.hasText(user.getEmail_id())) {
+            String userName = user.getFirst_name() + " " + user.getLast_name();
+            String orderTemplateTable = orderTemplateService.getOrderTemplateTable(order_Details);
+            String mailContent = userName + "|" + orderTemplateTable;
 
-        MailBuilder builder = new MailBuilder();
-        builder.setTo(user.getEmail_id());
-        builder.setContent(mailContent);
-        builder.setTemplate(MailTemplate.DIRECT_ORDER_CONFIRMATION);
-        emailSenderImpl.sendEmailHtmlTemplate(builder);
+            MailBuilder builder = new MailBuilder();
+            builder.setTo(user.getEmail_id());
+            builder.setContent(mailContent);
+            builder.setTemplate(MailTemplate.DIRECT_ORDER_CONFIRMATION);
+            emailSenderImpl.sendEmailHtmlTemplate(builder);
+        }
+
+        if (enableSms) {
+            String firstName = StringUtils.hasText(order_Details.getDelivery_address().getFirst_name()) ?
+                    order_Details.getDelivery_address().getFirst_name() : StringUtils.hasText(user.getFirst_name()) ?
+                    user.getFirst_name() : "Student";
+            String phoneNo = StringUtils.hasText(order_Details.getDelivery_address().getPhone_no()) ? order_Details.getDelivery_address().getPhone_no() : user.getMobile_no();
+            String content = firstName + "|" + order_Details.getCode();
+            smsTraceHelper.runWithTrace(List.of(phoneNo),
+                    content,
+                    SmsTemplate.ORDER_CONFIRMED,
+                    Defaults.AUTO,
+                    () -> smsService.sendSMS(List.of(phoneNo), content, SmsTemplate.ORDER_CONFIRMED)
+            );
+        }
 
         AggregationFilter.SEFilter filterS = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
         filterS.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getSeller_id()));
@@ -99,7 +116,7 @@ public class OrderStatusCheckService {
                 Spoc_Details spocDetails = first.get();
                 String mailId = spocDetails.getEmail_id();
                 String firstName = spocDetails.getFirst_name();
-                mailContent = firstName + "|" + orderTemplateTable;
+                String mailContent = firstName + "|" + orderTemplateService.getOrderTemplateTable(order_Details);
                 MailBuilder mailBuilder = new MailBuilder();
                 mailBuilder.setTo(mailId);
                 mailBuilder.setContent(mailContent);
