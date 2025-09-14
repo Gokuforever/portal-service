@@ -65,7 +65,7 @@ public class ManageCombo_BLService {
                 .name(product.getName())
                 .sellingPrice(CommonUtils.paiseToRupee(product.getSelling_price()))
                 .mrp(CommonUtils.paiseToRupee(product.getMrp()))
-                .image(CollectionUtils.isNotEmpty(product.getMedia()) ? product.getMedia().stream().filter(media -> media.getOrder() == 1).findFirst().get().getCdn_url() : null)
+                .image(CollectionUtils.isNotEmpty(product.getMedia()) && !product.getMedia().isEmpty() ? product.getMedia().stream().filter(media -> media.getOrder() == 0).findFirst().get().getCdn_url() : null)
                 .build();
     }
 
