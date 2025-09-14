@@ -74,7 +74,7 @@ public class ManageCombo_BLService {
         log.info("Starting combo creation process");
 
         try {
-            log.debug("Extracted CreateComboBean from request: {}", req);
+            log.info("Extracted CreateComboBean from request: {}", req);
 
             log.debug("Headers extracted successfully");
 
