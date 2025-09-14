@@ -7,7 +7,6 @@ import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.All_Status.User_Status;
-import com.sorted.commons.enums.EntityDetails;
 import com.sorted.commons.enums.ProcessType;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
@@ -98,8 +97,8 @@ public class ManageAuth_BLService {
             if (!StringUtils.hasText(entity_id)) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
             }
-            manageOtp.verify(EntityDetails.USERS, reference_id, otp, entity_id, ProcessType.SIGN_IN, Defaults.SIGN_IN);
             UsersBean usersBean = users_Service.validateAndGetUserInfo(entity_id);
+            manageOtp.verify(usersBean.getMobile_no(), reference_id, otp, ProcessType.SIGN_IN, Defaults.SIGN_IN);
             setCookies(httpServletRequest, httpServletResponse, usersBean);
             return SEResponse.getBasicSuccessResponseObject(usersBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
@@ -129,7 +128,7 @@ public class ManageAuth_BLService {
             if (!StringUtils.hasText(entity_id)) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
             }
-            String uuid = manageOtp.resendOtp(process_type, reference_id, entity_id);
+            String uuid = manageOtp.resendOtp(process_type, reference_id);
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setEntity_id(entity_id);
@@ -167,8 +166,7 @@ public class ManageAuth_BLService {
             if (User_Status.ACTIVE.getId() != users.getStatus()) {
                 throw new CustomIllegalArgumentsException(ResponseCode.USER_BLOCKED);
             }
-            String uuid = manageOtp.send(users.getMobile_no(), users.getId(), ProcessType.FORGOT_PASS,
-                    EntityDetails.USERS, users.getId());
+            String uuid = manageOtp.send(users.getMobile_no(), ProcessType.FORGOT_PASS, users.getId());
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setProcess_type(ProcessType.FORGOT_PASS.name());
@@ -205,8 +203,6 @@ public class ManageAuth_BLService {
             if (!StringUtils.hasText(entity_id)) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
             }
-            manageOtp.verify(EntityDetails.USERS, reference_id, otp, entity_id, ProcessType.FORGOT_PASS,
-                    Defaults.FORGOT_PASS);
             SEFilter filterU = new SEFilter(SEFilterType.AND);
             filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, entity_id));
             filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -215,6 +211,7 @@ public class ManageAuth_BLService {
             if (users == null) {
                 throw new CustomIllegalArgumentsException(ResponseCode.USER_NOT_FOUND);
             }
+            manageOtp.verify(users.getMobile_no(), reference_id, otp, ProcessType.FORGOT_PASS, Defaults.FORGOT_PASS);
             if (!Boolean.TRUE.equals(users.getIs_verified())) {
                 throw new CustomIllegalArgumentsException(ResponseCode.USER_NOT_FOUND);
             }

@@ -2,9 +2,7 @@ package com.sorted.portal.bl_services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sorted.commons.beans.EducationCategoryBean;
-import com.sorted.commons.beans.EducationCategoryField;
 import com.sorted.commons.beans.NearestSellerRes;
-import com.sorted.commons.entity.mongo.EducationCategories;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.EducationCategoriesService;
@@ -13,28 +11,23 @@ import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.AccessDeniedException;
-import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.CommonUtils;
-import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.Preconditions;
 import com.sorted.portal.request.beans.FormDataBean;
 import com.sorted.portal.service.EducationDetailsValidationService;
+import com.sorted.portal.service.NearestSellerService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Log4j2
 @RestController
@@ -45,7 +38,7 @@ public class ManagePopUp_BLService {
     private final EducationDetailsValidationService validationService;
     private final Users_Service usersService;
     private final RoleService roleService;
-    private final PorterUtility porterUtility;
+    private final NearestSellerService nearestSellerService;
 
     @GetMapping("/formConfig")
     public List<EducationCategoryBean> getPopUpDetails() {
@@ -96,7 +89,7 @@ public class ManagePopUp_BLService {
         }
 
         log.debug("Finding nearest seller for pincode: {}", req.getPincode());
-        NearestSellerRes response = porterUtility.getNearestSeller(req.getPincode(), null, user.getMobile_no(), user.getId());
+        NearestSellerRes response = nearestSellerService.getNearestSeller(req.getPincode(), null, user.getMobile_no(), user.getId());
         log.debug("Found nearest seller: {}", response.getSeller_id());
         log.debug("Updating user's nearest seller information");
         user.setNearestSeller(response.getSeller_id());

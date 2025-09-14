@@ -8,5 +8,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RateLimited {
-    double value() default 10.0; // Default rate limit of 10 requests per second
+    // Note: The value here is not used as we configure rate limiting globally
+    // The actual rate limit is configured in application.properties (rate.limiter.requests.per.minute)
+    double value() default 5.0; // Default rate limit configured in application.properties
 } 

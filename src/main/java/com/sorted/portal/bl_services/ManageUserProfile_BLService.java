@@ -101,7 +101,7 @@ public class ManageUserProfile_BLService {
             if (User_Status.ACTIVE.getId() != usersBean.getStatus()) {
                 throw new CustomIllegalArgumentsException(ResponseCode.USER_BLOCKED);
             }
-            String uuid = manageOtp.send(usersBean.getMobile_no(), usersBean.getId(), ProcessType.UPDATE_PASS, EntityDetails.USERS, usersBean.getId());
+            String uuid = manageOtp.send(usersBean.getMobile_no(),  ProcessType.UPDATE_PASS, usersBean.getId());
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setProcess_type(ProcessType.UPDATE_PASS.name());
@@ -136,7 +136,6 @@ public class ManageUserProfile_BLService {
             if (!StringUtils.hasText(reference_id)) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_REF_ID);
             }
-            manageOtp.verify(EntityDetails.USERS, reference_id, otp, entity_id, ProcessType.UPDATE_PASS, Defaults.UPDATE_PASS);
             SEFilter filterU = new SEFilter(SEFilterType.AND);
             filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, entity_id));
             filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -151,6 +150,7 @@ public class ManageUserProfile_BLService {
             if (User_Status.ACTIVE.getId() != users.getStatus()) {
                 throw new CustomIllegalArgumentsException(ResponseCode.USER_BLOCKED);
             }
+            manageOtp.verify(users.getMobile_no(), reference_id, otp, ProcessType.UPDATE_PASS, Defaults.UPDATE_PASS);
             users.setUuid(UUID.randomUUID().toString());
             users.setReset_pass_request_expiry(LocalDateTime.now().plusMinutes(resetWindow));
             users_Service.update(users.getId(), users, users.getId());

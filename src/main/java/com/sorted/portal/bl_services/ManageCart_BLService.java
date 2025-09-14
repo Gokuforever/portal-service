@@ -13,6 +13,7 @@ import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.All_Status.ProductCurrentStatus;
 import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.exceptions.AccessDeniedException;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
@@ -21,28 +22,24 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
-import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.assisting.beans.CartItems;
 import com.sorted.portal.assisting.beans.CartItemsBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
 import com.sorted.portal.request.beans.CartFetchReqBean;
 import com.sorted.portal.response.beans.CartBean;
+import com.sorted.portal.response.beans.FetchCartV2;
+import com.sorted.portal.service.EstimateDeliveryService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -55,8 +52,7 @@ public class ManageCart_BLService {
     private final Cart_Service cart_Service;
     private final ProductService productService;
     private final Users_Service users_Service;
-    private final Category_MasterService category_MasterService;
-    private final PorterUtility porterUtility;
+    private final EstimateDeliveryService estimateDeliveryService;
     private final StoreActivityService storeActivityService;
     private final Seller_Service sellerService;
     private final DemandingPincodeService demandingPincodeService;
@@ -67,6 +63,112 @@ public class ManageCart_BLService {
 
     @Value("${se.fixed-delivery-charge.in-paise:5900}")
     private long fixedDeliveryCharge;
+
+    @GetMapping("/v2/fetch")
+    public FetchCartV2 fetchV2(HttpServletRequest httpServletRequest) {
+        String req_user_id = httpServletRequest.getHeader("req_user_id");
+        if (!StringUtils.hasText(req_user_id)) {
+            throw new AccessDeniedException();
+        }
+
+        // Use more efficient query with projection to get only needed fields
+        SEFilter cartFilter = new SEFilter(SEFilterType.AND);
+        cartFilter.addClause(WhereClause.eq(Cart.Fields.user_id, req_user_id));
+        cartFilter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        Cart cart = cart_Service.repoFindOne(cartFilter);
+        if (cart == null) {
+            cart = new Cart();
+            cart.setUser_id(req_user_id);
+            cart_Service.create(cart, req_user_id);
+
+            // Return early for empty cart to avoid unnecessary processing
+            return FetchCartV2.builder()
+                    .totalCount(0)
+                    .totalAmount(BigDecimal.ZERO)
+                    .freeDeliveryDiff(CommonUtils.paiseToRupee(minCartValueInPaise))
+                    .deliveryFree(false)
+                    .savings(BigDecimal.ZERO)
+                    .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
+                    .build();
+        }
+
+        List<Item> cartItems = cart.getCart_items();
+        if (CollectionUtils.isEmpty(cartItems)) {
+            // Return early for empty cart
+            return FetchCartV2.builder()
+                    .totalCount(0)
+                    .totalAmount(BigDecimal.ZERO)
+                    .freeDeliveryDiff(CommonUtils.paiseToRupee(minCartValueInPaise))
+                    .deliveryFree(false)
+                    .savings(BigDecimal.ZERO)
+                    .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
+                    .build();
+        }
+
+        // Extract product IDs efficiently using parallel stream for large lists
+        List<String> productIds = cartItems.parallelStream()
+                .map(Item::getProduct_id)
+                .distinct() // Remove duplicates to reduce DB load
+                .collect(Collectors.toList());
+
+        // Use projection to fetch only required fields: id, selling_price, mrp
+        SEFilter productFilter = new SEFilter(SEFilterType.AND);
+        productFilter.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productIds));
+        productFilter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        productFilter.addProjection(BaseMongoEntity.Fields.id, Products.Fields.selling_price, Products.Fields.mrp);
+
+        // Consider adding projection here if your service supports it:
+        // productFilter.setProjection(Arrays.asList("id", "selling_price", "mrp"));
+
+        List<Products> products = productService.repoFind(productFilter);
+
+        // Use more efficient map creation with proper initial capacity
+        Map<String, Products> productsMap = products.stream()
+                .collect(Collectors.toMap(
+                        Products::getId,
+                        Function.identity(),
+                        (existing, replacement) -> existing, // Handle potential duplicates
+                        HashMap::new
+                ));
+
+        // Calculate totals using single pass with primitive operations
+        long totalCartValueInPaise = 0L;
+        long totalMrpInPaise = 0L;
+        int totalCount = 0;
+
+        for (Item item : cartItems) {
+            Products product = productsMap.get(item.getProduct_id());
+            if (product != null) {
+                long quantity = item.getQuantity();
+                totalCartValueInPaise += product.getSelling_price() * quantity;
+                totalMrpInPaise += product.getMrp() * quantity;
+                totalCount++;
+            }
+        }
+
+        // Calculate derived values
+        BigDecimal totalCartValue = CommonUtils.paiseToRupee(totalCartValueInPaise);
+        BigDecimal freeDeliveryDiff = totalCartValueInPaise < minCartValueInPaise
+                ? CommonUtils.paiseToRupee(minCartValueInPaise - totalCartValueInPaise)
+                : BigDecimal.ZERO;
+
+        long moneySavedInPaise = totalMrpInPaise - totalCartValueInPaise;
+        boolean isDeliveryFree = totalCartValueInPaise >= minCartValueInPaise; // Use >= for boundary case
+
+        if (isDeliveryFree) {
+            moneySavedInPaise += fixedDeliveryCharge;
+        }
+
+        return FetchCartV2.builder()
+                .totalCount(totalCount) // Use actual count of valid items
+                .totalAmount(totalCartValue)
+                .freeDeliveryDiff(freeDeliveryDiff)
+                .deliveryFree(isDeliveryFree)
+                .savings(CommonUtils.paiseToRupee(moneySavedInPaise))
+                .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
+                .build();
+    }
 
     @PostMapping("/clear")
     public SEResponse clear(HttpServletRequest httpServletRequest) {
@@ -194,18 +296,7 @@ public class ManageCart_BLService {
                 if (optional.isPresent()) {
                     total_item += optional.get().getQuantity();
                 }
-                if (product.getQuantity().compareTo(total_item) < 0) {
-                    String message = product.getQuantity().compareTo(0L) > 0
-                            ? "We only have " + product.getQuantity() + " in stock"
-                            : ResponseCode.OUT_OF_STOCK.getUserMessage();
-                    throw new CustomIllegalArgumentsException(message);
-                }
-
-                boolean secure_item = product.getIs_secure();
-                boolean is_secure_item = itemBean.isSecure_item();
-                if (is_secure_item && !secure_item) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.CANNOT_SECURE);
-                }
+                boolean is_secure_item = isIsSecureItem(product, total_item, itemBean);
 
                 Item item = new Item();
                 item.setProduct_id(product.getId());
@@ -238,6 +329,22 @@ public class ManageCart_BLService {
             log.error("/add:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
+    }
+
+    private static boolean isIsSecureItem(Products product, long total_item, CartItemsBean itemBean) {
+        if (product.getQuantity().compareTo(total_item) < 0) {
+            String message = product.getQuantity().compareTo(0L) > 0
+                    ? "We only have " + product.getQuantity() + " in stock"
+                    : ResponseCode.OUT_OF_STOCK.getUserMessage();
+            throw new CustomIllegalArgumentsException(message);
+        }
+
+        boolean secure_item = product.getIs_secure();
+        boolean is_secure_item = itemBean.isSecure_item();
+        if (is_secure_item && !secure_item) {
+            throw new CustomIllegalArgumentsException(ResponseCode.CANNOT_SECURE);
+        }
+        return is_secure_item;
     }
 
     private CartBean getCartBean(Cart cart) throws JsonProcessingException {
@@ -296,7 +403,7 @@ public class ManageCart_BLService {
         boolean addressPresent = StringUtils.hasText(address_id);
         if (addressPresent && summed > 0) {
             Seller seller = sellerService.findById(seller_id).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.SELLER_NOT_FOUND));
-            GetQuoteResponse quote = porterUtility.getEstimateDeliveryAmount(address_id, seller.getAddress_id(), customerName);
+            GetQuoteResponse quote = estimateDeliveryService.getEstimateDeliveryAmount(address_id, seller.getAddress_id(), customerName);
             if (quote != null) {
                 cart.setDelivery_charges(fixedDeliveryCharge);
                 cart_Service.update(cart.getId(), cart, cart.getModified_by());

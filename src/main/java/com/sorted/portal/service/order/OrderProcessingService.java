@@ -4,14 +4,15 @@ import com.phonepe.sdk.pg.common.models.response.RefundResponse;
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.beans.UsersBean;
-import com.sorted.commons.entity.mongo.Order_Details;
-import com.sorted.commons.entity.mongo.Order_Item;
-import com.sorted.commons.entity.mongo.Users;
+import com.sorted.commons.constants.Defaults;
+import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Order_Item_Service;
+import com.sorted.commons.entity.service.ProductService;
 import com.sorted.commons.enums.OrderStatus;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.helper.AggregationFilter.*;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.res.beans.CreateOrderResBean;
 import com.sorted.commons.porter.res.beans.FetchOrderRes.FareDetails;
@@ -22,7 +23,9 @@ import com.sorted.portal.request.beans.CreateDeliveryBean;
 import com.sorted.portal.request.beans.OrderAcceptRejectRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.math3.stat.descriptive.summary.Product;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDate;
 import java.time.Year;
@@ -43,6 +46,7 @@ public class OrderProcessingService {
     private final OrderDeliveryService deliveryService;
     private final PhonePeUtility phonePeUtility;
     private final InternalMailService internalMailService;
+    private final ProductService productService;
 
     /**
      * Process ready for pickup operation
@@ -148,6 +152,26 @@ public class OrderProcessingService {
         orderDetails.setRejection_remarks(remarks);
         orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
 
+        // TODO: mark products out of stock
+
+        SEFilter filterOI = new SEFilter(SEFilterType.AND);
+        filterOI.addClause(WhereClause.eq(Order_Item.Fields.order_id, orderDetails.getId()));
+        filterOI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        List<Order_Item> orderItems = orderItemService.repoFind(filterOI);
+        if (!CollectionUtils.isEmpty(orderItems)) {
+            List<String> productIds = orderItems.stream().map(Order_Item::getProduct_id).distinct().toList();
+            SEFilter filterP = new SEFilter(SEFilterType.AND);
+            filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productIds));
+            filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            List<Products> products = productService.repoFind(filterP);
+            if (!CollectionUtils.isEmpty(products)) {
+                products.forEach(product -> product.setQuantity(0L));
+                for (Products product : products) {
+                    productService.update(product.getId(), product, "On Reject");
+                }
+            }
+        }
+
         long nanoseconds = CommonUtils.getNanoseconds();
         String refundTxnId = "REF-" +
                 LocalDate.now().getMonth() +
@@ -174,14 +198,8 @@ public class OrderProcessingService {
         orderDetails.setStatus(orderStatus, userId);
         orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
 
-        if (orderStatus == OrderStatus.FULLY_REFUNDED) {
-            // TODO: amount refunded
-        } else if (orderStatus == OrderStatus.REFUND_FAILED) {
-            // TODO: refund initiated
-            // TODO: create cron job for retry
+        if (orderStatus == OrderStatus.REFUND_FAILED) {
             internalMailService.sendMailOnError("Refund failed for order ID: " + orderDetails.getId(), "Refund failed for order ID: " + orderDetails.getId(), null);
-        } else {
-            // TODO: refund initiated
         }
 
         return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);

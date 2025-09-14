@@ -9,7 +9,6 @@ import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Users_Service;
-import com.sorted.commons.enums.EntityDetails;
 import com.sorted.commons.enums.MailTemplate;
 import com.sorted.commons.enums.ProcessType;
 import com.sorted.commons.enums.ResponseCode;
@@ -23,9 +22,15 @@ import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.manage.otp.ManageOtp;
 import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.utils.PasswordValidatorUtils;
+import com.sorted.commons.utils.Preconditions;
 import com.sorted.commons.utils.SERegExpUtils;
+import com.sorted.portal.annotation.RateLimited;
+import com.sorted.portal.request.beans.AuthV2Bean;
 import com.sorted.portal.request.beans.SignUpRequest;
 import com.sorted.portal.request.beans.VerifyOtpBean;
+import com.sorted.portal.response.beans.AuthV2Response;
+import com.sorted.portal.response.beans.SendOtpReq;
+import com.sorted.portal.service.AuthService;
 import com.sorted.portal.service.EducationDetailsValidationService;
 import com.sorted.portal.service.SignUpService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,14 +53,92 @@ import static com.sorted.portal.service.CookieService.setCookies;
 public class ManageSignUp_BLService {
 
     private final ManageOtp manageOtp;
+    private final AuthService authService;
     private final Users_Service users_Service;
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-    @Value("${se.portal.customer.signup.role}")
-    private String customer_signup_role;
     private final SignUpService signUpService;
     private final EmailSenderImpl emailSenderImpl;
     private final EducationDetailsValidationService validationService;
+    @Value("${se.portal.customer.signup.role}")
+    private String customer_signup_role;
+
+    @RateLimited(50)
+    @PostMapping("/otp")
+    public String sendOpt(@RequestBody SendOtpReq request) {
+        String mobileNo = request.mobileNo();
+        Preconditions.check(StringUtils.hasText(mobileNo), ResponseCode.MISSING_MN);
+        Preconditions.check(SERegExpUtils.isMobileNo(mobileNo), ResponseCode.INVALID_MN);
+        return manageOtp.send(mobileNo, ProcessType.AUTH, Defaults.AUTH);
+    }
+
+    @PostMapping("v2/auth")
+    public AuthV2Response signUpV2(@RequestBody AuthV2Bean auth, HttpServletRequest httpServletRequest) {
+        Users user = authService.verifyAuth(auth, ProcessType.AUTH, httpServletRequest);
+
+        UsersBean usersBean = users_Service.validateAndGetUserInfo(user.getId());
+        return AuthV2Response.builder()
+                .usersBean(usersBean)
+                .redirectionUrl(auth.redirectToCart() ? "/order/bag" : "/")
+                .build();
+    }
+
+//    @PostMapping("/signup/verifyOtp/v2")
+//    public UsersBean verifyOtpV2(@RequestBody VerifyOtpBean verifyOtpBean, HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
+//        String otp = verifyOtpBean.getOtp();
+//        String reference_id = verifyOtpBean.getReference_id();
+//        String entity_id = verifyOtpBean.getEntity_id();
+//
+//        Preconditions.check(StringUtils.hasText(otp), ResponseCode.MISSING_OTP);
+//        Preconditions.check(SERegExpUtils.isOtp(otp), ResponseCode.INVALID_OTP);
+//        Preconditions.check(StringUtils.hasText(reference_id), ResponseCode.MISSING_REF_ID);
+//        Preconditions.check(StringUtils.hasText(entity_id), ResponseCode.MISSING_ENTITY);
+//
+//        manageOtp.verify(reference_id, otp, ProcessType.SIGN_UP, Defaults.SIGN_UP);
+//
+//        SEFilter filterCL = new SEFilter(SEFilterType.AND);
+//        filterCL.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, entity_id));
+//        filterCL.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//
+//        Users users = users_Service.repoFindOne(filterCL);
+//        if (users == null) {
+//            throw new CustomIllegalArgumentsException(ResponseCode.ENTITY_NOT_FOUND);
+//        }
+//
+//        SEFilter filterR = new SEFilter(SEFilterType.AND);
+//        filterR.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, customer_signup_role));
+//        filterR.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//
+//        Role role = roleService.repoFindOne(filterR);
+//        if (role == null) {
+//            throw new CustomIllegalArgumentsException(ResponseCode.MSSING_CUST_DEF_ROLE);
+//        }
+//        users.setIs_verified(true);
+//        users.setRole_id(customer_signup_role);
+//
+//        String guest_user_id = httpServletRequest.getHeader("req_user_id");
+//        if (StringUtils.hasText(guest_user_id)) {
+//            SEFilter filterGU = new SEFilter(SEFilterType.AND);
+//            filterGU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, guest_user_id));
+//            filterGU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//            Users guestUser = users_Service.repoFindOne(filterGU);
+//            if (guestUser != null) {
+//                EducationCategoryBean educationDetails = guestUser.getEducationDetails();
+//                if (educationDetails != null) {
+//                    users.setEducationDetails(educationDetails);
+//                }
+//                users_Service.deleteOne(guest_user_id, users.getId());
+//                signUpService.migrateCart(guest_user_id, users.getId());
+//                signUpService.migrateAddressForCustomer(guest_user_id, users.getId());
+//            }
+//        }
+//        users_Service.update(users.getId(), users, Defaults.SIGN_UP);
+//
+//        UsersBean usersBean = users_Service.validateAndGetUserInfo(users.getId());
+//        setCookies(httpServletRequest, httpServletResponse, usersBean);
+//        return usersBean;
+//    }
+
 
     @PostMapping("/signup")
     public SEResponse signUp(@RequestBody SERequest request) {
@@ -133,7 +216,7 @@ public class ManageSignUp_BLService {
 
             users_Service.upsert(user.getId(), user, Defaults.SIGN_UP);
 
-            String uuid = manageOtp.send(req.getMobile_no(), user.getId(), ProcessType.SIGN_UP, EntityDetails.USERS, Defaults.SIGN_UP);
+            String uuid = manageOtp.send(req.getMobile_no(), ProcessType.SIGN_UP, Defaults.SIGN_UP);
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setEntity_id(user.getId());
@@ -170,7 +253,6 @@ public class ManageSignUp_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
             }
 
-            manageOtp.verify(EntityDetails.USERS, reference_id, otp, entity_id, ProcessType.SIGN_UP, Defaults.SIGN_UP);
 
             SEFilter filterCL = new SEFilter(SEFilterType.AND);
             filterCL.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, entity_id));
@@ -180,6 +262,7 @@ public class ManageSignUp_BLService {
             if (users == null) {
                 throw new CustomIllegalArgumentsException(ResponseCode.ENTITY_NOT_FOUND);
             }
+            manageOtp.verify(users.getMobile_no(), reference_id, otp, ProcessType.SIGN_UP, Defaults.SIGN_UP);
 
             SEFilter filterR = new SEFilter(SEFilterType.AND);
             filterR.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, customer_signup_role));

@@ -16,12 +16,10 @@ import com.sorted.commons.helper.SearchHistoryAsyncHelper;
 import com.sorted.commons.repository.mongo.ProductRepository;
 import com.sorted.commons.utils.AwsS3Service;
 import com.sorted.commons.utils.CommonUtils;
-import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDetailsBuilder;
-import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
 import com.sorted.portal.enums.ReportType;
@@ -33,6 +31,7 @@ import com.sorted.portal.response.beans.OrderItemReportsDTO;
 import com.sorted.portal.response.beans.OrderReportDTO;
 import com.sorted.portal.service.ExcelGenerationUtility;
 import com.sorted.portal.service.FileGeneratorUtil;
+import com.sorted.portal.service.NearestSellerService;
 import com.sorted.portal.service.StoreProductService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -67,7 +66,7 @@ public class ManageProduct_BLService {
     private final Users_Service users_Service;
     private final Seller_Service seller_Service;
     private final SearchHistoryAsyncHelper searchHistoryAsyncHelper;
-    private final PorterUtility porterUtility;
+    private final NearestSellerService nearestSellerService;
     private final AwsS3Service awsS3Service;
     @Value("${se.default.page}")
     private int defaultPage;
@@ -97,20 +96,20 @@ public class ManageProduct_BLService {
         }
         SEFilter filter = new SEFilter(SEFilterType.AND);
         String nearestSeller = usersBean.getNearestSeller();
-        if (StringUtils.hasText(nearestSeller)) {
-            boolean storeOperational = storeActivityService.isStoreOperational(nearestSeller);
-            if (!storeOperational) {
-                NearestSellerRes nearestSellerRes = porterUtility.getNearestSeller(usersBean.getNearestPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
-                if (!nearestSellerRes.getSeller_id().equals(nearestSeller)) {
-                    nearestSeller = nearestSellerRes.getSeller_id();
-                    @SuppressWarnings("OptionalGetWithoutIsPresent")
-                    Users users = users_Service.findById(usersBean.getId()).get();
-                    users.setNearestSeller(nearestSeller);
-                    users_Service.update(users.getId(), users, users.getId());
-                }
-            }
-            filter.addClause(WhereClause.eq(Products.Fields.seller_id, nearestSeller));
-        }
+//        if (StringUtils.hasText(nearestSeller)) {
+//            boolean storeOperational = storeActivityService.isStoreOperational(nearestSeller);
+//            if (!storeOperational) {
+//                NearestSellerRes nearestSellerRes = nearestSellerService.getNearestSeller(usersBean.getNearestPincode(), usersBean.getMobile_no(), usersBean.getFirst_name(), usersBean.getId());
+//                if (!nearestSellerRes.getSeller_id().equals(nearestSeller)) {
+//                    nearestSeller = nearestSellerRes.getSeller_id();
+//                    @SuppressWarnings("OptionalGetWithoutIsPresent")
+//                    Users users = users_Service.findById(usersBean.getId()).get();
+//                    users.setNearestSeller(nearestSeller);
+//                    users_Service.update(users.getId(), users, users.getId());
+//                }
+//            }
+//            filter.addClause(WhereClause.eq(Products.Fields.seller_id, nearestSeller));
+//        }
         EducationCategoryBean educationDetails = usersBean.getEducationDetails();
 
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -987,11 +986,6 @@ public class ManageProduct_BLService {
 //		}
         if (CollectionUtils.isEmpty(req.getSub_categories())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_SUB_CATEGORY);
-        }
-        if (StringUtils.hasText(req.getDescription())) {
-//            if (!SERegExpUtils.standardTextValidation(req.getDescription())) {
-//                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
-//            }
         }
         if (!StringUtils.hasText(req.getQuantity())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_QUANTITY);
