@@ -20,6 +20,7 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.Preconditions;
+import com.sorted.portal.request.beans.ComboProducts;
 import com.sorted.portal.request.beans.CreateComboBean;
 import com.sorted.portal.request.beans.GetCombosBean;
 import com.sorted.portal.response.beans.ComboBean;
@@ -27,6 +28,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.collections4.CollectionUtils;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,14 +47,26 @@ public class ManageCombo_BLService {
     private final ComboService comboService;
 
     @GetMapping("/products")
-    public List<Products> getProducts() {
+    public @NotNull List<ComboProducts> getProducts() {
         log.info("Getting products");
 
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         filter.addClause(WhereClause.eq(Products.Fields.seller_id, "68711a63a2dcdf55ed170972"));
 
-        return productService.repoFind(filter);
+        List<Products> products = productService.repoFind(filter);
+
+        return products.stream().map(this::getProduct).collect(Collectors.toList());
+    }
+
+    private ComboProducts getProduct(Products product) {
+        return ComboProducts.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .sellingPrice(CommonUtils.paiseToRupee(product.getSelling_price()))
+                .mrp(CommonUtils.paiseToRupee(product.getMrp()))
+                .image(CollectionUtils.isNotEmpty(product.getMedia()) ? product.getMedia().stream().filter(media -> media.getOrder() == 1).findFirst().get().getCdn_url() : null)
+                .build();
     }
 
     @PostMapping("/create")
