@@ -6,6 +6,7 @@ import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.*;
+import com.sorted.commons.exceptions.BaseException;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
@@ -50,7 +51,7 @@ public class ManageAddress_BLService {
     public SEResponse add(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
             return createOrUpdateAddress(request, httpServletRequest, false);
-        } catch (CustomIllegalArgumentsException ex) {
+        } catch (BaseException ex) {
             throw ex;
         } catch (Exception e) {
             log.error("add/address:: exception occurred");
@@ -172,12 +173,12 @@ public class ManageAddress_BLService {
         // @formatter:off
         GetQuoteRequest quoteRequest = GetQuoteRequest.builder()
                 .pickup_details(GetQuoteRequest.PickupDetails.builder()
-                        .lat(pickUpAddress.getLat().doubleValue())
-                        .lng(pickUpAddress.getLng().doubleValue())
+                        .lat(20.003466018240182)
+                        .lng(73.78700194126895)
                         .build())
                 .drop_details(GetQuoteRequest.DropDetails.builder()
-                        .lat(address.getLat().doubleValue())
-                        .lng(address.getLng().doubleValue())
+                        .lat(12.89795704454522)
+                        .lng(77.62119799020186)
                         .build())
                 .customer(GetQuoteRequest.Customer.builder()
                         .name(StringUtils.hasText(usersBean.getFirst_name()) ? usersBean.getFirst_name() : "Studeaze")
