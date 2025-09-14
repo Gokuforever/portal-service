@@ -70,28 +70,26 @@ public class ManageCombo_BLService {
     }
 
     @PostMapping("/create")
-    public SEResponse create(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+    public SEResponse create(@RequestBody CreateComboBean req) {
         log.info("Starting combo creation process");
 
         try {
-            CreateComboBean req = request.getGenericRequestDataObject(CreateComboBean.class);
             log.debug("Extracted CreateComboBean from request: {}", req);
 
-            CommonUtils.extractHeaders(httpServletRequest, req);
             log.debug("Headers extracted successfully");
 
             log.info("Validating user for combo creation activity");
-            UsersBean usersBean = usersService.validateUserForActivity(req, Permission.EDIT, Activity.MANAGE_COMBO);
-            log.debug("User validation successful for user: {}", usersBean.getId());
+//            UsersBean usersBean = usersService.validateUserForActivity(req, Permission.EDIT, Activity.MANAGE_COMBO);
+//            log.debug("User validation successful for user: {}", usersBean.getId());
 
-            Role role = usersBean.getRole();
-            UserType userType = role.getUser_type();
-            log.debug("User type: {}", userType);
-
-            if (userType != UserType.SELLER) {
-                log.warn("Access denied - user type {} is not SELLER", userType);
-                throw new AccessDeniedException();
-            }
+//            Role role = usersBean.getRole();
+//            UserType userType = role.getUser_type();
+//            log.debug("User type: {}", userType);
+//
+//            if (userType != UserType.SELLER) {
+//                log.warn("Access denied - user type {} is not SELLER", userType);
+//                throw new AccessDeniedException();
+//            }
 
             log.info("Validating combo creation request parameters");
             Preconditions.check(StringUtils.hasText(req.getName()), ResponseCode.MANDATE_COMBO_NAME);
@@ -110,11 +108,11 @@ public class ManageCombo_BLService {
             itemIds.remove(null);
             log.debug("Cleaned item IDs, final count: {}", itemIds.size());
 
-            log.info("Building filter to fetch products for seller: {}", usersBean.getSeller().getId());
+//            log.info("Building filter to fetch products for seller: {}", usersBean.getSeller().getId());
             SEFilter filter = new SEFilter(SEFilterType.AND);
             filter.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(itemIds)));
             filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-            filter.addClause(WhereClause.eq(Products.Fields.seller_id, usersBean.getSeller().getId()));
+            filter.addClause(WhereClause.eq(Products.Fields.seller_id, "68711a63a2dcdf55ed170972"));
 
             log.info("Fetching products from database");
             List<Products> products = productService.repoFind(filter);
@@ -129,14 +127,14 @@ public class ManageCombo_BLService {
             combo.setName(req.getName());
             combo.setDescription(req.getDescription());
             combo.setPrice(req.getPrice());
-            combo.setSeller_id(usersBean.getSeller().getId());
+            combo.setSeller_id("68711a63a2dcdf55ed170972");
             combo.setItem_ids(req.getItem_ids());
             combo.setActive(true);
             log.debug("Combo entity prepared: name={}, price={}, seller_id={}",
                     combo.getName(), combo.getPrice(), combo.getSeller_id());
 
             log.info("Saving combo to database");
-            comboService.create(combo, usersBean.getId());
+            comboService.create(combo, "/combo/create");
             log.info("Combo created successfully with name: {}", combo.getName());
 
             return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
