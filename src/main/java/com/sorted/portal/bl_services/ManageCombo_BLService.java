@@ -4,7 +4,6 @@ import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Combo;
 import com.sorted.commons.entity.mongo.Products;
-import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.service.ComboService;
 import com.sorted.commons.entity.service.ProductService;
 import com.sorted.commons.entity.service.Users_Service;
@@ -32,6 +31,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -101,7 +101,7 @@ public class ManageCombo_BLService {
             Preconditions.check(CollectionUtils.isNotEmpty(req.getItem_ids()), ResponseCode.MANDATE_COMBO_PRODUCTS);
             log.debug("Combo items validation passed, item count: {}", req.getItem_ids().size());
 
-            Preconditions.check(req.getPrice() != null && req.getPrice() > 0, ResponseCode.MANDATE_COMBO_PRICE);
+            Preconditions.check(req.getPrice() != null && BigDecimal.ZERO.compareTo(req.getPrice()) > 0, ResponseCode.MANDATE_COMBO_PRICE);
             log.debug("Combo price validation passed: {}", req.getPrice());
 
             HashSet<String> itemIds = new HashSet<>(req.getItem_ids());
@@ -126,7 +126,7 @@ public class ManageCombo_BLService {
             Combo combo = new Combo();
             combo.setName(req.getName());
             combo.setDescription(req.getDescription());
-            combo.setPrice(req.getPrice());
+            combo.setPrice(CommonUtils.rupeeToPaise(req.getPrice()));
             combo.setSeller_id("68711a63a2dcdf55ed170972");
             combo.setItem_ids(req.getItem_ids());
             combo.setActive(true);

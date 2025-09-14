@@ -4,6 +4,7 @@ import com.sorted.commons.helper.ReqBaseBean;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @EqualsAndHashCode(callSuper = true)
@@ -12,6 +13,6 @@ public class CreateComboBean extends ReqBaseBean {
 
     private String name;
     private String description;
-    private Long price;
+    private BigDecimal price;
     private List<String> item_ids;
 }
