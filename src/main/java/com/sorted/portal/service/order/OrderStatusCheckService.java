@@ -125,7 +125,7 @@ public class OrderStatusCheckService {
 
                 String mobileNo = spocDetails.getMobile_no();
 
-                String content = firstName + "|" + order_Details.getCode() + "|" + "https://seller.studeaze.in/orders";
+                String content = firstName + "|" + order_Details.getCode() + "|" + "seller.studeaze.in/orders";
 
                 if (enableSms) {
                     smsTraceHelper.runWithTrace(List.of(mobileNo),
