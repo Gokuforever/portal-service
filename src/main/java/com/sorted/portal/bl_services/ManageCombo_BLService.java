@@ -101,7 +101,7 @@ public class ManageCombo_BLService {
             Preconditions.check(CollectionUtils.isNotEmpty(req.getItem_ids()), ResponseCode.MANDATE_COMBO_PRODUCTS);
             log.debug("Combo items validation passed, item count: {}", req.getItem_ids().size());
 
-            Preconditions.check(req.getPrice() != null && BigDecimal.ZERO.compareTo(req.getPrice()) > 0, ResponseCode.MANDATE_COMBO_PRICE);
+            Preconditions.check(req.getPrice() != null && BigDecimal.ZERO.compareTo(req.getPrice()) < 0, ResponseCode.MANDATE_COMBO_PRICE);
             log.debug("Combo price validation passed: {}", req.getPrice());
 
             HashSet<String> itemIds = new HashSet<>(req.getItem_ids());
