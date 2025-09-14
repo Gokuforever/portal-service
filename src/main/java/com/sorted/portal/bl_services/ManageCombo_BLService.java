@@ -28,10 +28,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.function.Function;
@@ -46,6 +43,17 @@ public class ManageCombo_BLService {
     private final Users_Service usersService;
     private final ProductService productService;
     private final ComboService comboService;
+
+    @GetMapping("/products")
+    public List<Products> getProducts() {
+        log.info("Getting products");
+
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filter.addClause(WhereClause.eq(Products.Fields.seller_id, "68711a63a2dcdf55ed170972"));
+
+        return productService.repoFind(filter);
+    }
 
     @PostMapping("/create")
     public SEResponse create(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
@@ -159,8 +167,6 @@ public class ManageCombo_BLService {
 
         List<ComboBean> comboBeans = new ArrayList<>();
         for (Combo combo : combos) {
-
-
             comboBeans.add(ComboBean.builder()
                     .name(combo.getName())
                     .description(combo.getDescription())
