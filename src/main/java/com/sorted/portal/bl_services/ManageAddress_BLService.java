@@ -238,6 +238,7 @@ public class ManageAddress_BLService {
                     dto.setLat(e.getLat());
                     dto.setLng(e.getLng());
                     dto.setIs_default(e.getIs_default());
+                    dto.setPhone_no(e.getPhone_no());
                     listA.add(dto);
                 });
             }
