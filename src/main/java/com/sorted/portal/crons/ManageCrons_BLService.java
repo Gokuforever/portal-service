@@ -1,6 +1,8 @@
 package com.sorted.portal.crons;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.phonepe.sdk.pg.common.models.response.PaymentRefundDetail;
+import com.phonepe.sdk.pg.common.models.response.RefundStatusResponse;
 import com.sorted.commons.beans.BusinessHours;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.constants.Defaults;
@@ -19,6 +21,7 @@ import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.porter.res.beans.FetchOrderRes;
 import com.sorted.commons.utils.InternalMailService;
 import com.sorted.commons.utils.PorterUtility;
+import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.service.order.OrderStatusCheckService;
 import com.sorted.portal.service.order.OrderTemplateService;
 import com.sorted.portal.service.secure.SecureReturnDataService;
@@ -56,8 +59,9 @@ public class ManageCrons_BLService {
     private final Users_Service usersService;
     private final EmailSenderImpl emailSenderImpl;
     private final InternalMailService internalMailService;
+    private final PhonePeUtility phonePeUtility;
 
-//    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
+    //    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
@@ -84,7 +88,7 @@ public class ManageCrons_BLService {
 
     }
 
-//    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
+    //    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheckForCancelledOrders() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
@@ -120,7 +124,7 @@ public class ManageCrons_BLService {
         porterUtility.updateOrderStatus(details, fetchOrderRes);
     }
 
-//    @Scheduled(fixedRate = 60000) // Executes every 60000ms (1 minute)
+    //    @Scheduled(fixedRate = 60000) // Executes every 60000ms (1 minute)
     public void phonePeStatusCheckForPendingTransactions() {
         log.info("PhonePe Status Check For Pending Transactions");
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
@@ -223,7 +227,7 @@ public class ManageCrons_BLService {
         }
     }
 
-//    @Scheduled(cron = "0 0 10 * * ?")
+    //    @Scheduled(cron = "0 0 10 * * ?")
     public void sendReminderToSellers() {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -271,6 +275,37 @@ public class ManageCrons_BLService {
                 mailBuilder.setContent(mailContent);
                 mailBuilder.setTemplate(MailTemplate.NEW_ORDER_ARRIVED);
                 emailSenderImpl.sendEmailHtmlTemplate(mailBuilder);
+            }
+        }
+    }
+
+
+    @Scheduled(fixedRate = 60000)
+    public void checkPhonePeRefundStatus() {
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filter.addClause(WhereClause.eq(Order_Details.Fields.status_id, OrderStatus.PENDING_REFUND.getId()));
+
+        List<Order_Details> orderDetails = order_Details_Service.repoFind(filter);
+
+        if (CollectionUtils.isEmpty(orderDetails)) {
+            return;
+        }
+
+        for (Order_Details order : orderDetails) {
+            Optional<RefundStatusResponse> refundStatusResponse = phonePeUtility.refundStatus(order.getRefund_transaction_id());
+            if (refundStatusResponse.isEmpty()) {
+                return;
+            }
+
+            RefundStatusResponse response = refundStatusResponse.get();
+            if (response.getState().equals("COMPLETED")) {
+                order.setStatus(OrderStatus.FULLY_REFUNDED, Defaults.PHONEPE_REFUND_CRON);
+                order_Details_Service.update(order.getId(), order, Defaults.PHONEPE_REFUND_CRON);
+            } else if (response.getState().equals("FAILED")) {
+                order.setStatus(OrderStatus.REFUND_FAILED, Defaults.PHONEPE_REFUND_CRON);
+                order_Details_Service.update(order.getId(), order, Defaults.PHONEPE_REFUND_CRON);
+                internalMailService.sendMailOnError("Refund failed for order ID: " + order.getId(), "Refund failed for order ID: " + order.getId(), null);
             }
         }
     }
