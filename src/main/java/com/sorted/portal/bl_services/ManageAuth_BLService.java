@@ -5,6 +5,7 @@ import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Users;
+import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.All_Status.User_Status;
 import com.sorted.commons.enums.ProcessType;
@@ -47,6 +48,7 @@ import static com.sorted.portal.service.CookieService.setCookies;
 public class ManageAuth_BLService {
 
     private final Users_Service users_Service;
+    private final RoleService roleService;
     private final ManageOtp manageOtp;
     private final ManageOTPManagerService manageOTPManagerService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
@@ -130,7 +132,9 @@ public class ManageAuth_BLService {
             if (!StringUtils.hasText(entity_id)) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
             }
-            String uuid = manageOTPManagerService.resendOtp(process_type, reference_id);
+
+
+            String uuid = manageOTPManagerService.resendOtp(process_type, reference_id, users_Service.isSeller(entity_id));
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setEntity_id(entity_id);
@@ -168,7 +172,7 @@ public class ManageAuth_BLService {
             if (User_Status.ACTIVE.getId() != users.getStatus()) {
                 throw new CustomIllegalArgumentsException(ResponseCode.USER_BLOCKED);
             }
-            String uuid = manageOTPManagerService.send(users.getMobile_no(), ProcessType.FORGOT_PASS, users.getId());
+            String uuid = manageOTPManagerService.send(users.getMobile_no(), ProcessType.FORGOT_PASS, users.getId(), users_Service.isSeller(users.getId()));
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setProcess_type(ProcessType.FORGOT_PASS.name());
