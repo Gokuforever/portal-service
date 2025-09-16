@@ -19,10 +19,12 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.Preconditions;
+import com.sorted.portal.enums.ComboStatus;
 import com.sorted.portal.request.beans.ComboProducts;
 import com.sorted.portal.request.beans.CreateComboBean;
 import com.sorted.portal.request.beans.GetCombosBean;
 import com.sorted.portal.response.beans.ComboBean;
+import com.sorted.portal.response.beans.ComboProduct;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -147,48 +149,85 @@ public class ManageCombo_BLService {
         }
     }
 
-    public SEResponse getCombos(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+    @GetMapping("/fetch/all")
+    public List<ComboBean> fetchAll() {
+//    public List<ComboBean> fetchAll(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
 
-        GetCombosBean req = request.getGenericRequestDataObject(GetCombosBean.class);
-        CommonUtils.extractHeaders(httpServletRequest, req);
-        UsersBean usersBean = usersService.validateUserForActivity(req, Permission.VIEW, Activity.PRODUCTS, Activity.INVENTORY_MANAGEMENT, Activity.MANAGE_COMBO);
-        UserType userType = usersBean.getRole().getUser_type();
-        String sellerId = switch (userType) {
-            case CUSTOMER, GUEST -> usersBean.getNearestSeller();
-            case SELLER -> usersBean.getRole().getSeller_id();
-            default -> throw new AccessDeniedException();
-        };
+//        GetCombosBean req = request.getGenericRequestDataObject(GetCombosBean.class);
+//        CommonUtils.extractHeaders(httpServletRequest, req);
+//        UsersBean usersBean = usersService.validateUserForActivity(req, Permission.VIEW, Activity.PRODUCTS, Activity.INVENTORY_MANAGEMENT, Activity.MANAGE_COMBO);
+//        UserType userType = usersBean.getRole().getUser_type();
+//        switch (userType) {
+//            case CUSTOMER, GUEST, SELLER:
+//                break;
+//            default:
+//                throw new AccessDeniedException();
+//        }
 
         SEFilter filter = new SEFilter(SEFilterType.AND);
-        filter.addClause(WhereClause.eq(Combo.Fields.seller_id, sellerId));
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         List<Combo> combos = comboService.repoFind(filter);
+        if (CollectionUtils.isEmpty(combos)) {
+            return Collections.emptyList();
+        }
+
         Preconditions.check(CollectionUtils.isNotEmpty(combos), ResponseCode.NO_RECORD);
 
-        Set<String> productIds = combos.stream().flatMap(e -> e.getItem_ids().stream()).collect(Collectors.toSet());
+        List<String> productIds = combos.stream().flatMap(e -> e.getItem_ids().stream()).distinct().toList();
 
         SEFilter productFilter = new SEFilter(SEFilterType.AND);
-        productFilter.addClause(WhereClause.in(BaseMongoEntity.Fields.id, CommonUtils.convertS2L(productIds)));
+        productFilter.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productIds));
         productFilter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         List<Products> products = productService.repoFind(productFilter);
+        if (CollectionUtils.isEmpty(products)) {
+            return Collections.emptyList();
+        }
         Preconditions.check(CollectionUtils.isNotEmpty(products), ResponseCode.NO_RECORD);
 
         Map<String, Products> productMap = products.stream().collect(Collectors.toMap(Products::getId, Function.identity()));
 
         List<ComboBean> comboBeans = new ArrayList<>();
         for (Combo combo : combos) {
+            List<ComboProduct> comboProducts = new ArrayList<>();
+            for (String itemId : combo.getItem_ids()) {
+                Products product = productMap.getOrDefault(itemId, null);
+                if (product == null) {
+                    continue;
+                }
+                ComboProduct comboProduct = ComboProduct.builder()
+                        .productId(product.getId())
+                        .productName(product.getName())
+                        .cdnUrl(CollectionUtils.isNotEmpty(product.getMedia()) && !product.getMedia().isEmpty() ? product.getMedia().stream().filter(media -> media.getOrder() == 0).findFirst().get().getCdn_url() : null)
+                        .productCode(product.getProduct_code())
+                        .sellingPrice(CommonUtils.paiseToRupee(product.getSelling_price()))
+                        .mrp(CommonUtils.paiseToRupee(product.getMrp()))
+                        .quantity(product.getQuantity())
+                        .build();
+                comboProducts.add(comboProduct);
+            }
+            ComboStatus comboStatus;
+            if (comboProducts.isEmpty() || comboProducts.stream().allMatch(e -> e.quantity().compareTo(0L) <= 0)) {
+                comboStatus = ComboStatus.OUT_OF_STOCK;
+            } else if (comboProducts.size() < combo.getItem_ids().size() || comboProducts.stream().anyMatch(e -> e.quantity().compareTo(0L) <= 0)) {
+                comboStatus = ComboStatus.FEW_OUT_OF_STOCK;
+            } else {
+                comboStatus = ComboStatus.IN_STOCK;
+            }
+
             comboBeans.add(ComboBean.builder()
                     .name(combo.getName())
                     .description(combo.getDescription())
                     .price(CommonUtils.paiseToRupee(combo.getPrice()))
                     .creationDate(combo.getCreation_date_str())
                     .id(combo.getId())
+                    .comboStatus(comboStatus)
+                    .products(comboProducts)
                     .build());
         }
 
-        return SEResponse.getBasicSuccessResponseList(comboBeans, ResponseCode.SUCCESSFUL);
+        return comboBeans;
     }
 
 }
