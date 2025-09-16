@@ -8,7 +8,6 @@ import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.All_Status.User_Status;
-import com.sorted.commons.enums.EntityDetails;
 import com.sorted.commons.enums.ProcessType;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
@@ -17,6 +16,7 @@ import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
+import com.sorted.commons.manage.otp.ManageOTPManagerService;
 import com.sorted.commons.manage.otp.ManageOtp;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.PasswordValidatorUtils;
@@ -46,6 +46,7 @@ public class ManageUserProfile_BLService {
 
     private final Users_Service users_Service;
     private final ManageOtp manageOtp;
+    private final ManageOTPManagerService manageOTPManagerService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     ;
     @Value("${se.portal.password.reset.window.in_minutes}")
@@ -101,7 +102,7 @@ public class ManageUserProfile_BLService {
             if (User_Status.ACTIVE.getId() != usersBean.getStatus()) {
                 throw new CustomIllegalArgumentsException(ResponseCode.USER_BLOCKED);
             }
-            String uuid = manageOtp.send(usersBean.getMobile_no(),  ProcessType.UPDATE_PASS, usersBean.getId());
+            String uuid = manageOTPManagerService.send(usersBean.getMobile_no(), ProcessType.UPDATE_PASS, usersBean.getId());
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setProcess_type(ProcessType.UPDATE_PASS.name());

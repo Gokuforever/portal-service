@@ -19,6 +19,7 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.MailBuilder;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
+import com.sorted.commons.manage.otp.ManageOTPManagerService;
 import com.sorted.commons.manage.otp.ManageOtp;
 import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.utils.PasswordValidatorUtils;
@@ -53,6 +54,7 @@ import static com.sorted.portal.service.CookieService.setCookies;
 public class ManageSignUp_BLService {
 
     private final ManageOtp manageOtp;
+    private final ManageOTPManagerService otpManagerService;
     private final AuthService authService;
     private final Users_Service users_Service;
     private final RoleService roleService;
@@ -69,7 +71,7 @@ public class ManageSignUp_BLService {
         String mobileNo = request.mobileNo();
         Preconditions.check(StringUtils.hasText(mobileNo), ResponseCode.MISSING_MN);
         Preconditions.check(SERegExpUtils.isMobileNo(mobileNo), ResponseCode.INVALID_MN);
-        return manageOtp.send(mobileNo, ProcessType.AUTH, Defaults.AUTH);
+        return otpManagerService.send(mobileNo, ProcessType.AUTH, Defaults.AUTH);
     }
 
     @PostMapping("v2/auth")
@@ -216,7 +218,7 @@ public class ManageSignUp_BLService {
 
             users_Service.upsert(user.getId(), user, Defaults.SIGN_UP);
 
-            String uuid = manageOtp.send(req.getMobile_no(), ProcessType.SIGN_UP, Defaults.SIGN_UP);
+            String uuid = otpManagerService.send(req.getMobile_no(), ProcessType.SIGN_UP, Defaults.SIGN_UP);
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setEntity_id(user.getId());
