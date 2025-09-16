@@ -77,9 +77,7 @@ public class ManageUserProfileV2_BLService {
 
         usersService.update(users.getId(), users, users.getId());
         UsersBean userInfo = usersService.validateAndGetUserInfo(users.getId());
-        return CompleteProfileRes.builder()
-                .userInfo(userInfo)
-                .build();
+        return CompleteProfileRes.builder().userInfo(userInfo).build();
     }
 
     private void validateRequest(CompleteUserProfile request) {
@@ -115,11 +113,8 @@ public class ManageUserProfileV2_BLService {
         }
 
         validateRequest(request);
-        String referenceId = manageOtp.send(request.getMobile(), ProcessType.PROFILE, request.getReq_user_id());
-        return CompleteProfileRes.builder()
-                .referenceId(referenceId)
-                .otpVerificationRequired(true)
-                .build();
+        String referenceId = manageOtp.send(request.getMobile(), ProcessType.PROFILE, request.getReq_user_id(), usersService.isSeller(request.getMobile()));
+        return CompleteProfileRes.builder().referenceId(referenceId).otpVerificationRequired(true).build();
     }
 
     @GetMapping("/fetch")

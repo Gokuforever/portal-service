@@ -48,7 +48,6 @@ public class ManageUserProfile_BLService {
     private final ManageOtp manageOtp;
     private final ManageOTPManagerService manageOTPManagerService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-    ;
     @Value("${se.portal.password.reset.window.in_minutes}")
     private int resetWindow;
 
@@ -102,7 +101,7 @@ public class ManageUserProfile_BLService {
             if (User_Status.ACTIVE.getId() != usersBean.getStatus()) {
                 throw new CustomIllegalArgumentsException(ResponseCode.USER_BLOCKED);
             }
-            String uuid = manageOTPManagerService.send(usersBean.getMobile_no(), ProcessType.UPDATE_PASS, usersBean.getId());
+            String uuid = manageOTPManagerService.send(usersBean.getMobile_no(), ProcessType.UPDATE_PASS, usersBean.getId(), users_Service.isSeller(usersBean));
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setProcess_type(ProcessType.UPDATE_PASS.name());

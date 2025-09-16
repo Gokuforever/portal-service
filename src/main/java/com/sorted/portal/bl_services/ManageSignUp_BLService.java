@@ -71,7 +71,7 @@ public class ManageSignUp_BLService {
         String mobileNo = request.mobileNo();
         Preconditions.check(StringUtils.hasText(mobileNo), ResponseCode.MISSING_MN);
         Preconditions.check(SERegExpUtils.isMobileNo(mobileNo), ResponseCode.INVALID_MN);
-        return otpManagerService.send(mobileNo, ProcessType.AUTH, Defaults.AUTH);
+        return otpManagerService.send(mobileNo, ProcessType.AUTH, Defaults.AUTH, users_Service.isSellerByMobile(mobileNo));
     }
 
     @PostMapping("v2/auth")
@@ -218,7 +218,7 @@ public class ManageSignUp_BLService {
 
             users_Service.upsert(user.getId(), user, Defaults.SIGN_UP);
 
-            String uuid = otpManagerService.send(req.getMobile_no(), ProcessType.SIGN_UP, Defaults.SIGN_UP);
+            String uuid = otpManagerService.send(req.getMobile_no(), ProcessType.SIGN_UP, Defaults.SIGN_UP, users_Service.isSeller(user));
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setEntity_id(user.getId());
