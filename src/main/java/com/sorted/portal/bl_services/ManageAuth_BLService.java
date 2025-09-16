@@ -15,6 +15,7 @@ import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
+import com.sorted.commons.manage.otp.ManageOTPManagerService;
 import com.sorted.commons.manage.otp.ManageOtp;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.PasswordValidatorUtils;
@@ -47,6 +48,7 @@ public class ManageAuth_BLService {
 
     private final Users_Service users_Service;
     private final ManageOtp manageOtp;
+    private final ManageOTPManagerService manageOTPManagerService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Value("${se.portal.password.reset.window.in_minutes}")
@@ -128,7 +130,7 @@ public class ManageAuth_BLService {
             if (!StringUtils.hasText(entity_id)) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
             }
-            String uuid = manageOtp.resendOtp(process_type, reference_id);
+            String uuid = manageOTPManagerService.resendOtp(process_type, reference_id);
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setEntity_id(entity_id);
@@ -166,7 +168,7 @@ public class ManageAuth_BLService {
             if (User_Status.ACTIVE.getId() != users.getStatus()) {
                 throw new CustomIllegalArgumentsException(ResponseCode.USER_BLOCKED);
             }
-            String uuid = manageOtp.send(users.getMobile_no(), ProcessType.FORGOT_PASS, users.getId());
+            String uuid = manageOTPManagerService.send(users.getMobile_no(), ProcessType.FORGOT_PASS, users.getId());
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setProcess_type(ProcessType.FORGOT_PASS.name());

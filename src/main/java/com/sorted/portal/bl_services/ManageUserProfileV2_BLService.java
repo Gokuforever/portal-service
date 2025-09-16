@@ -13,7 +13,7 @@ import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
-import com.sorted.commons.manage.otp.ManageOtp;
+import com.sorted.commons.manage.otp.ManageOTPManagerService;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.Preconditions;
 import com.sorted.commons.utils.SERegExpUtils;
@@ -33,7 +33,7 @@ public class ManageUserProfileV2_BLService {
 
     private final Users_Service usersService;
     private final EducationDetailsValidationService validationService;
-    private final ManageOtp manageOtp;
+    private final ManageOTPManagerService manageOtp;
     private final AuthService authService;
 
     @PostMapping("/complete")
