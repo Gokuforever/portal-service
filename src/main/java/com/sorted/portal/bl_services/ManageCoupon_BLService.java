@@ -47,7 +47,7 @@ public class ManageCoupon_BLService {
     private UserInfoBean getUserInfoBean(Users user) {
         return UserInfoBean.builder()
                 .id(user.getId())
-                .mobile(user.getMobile_no())
+                .mobile( "91" + user.getMobile_no())
                 .name(user.getFirst_name())
                 .email(user.getEmail_id())
                 .build();
