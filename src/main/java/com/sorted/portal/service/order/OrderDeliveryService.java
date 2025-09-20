@@ -11,6 +11,7 @@ import com.sorted.commons.porter.res.beans.CreateOrderResBean;
 import com.sorted.commons.utils.PorterUtility;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
