@@ -184,6 +184,8 @@ public class ManageMetaData_BLService {
                     .image(CollectionUtils.isEmpty(product.getMedia()) ? "" : product.getMedia().stream().filter(e -> e.getOrder() == 0).findFirst().get().getCdn_url())
                     .id(product.getId())
                     .name(product.getName())
+                    .quantity(product.getQuantity())
+                    .secure(Boolean.TRUE.equals(product.getIs_secure()))
                     .build();
             productBeans.add(productBean);
         }
