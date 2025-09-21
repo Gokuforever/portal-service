@@ -29,8 +29,6 @@ public record CreateCouponBean(
         boolean oncePerUser,
         @JsonProperty("assigned_to_users")
         List<String> assignedToUsers,
-//        @JsonProperty("eligible_user_ids")
-//        List<String> eligibleUserIds,
         @JsonProperty("max_discount")
         BigDecimal maxDiscount
 

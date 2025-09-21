@@ -101,7 +101,7 @@ public class ManageCoupon_BLService {
             Preconditions.check(StringUtils.hasText(request.endDate()), ResponseCode.MISSING_COUPON_END_DATE);
             LocalDate startDate = LocalDate.parse(request.startDate());
             LocalDate endDate = LocalDate.parse(request.endDate());
-            Preconditions.check(startDate.isAfter(LocalDate.now()), ResponseCode.MISSING_COUPON_START_DATE);
+            Preconditions.check(startDate.isAfter(LocalDate.now().minusDays(1)), ResponseCode.MISSING_COUPON_START_DATE);
             Preconditions.check(startDate.isBefore(endDate), ResponseCode.MISSING_COUPON_END_DATE);
             Preconditions.check(StringUtils.hasText(request.description()), ResponseCode.MISSING_COUPON_DESCRIPTION);
             Preconditions.check(request.discountType() != null, ResponseCode.MISSING_COUPON_DISCOUNT_TYPE);
