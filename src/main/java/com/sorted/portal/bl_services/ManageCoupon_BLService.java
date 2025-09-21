@@ -19,6 +19,7 @@ import com.sorted.commons.utils.Preconditions;
 import com.sorted.portal.request.beans.CreateCouponBean;
 import com.sorted.portal.response.beans.UserInfoBean;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+@Log4j2
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/coupon")
@@ -90,6 +92,8 @@ public class ManageCoupon_BLService {
 
     private static void validate(CreateCouponBean request) {
         try {
+            log.info("validate:: API started");
+            log.info("request: {}", request);
             Preconditions.check(request != null, ResponseCode.INVALID_REQ);
             Preconditions.check(StringUtils.hasText(request.code()), ResponseCode.MISSING_COUPON_CODE);
             Preconditions.check(StringUtils.hasText(request.name()), ResponseCode.MISSING_COUPON_NAME);
