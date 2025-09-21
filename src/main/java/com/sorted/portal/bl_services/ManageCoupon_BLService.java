@@ -1,5 +1,6 @@
 package com.sorted.portal.bl_services;
 
+import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.CouponEntity;
@@ -8,16 +9,20 @@ import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.CouponService;
 import com.sorted.commons.entity.service.RoleService;
 import com.sorted.commons.entity.service.Users_Service;
+import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.CouponScope;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
+import com.sorted.commons.exceptions.AccessDeniedException;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.exceptions.InvalidDiscountType;
 import com.sorted.commons.helper.AggregationFilter.*;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.Preconditions;
 import com.sorted.portal.request.beans.CreateCouponBean;
+import com.sorted.portal.response.beans.ActiveCoupon;
 import com.sorted.portal.response.beans.UserInfoBean;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.util.CollectionUtils;
@@ -26,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Log4j2
@@ -143,5 +149,51 @@ public class ManageCoupon_BLService {
         } catch (Exception e) {
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
+    }
+
+    @GetMapping("/getActiveCoupons")
+    public List<ActiveCoupon> getActiveCoupons(HttpServletRequest request) {
+        String req_user_id = request.getHeader("req_user_id");
+        Preconditions.check(StringUtils.hasText(req_user_id), new AccessDeniedException());
+        UsersBean usersBean = usersService.validateUserForActivity(req_user_id, Activity.HOME);
+
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filter.addClause(WhereClause.gte(CouponEntity.Fields.startDate, LocalDate.now().atStartOfDay()));
+        filter.addClause(WhereClause.lte(CouponEntity.Fields.endDate, LocalDate.now().plusDays(1).atStartOfDay().minusMinutes(1)));
+
+        List<CouponEntity> coupons = couponService.repoFind(filter);
+
+        List<ActiveCoupon> activeCoupons = new ArrayList<>();
+        for (CouponEntity coupon : coupons) {
+            if (coupon.isOncePerUser()) {
+                if (!CollectionUtils.isEmpty(coupon.getCouponUsages())) {
+                    boolean match = coupon.getCouponUsages().stream().anyMatch(usage -> usage.getUserId().equals(usersBean.getId()));
+                    if (match) {
+                        continue;
+                    }
+                }
+                if (coupon.getCouponScope().equals(CouponScope.USER_SPECIFIC)) {
+                    if (CollectionUtils.isEmpty(coupon.getAssignedToUsers())) {
+                        continue;
+                    }
+                    boolean match = coupon.getAssignedToUsers().stream().anyMatch(user -> user.equals(usersBean.getId()));
+                    if (!match) {
+                        continue;
+                    }
+                }
+                ActiveCoupon activeCoupon = ActiveCoupon.builder()
+                        .couponCode(coupon.getCode())
+                        .description(coupon.getDescription())
+                        .discountType(coupon.getDiscountType())
+                        .discountValue(CommonUtils.paiseToRupee(coupon.getDiscountValue()))
+                        .discountPercentage(coupon.getDiscountPercentage())
+                        .startDate(coupon.getStartDate().toLocalDate())
+                        .endDate(coupon.getEndDate().toLocalDate())
+                        .build();
+                activeCoupons.add(activeCoupon);
+            }
+        }
+        return activeCoupons;
     }
 }
