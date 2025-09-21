@@ -1,6 +1,5 @@
 package com.sorted.portal.response.beans;
 
-import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.enums.WeekDay;
 import lombok.Builder;
 import lombok.Getter;

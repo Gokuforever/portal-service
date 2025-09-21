@@ -13,7 +13,9 @@ import com.sorted.commons.enums.OrderStatus;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
-import com.sorted.commons.helper.AggregationFilter.*;
+import com.sorted.commons.helper.AggregationFilter.SEFilter;
+import com.sorted.commons.helper.AggregationFilter.SEFilterType;
+import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SEResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +28,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RestController

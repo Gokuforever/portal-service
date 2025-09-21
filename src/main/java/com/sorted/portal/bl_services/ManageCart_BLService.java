@@ -1,18 +1,14 @@
 package com.sorted.portal.bl_services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.sorted.commons.beans.Item;
-import com.sorted.commons.beans.Media;
-import com.sorted.commons.beans.UsersBean;
-import com.sorted.commons.entity.mongo.BaseMongoEntity;
-import com.sorted.commons.entity.mongo.Cart;
-import com.sorted.commons.entity.mongo.Products;
-import com.sorted.commons.entity.mongo.Seller;
+import com.sorted.commons.beans.*;
+import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.All_Status.ProductCurrentStatus;
 import com.sorted.commons.enums.Permission;
 import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.AccessDeniedException;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
@@ -22,11 +18,12 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
-import com.sorted.portal.assisting.beans.CartItems;
+import com.sorted.commons.utils.CouponUtility;
+import com.sorted.commons.utils.Preconditions;
 import com.sorted.portal.assisting.beans.CartItemsBean;
+import com.sorted.portal.request.beans.ApplyCouponBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
 import com.sorted.portal.request.beans.CartFetchReqBean;
-import com.sorted.portal.response.beans.CartBean;
 import com.sorted.portal.response.beans.FetchCartV2;
 import com.sorted.portal.service.EstimateDeliveryService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -57,6 +54,8 @@ public class ManageCart_BLService {
     private final Seller_Service sellerService;
     private final DemandingPincodeService demandingPincodeService;
     private final Address_Service addressService;
+    private final CouponService couponService;
+    private final CouponUtility couponUtility;
 
     @Value("${se.minimum-cart-value.in-paise:10000}")
     private long minCartValueInPaise;
@@ -424,5 +423,39 @@ public class ManageCart_BLService {
         return cartBean;
     }
 
+    @PostMapping("/applyCoupon")
+    public void applyCoupon(@RequestBody ApplyCouponBean request, HttpServletRequest httpServletRequest) throws JsonProcessingException {
+        CommonUtils.extractHeaders(httpServletRequest, request);
+        UsersBean usersBean = users_Service.validateUserForActivity(request.getReq_user_id(), Activity.CART_MANAGEMENT);
+        UserType userType = usersBean.getRole().getUser_type();
+        switch (userType) {
+            case CUSTOMER, GUEST:
+                break;
+            default:
+                throw new AccessDeniedException();
+        }
+        Preconditions.check(StringUtils.hasText(request.getCouponCode()), ResponseCode.MISSING_COUPON_CODE);
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(CouponEntity.Fields.code, request.getCouponCode()));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        CouponEntity coupon = couponService.repoFindOne(filter);
+        Preconditions.check(coupon != null, ResponseCode.COUPON_CODE_NOT_FOUND);
+
+        SEFilter filterC = new SEFilter(SEFilterType.AND);
+        filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
+        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        Cart cart = cart_Service.repoFindOne(filterC);
+        Preconditions.check(cart != null, ResponseCode.NO_RECORD);
+
+        CartBean cartBean = this.getCartBean(cart);
+
+        Long discountAmount = couponUtility.validateCouponAndGetDiscount(cartBean, coupon, usersBean.getId());
+        cart.setCouponCode(coupon.getCode());
+        cartBean.setCouponCode(coupon.getCode());
+        cartBean.setDiscountAmount(CommonUtils.paiseToRupee(discountAmount));
+
+    }
 
 }

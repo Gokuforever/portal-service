@@ -7,8 +7,6 @@ import com.sorted.commons.entity.mongo.Category_Master;
 import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.service.Category_MasterService;
 import com.sorted.commons.entity.service.ProductService;
-import com.sorted.commons.enums.ResponseCode;
-import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;

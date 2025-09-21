@@ -1,6 +1,5 @@
 package com.sorted.portal.service.order;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sorted.commons.beans.AddressDTO;
 import com.sorted.commons.beans.Spoc_Details;
 import com.sorted.commons.entity.mongo.Order_Details;
@@ -11,7 +10,6 @@ import com.sorted.commons.porter.res.beans.CreateOrderResBean;
 import com.sorted.commons.utils.PorterUtility;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 

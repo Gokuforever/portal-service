@@ -30,7 +30,9 @@ public record CreateCouponBean(
         @JsonProperty("assigned_to_users")
         List<String> assignedToUsers,
         @JsonProperty("max_discount")
-        BigDecimal maxDiscount
+        BigDecimal maxDiscount,
+        @JsonProperty("min_cart_value")
+        BigDecimal minCartValue
 
 ) {
 }

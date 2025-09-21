@@ -97,6 +97,7 @@ public class ManageCoupon_BLService {
                 .oncePerUser(request.oncePerUser())
                 .assignedToUsers(request.assignedToUsers())
                 .maxDiscount(CommonUtils.rupeeToPaise(request.maxDiscount()))
+                .minCartValue(request.minCartValue() == null ? 0L : CommonUtils.rupeeToPaise(request.minCartValue()))
                 .build();
         couponService.create(entity, Defaults.RETOOL);
     }
