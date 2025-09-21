@@ -115,7 +115,7 @@ public class ManageCoupon_BLService {
                     Preconditions.check(request.discountPercentage() != null, ResponseCode.MISSING_COUPON_DISCOUNT_PERCENTAGE);
                     Preconditions.check(request.discountPercentage().compareTo(BigDecimal.ZERO) > 0 && request.discountPercentage().compareTo(new BigDecimal(100)) <= 0, ResponseCode.INVALID_COUPON_DISCOUNT_PERCENTAGE);
                     if (request.maxDiscount() != null) {
-                        Preconditions.check(request.maxDiscount().compareTo(BigDecimal.ZERO) > 0, ResponseCode.INVALID_COUPON_MAX_DISCOUNT);
+                        Preconditions.check(request.maxDiscount().compareTo(BigDecimal.ZERO) >= 0, ResponseCode.INVALID_COUPON_MAX_DISCOUNT);
                     }
                 }
                 default -> throw new InvalidDiscountType();
