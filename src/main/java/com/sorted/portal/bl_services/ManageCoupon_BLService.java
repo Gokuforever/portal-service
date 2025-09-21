@@ -72,6 +72,17 @@ public class ManageCoupon_BLService {
     @PostMapping("/create")
     public void create(@RequestBody CreateCouponBean request) {
         validate(request);
+
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filter.addClause(WhereClause.eq(CouponEntity.Fields.code, request.code()));
+
+        long count = couponService.countByFilter(filter);
+
+        if (count > 0) {
+            throw new CustomIllegalArgumentsException(ResponseCode.COUPON_CODE_EXISTS);
+        }
+
         CouponEntity entity = CouponEntity.builder()
                 .code(request.code())
                 .name(request.name())
