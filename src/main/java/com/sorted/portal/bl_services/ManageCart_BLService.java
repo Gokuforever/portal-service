@@ -4,11 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sorted.commons.beans.*;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
-import com.sorted.commons.enums.Activity;
+import com.sorted.commons.enums.*;
 import com.sorted.commons.enums.All_Status.ProductCurrentStatus;
-import com.sorted.commons.enums.Permission;
-import com.sorted.commons.enums.ResponseCode;
-import com.sorted.commons.enums.UserType;
 import com.sorted.commons.exceptions.AccessDeniedException;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
@@ -25,6 +22,9 @@ import com.sorted.portal.request.beans.ApplyCouponBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
 import com.sorted.portal.request.beans.CartFetchReqBean;
 import com.sorted.portal.response.beans.FetchCartV2;
+import com.sorted.portal.response.beans.CouponListResponse;
+import com.sorted.portal.response.beans.ApplicableCoupon;
+import com.sorted.portal.response.beans.OtherCoupon;
 import com.sorted.portal.service.EstimateDeliveryService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +35,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -458,4 +460,246 @@ public class ManageCart_BLService {
 
     }
 
+    @PostMapping("/getAllCoupons")
+    public CouponListResponse getAllCoupons(HttpServletRequest httpServletRequest) throws JsonProcessingException {
+        String reqUserId = httpServletRequest.getHeader("req_user_id");
+        Preconditions.check(StringUtils.hasText(reqUserId), new AccessDeniedException());
+        UsersBean usersBean = users_Service.validateUserForActivity(reqUserId, Activity.CART_MANAGEMENT);
+        
+        LocalDateTime now = LocalDateTime.now();
+
+        // Get active coupons
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filter.addClause(WhereClause.eq(CouponEntity.Fields.active, true));
+        filter.addClause(WhereClause.lte(CouponEntity.Fields.startDate, now));
+        filter.addClause(WhereClause.gte(CouponEntity.Fields.endDate, now));
+
+        List<CouponEntity> coupons = couponService.repoFind(filter);
+        if (CollectionUtils.isEmpty(coupons)) {
+            return CouponListResponse.builder()
+                    .applicableCoupons(new ArrayList<>())
+                    .otherCoupons(new ArrayList<>())
+                    .build();
+        }
+        
+        // Get user's cart
+        SEFilter filterC = new SEFilter(SEFilterType.AND);
+        filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
+        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        Cart cart = cart_Service.repoFindOne(filterC);
+        if (cart == null) {
+            return CouponListResponse.builder()
+                    .applicableCoupons(new ArrayList<>())
+                    .otherCoupons(new ArrayList<>())
+                    .currentCartValue(BigDecimal.ZERO)
+                    .build();
+        }
+        
+        CartBean cartBean = this.getCartBean(cart);
+        if (CollectionUtils.isEmpty(cartBean.getCart_items())) {
+            return CouponListResponse.builder()
+                    .applicableCoupons(new ArrayList<>())
+                    .otherCoupons(new ArrayList<>())
+                    .currentCartValue(BigDecimal.ZERO)
+                    .build();
+        }
+
+        Long cartValueInPaise = CommonUtils.rupeeToPaise(cartBean.getItem_total());
+        List<ApplicableCoupon> applicableCoupons = new ArrayList<>();
+        List<OtherCoupon> otherCoupons = new ArrayList<>();
+        
+        for (CouponEntity coupon : coupons) {
+            // Check coupon scope
+            CouponScope couponScope = coupon.getCouponScope();
+            if (couponScope != null && couponScope.equals(CouponScope.USER_SPECIFIC)) {
+                if (CollectionUtils.isEmpty(coupon.getAssignedToUsers())) {
+                    continue;
+                }
+                boolean match = coupon.getAssignedToUsers().stream()
+                        .anyMatch(user -> user.equals(usersBean.getId()));
+                if (!match) {
+                    continue;
+                }
+            }
+            
+            // Check if user has already used this coupon (if once per user)
+            if (coupon.isOncePerUser() && !CollectionUtils.isEmpty(coupon.getCouponUsages())) {
+                boolean alreadyUsed = coupon.getCouponUsages().stream()
+                        .anyMatch(usage -> usage.getUserId().equals(usersBean.getId()));
+                if (alreadyUsed) {
+                    continue;
+                }
+            }
+            
+            // Check max uses
+            if (coupon.getMaxUses() != null && coupon.getUsedCount() != null 
+                    && coupon.getUsedCount() >= coupon.getMaxUses()) {
+                continue;
+            }
+            
+            // Check minimum cart value
+            Long minCartValue = coupon.getMinCartValue() != null ? coupon.getMinCartValue() : 0L;
+            
+            if (cartValueInPaise >= minCartValue) {
+                // Coupon is applicable
+                ApplicableCoupon applicableCoupon = createApplicableCoupon(coupon, cartValueInPaise);
+                applicableCoupons.add(applicableCoupon);
+            } else {
+                // Coupon needs more cart value
+                OtherCoupon otherCoupon = createOtherCoupon(coupon, cartValueInPaise, minCartValue);
+                otherCoupons.add(otherCoupon);
+            }
+        }
+        
+        // Sort applicable coupons by discount amount (highest first)
+        applicableCoupons.sort((a, b) -> b.getCalculatedDiscount().compareTo(a.getCalculatedDiscount()));
+        
+        // Mark the best offer
+        if (!applicableCoupons.isEmpty()) {
+            applicableCoupons.get(0).setBestOffer(true);
+        }
+        
+        // Set sort order
+        for (int i = 0; i < applicableCoupons.size(); i++) {
+            applicableCoupons.get(i).setSortOrder(i + 1);
+        }
+        
+        // Sort other coupons by additional amount needed (lowest first)
+        otherCoupons.sort(Comparator.comparing(OtherCoupon::getAdditionalAmountNeeded));
+        
+        // Set sort order for other coupons
+        for (int i = 0; i < otherCoupons.size(); i++) {
+            otherCoupons.get(i).setSortOrder(i + 1);
+        }
+        
+        return CouponListResponse.builder()
+                .applicableCoupons(applicableCoupons)
+                .otherCoupons(otherCoupons)
+                .currentCartValue(cartBean.getItem_total())
+                .deliveryCharge(cartBean.getDelivery_charge())
+                .totalAmount(cartBean.getTotal_amount())
+                .build();
+    }
+    
+    private ApplicableCoupon createApplicableCoupon(CouponEntity coupon, Long cartValueInPaise) {
+        BigDecimal calculatedDiscount = calculateCouponDiscount(coupon, cartValueInPaise);
+        BigDecimal cartValue = CommonUtils.paiseToRupee(cartValueInPaise);
+        BigDecimal finalCartValue = cartValue.subtract(calculatedDiscount).max(BigDecimal.ZERO);
+        
+        String savingsText = generateSavingsText(coupon, calculatedDiscount);
+        
+        return ApplicableCoupon.builder()
+                .code(coupon.getCode())
+                .name(coupon.getName())
+                .description(coupon.getDescription())
+                .discountType(coupon.getDiscountType())
+                .discountValue(coupon.getDiscountValue() != null ? 
+                        CommonUtils.paiseToRupee(coupon.getDiscountValue()) : null)
+                .discountPercentage(coupon.getDiscountPercentage())
+                .calculatedDiscount(calculatedDiscount)
+                .finalCartValue(finalCartValue)
+                .maxDiscount(coupon.getMaxDiscount() != null ? 
+                        CommonUtils.paiseToRupee(coupon.getMaxDiscount()) : null)
+                .minCartValue(coupon.getMinCartValue() != null ? 
+                        CommonUtils.paiseToRupee(coupon.getMinCartValue()) : BigDecimal.ZERO)
+                .endDate(coupon.getEndDate())
+                .savingsText(savingsText)
+                .isBestOffer(false)
+                .build();
+    }
+    
+    private OtherCoupon createOtherCoupon(CouponEntity coupon, Long cartValueInPaise, Long minCartValue) {
+        BigDecimal additionalAmountNeeded = CommonUtils.paiseToRupee(minCartValue - cartValueInPaise);
+        BigDecimal potentialDiscount = calculateCouponDiscount(coupon, minCartValue);
+        
+        String eligibilityText = String.format("Add ₹%.2f more to unlock this offer", 
+                additionalAmountNeeded.doubleValue());
+        String notApplicableReason = "Minimum cart value not met";
+        
+        return OtherCoupon.builder()
+                .code(coupon.getCode())
+                .name(coupon.getName())
+                .description(coupon.getDescription())
+                .discountType(coupon.getDiscountType())
+                .discountValue(coupon.getDiscountValue() != null ? 
+                        CommonUtils.paiseToRupee(coupon.getDiscountValue()) : null)
+                .discountPercentage(coupon.getDiscountPercentage())
+                .minCartValue(CommonUtils.paiseToRupee(minCartValue))
+                .additionalAmountNeeded(additionalAmountNeeded)
+                .potentialDiscount(potentialDiscount)
+                .maxDiscount(coupon.getMaxDiscount() != null ? 
+                        CommonUtils.paiseToRupee(coupon.getMaxDiscount()) : null)
+                .endDate(coupon.getEndDate())
+                .eligibilityText(eligibilityText)
+                .notApplicableReason(notApplicableReason)
+                .build();
+    }
+    
+    private BigDecimal calculateCouponDiscount(CouponEntity coupon, Long cartValueInPaise) {
+        BigDecimal discount = BigDecimal.ZERO;
+        
+        if (coupon.getDiscountType() == null) {
+            return discount;
+        }
+        
+        switch (coupon.getDiscountType()) {
+            case PERCENTAGE:
+                if (coupon.getDiscountPercentage() != null) {
+                    BigDecimal cartValue = CommonUtils.paiseToRupee(cartValueInPaise);
+                    discount = cartValue.multiply(coupon.getDiscountPercentage())
+                            .divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
+                    
+                    // Apply max discount cap if present
+                    if (coupon.getMaxDiscount() != null) {
+                        BigDecimal maxDiscountInRupees = CommonUtils.paiseToRupee(coupon.getMaxDiscount());
+                        discount = discount.min(maxDiscountInRupees);
+                    }
+                }
+                break;
+                
+            case FIXED:
+                if (coupon.getDiscountValue() != null) {
+                    discount = CommonUtils.paiseToRupee(coupon.getDiscountValue());
+                    
+                    // Ensure discount doesn't exceed cart value
+                    BigDecimal cartValue = CommonUtils.paiseToRupee(cartValueInPaise);
+                    discount = discount.min(cartValue);
+                }
+                break;
+                
+            default:
+                // Handle any other discount types if they exist
+                break;
+        }
+        
+        return discount.setScale(2, BigDecimal.ROUND_HALF_UP);
+    }
+    
+    private String generateSavingsText(CouponEntity coupon, BigDecimal calculatedDiscount) {
+        if (coupon.getDiscountType() == null) {
+            return "";
+        }
+        
+        switch (coupon.getDiscountType()) {
+            case PERCENTAGE:
+                if (coupon.getMaxDiscount() != null) {
+                    BigDecimal maxDiscountInRupees = CommonUtils.paiseToRupee(coupon.getMaxDiscount());
+                    if (calculatedDiscount.compareTo(maxDiscountInRupees) >= 0) {
+                        return String.format("Save ₹%.2f (Max discount reached)", 
+                                calculatedDiscount.doubleValue());
+                    }
+                }
+                return String.format("Save %s%% - ₹%.2f", 
+                        coupon.getDiscountPercentage().toPlainString(), 
+                        calculatedDiscount.doubleValue());
+                
+            case FIXED:
+                return String.format("Flat ₹%.2f off", calculatedDiscount.doubleValue());
+                
+            default:
+                return String.format("Save ₹%.2f", calculatedDiscount.doubleValue());
+        }
+    }
 }

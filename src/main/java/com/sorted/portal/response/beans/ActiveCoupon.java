@@ -11,6 +11,7 @@ import java.time.LocalDate;
 public record ActiveCoupon(
         @JsonProperty("coupon_code")
         String couponCode,
+        String name,
         String description,
         @JsonProperty("discount_type")
         DiscountType discountType,
@@ -18,7 +19,7 @@ public record ActiveCoupon(
         BigDecimal discountValue,
         @JsonProperty("discount_percentage")
         BigDecimal discountPercentage,
-        @JsonProperty("min_order_value")
+        @JsonProperty("start_date")
         LocalDate startDate,
         LocalDate endDate
 ) {

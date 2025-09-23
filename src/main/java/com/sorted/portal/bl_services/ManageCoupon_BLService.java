@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -159,8 +160,8 @@ public class ManageCoupon_BLService {
 
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        filter.addClause(WhereClause.gte(CouponEntity.Fields.startDate, LocalDate.now().atStartOfDay()));
-        filter.addClause(WhereClause.lte(CouponEntity.Fields.endDate, LocalDate.now().plusDays(1).atStartOfDay().minusMinutes(1)));
+        filter.addClause(WhereClause.lte(CouponEntity.Fields.startDate, LocalDateTime.now()));
+        filter.addClause(WhereClause.gte(CouponEntity.Fields.endDate, LocalDate.now().plusDays(1).atStartOfDay().minusMinutes(1)));
 
         List<CouponEntity> coupons = couponService.repoFind(filter);
 
@@ -190,6 +191,7 @@ public class ManageCoupon_BLService {
                         .discountPercentage(coupon.getDiscountPercentage())
                         .startDate(coupon.getStartDate().toLocalDate())
                         .endDate(coupon.getEndDate().toLocalDate())
+                        .name(coupon.getName())
                         .build();
                 activeCoupons.add(activeCoupon);
             }
