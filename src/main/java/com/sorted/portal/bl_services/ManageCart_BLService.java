@@ -460,7 +460,7 @@ public class ManageCart_BLService {
 
     }
 
-    @PostMapping("/getAllCoupons")
+    @GetMapping("/getAllCoupons")
     public CouponListResponse getAllCoupons(HttpServletRequest httpServletRequest) throws JsonProcessingException {
         String reqUserId = httpServletRequest.getHeader("req_user_id");
         Preconditions.check(StringUtils.hasText(reqUserId), new AccessDeniedException());
@@ -468,10 +468,9 @@ public class ManageCart_BLService {
         
         LocalDateTime now = LocalDateTime.now();
 
-        // Get active coupons
+
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        filter.addClause(WhereClause.eq(CouponEntity.Fields.active, true));
         filter.addClause(WhereClause.lte(CouponEntity.Fields.startDate, now));
         filter.addClause(WhereClause.gte(CouponEntity.Fields.endDate, now));
 
@@ -511,7 +510,7 @@ public class ManageCart_BLService {
         List<OtherCoupon> otherCoupons = new ArrayList<>();
         
         for (CouponEntity coupon : coupons) {
-            // Check coupon scope
+            // Check couponEntity scope
             CouponScope couponScope = coupon.getCouponScope();
             if (couponScope != null && couponScope.equals(CouponScope.USER_SPECIFIC)) {
                 if (CollectionUtils.isEmpty(coupon.getAssignedToUsers())) {
@@ -524,7 +523,7 @@ public class ManageCart_BLService {
                 }
             }
             
-            // Check if user has already used this coupon (if once per user)
+            // Check if user has already used this couponEntity (if once per user)
             if (coupon.isOncePerUser() && !CollectionUtils.isEmpty(coupon.getCouponUsages())) {
                 boolean alreadyUsed = coupon.getCouponUsages().stream()
                         .anyMatch(usage -> usage.getUserId().equals(usersBean.getId()));
@@ -543,11 +542,11 @@ public class ManageCart_BLService {
             Long minCartValue = coupon.getMinCartValue() != null ? coupon.getMinCartValue() : 0L;
             
             if (cartValueInPaise >= minCartValue) {
-                // Coupon is applicable
+                // CouponEntity is applicable
                 ApplicableCoupon applicableCoupon = createApplicableCoupon(coupon, cartValueInPaise);
                 applicableCoupons.add(applicableCoupon);
             } else {
-                // Coupon needs more cart value
+                // CouponEntity needs more cart value
                 OtherCoupon otherCoupon = createOtherCoupon(coupon, cartValueInPaise, minCartValue);
                 otherCoupons.add(otherCoupon);
             }
@@ -648,11 +647,10 @@ public class ManageCart_BLService {
             case PERCENTAGE:
                 if (coupon.getDiscountPercentage() != null) {
                     BigDecimal cartValue = CommonUtils.paiseToRupee(cartValueInPaise);
-                    discount = cartValue.multiply(coupon.getDiscountPercentage())
-                            .divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
+                    discount = cartValue.multiply(coupon.getDiscountPercentage()).divide(BigDecimal.valueOf(100)).setScale(2, BigDecimal.ROUND_HALF_UP);
                     
                     // Apply max discount cap if present
-                    if (coupon.getMaxDiscount() != null) {
+                    if (coupon.getMaxDiscount() != null && coupon.getMaxDiscount() > 0) {
                         BigDecimal maxDiscountInRupees = CommonUtils.paiseToRupee(coupon.getMaxDiscount());
                         discount = discount.min(maxDiscountInRupees);
                     }
@@ -681,25 +679,22 @@ public class ManageCart_BLService {
         if (coupon.getDiscountType() == null) {
             return "";
         }
-        
-        switch (coupon.getDiscountType()) {
-            case PERCENTAGE:
-                if (coupon.getMaxDiscount() != null) {
+
+        return switch (coupon.getDiscountType()) {
+            case PERCENTAGE -> {
+                if (coupon.getMaxDiscount() != null && coupon.getMaxDiscount() > 0) {
                     BigDecimal maxDiscountInRupees = CommonUtils.paiseToRupee(coupon.getMaxDiscount());
                     if (calculatedDiscount.compareTo(maxDiscountInRupees) >= 0) {
-                        return String.format("Save ₹%.2f (Max discount reached)", 
+                        yield String.format("You've saved ₹%.2f (Max discount reached)",
                                 calculatedDiscount.doubleValue());
                     }
                 }
-                return String.format("Save %s%% - ₹%.2f", 
-                        coupon.getDiscountPercentage().toPlainString(), 
+                yield String.format("You've saved %s%% - ₹%.2f",
+                        coupon.getDiscountPercentage().toPlainString(),
                         calculatedDiscount.doubleValue());
-                
-            case FIXED:
-                return String.format("Flat ₹%.2f off", calculatedDiscount.doubleValue());
-                
-            default:
-                return String.format("Save ₹%.2f", calculatedDiscount.doubleValue());
-        }
+            }
+            case FIXED -> String.format("Flat ₹%.2f off", calculatedDiscount.doubleValue());
+            default -> String.format("You've saved ₹%.2f", calculatedDiscount.doubleValue());
+        };
     }
 }
