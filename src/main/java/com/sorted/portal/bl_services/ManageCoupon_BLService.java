@@ -97,14 +97,14 @@ public class ManageCoupon_BLService {
                 .endDate(LocalDate.parse(request.endDate()).plusDays(1).atStartOfDay().minusMinutes(1))
                 .description(request.description())
                 .discountType(request.discountType())
-                .discountValue(CommonUtils.rupeeToPaise(request.discountValue()))
+                .discountValue(request.discountValue() == null ? null : CommonUtils.rupeeToPaise(request.discountValue()))
                 .discountPercentage(request.discountPercentage())
                 .couponScope(request.couponScope())
                 .maxUses(request.maxUsage())
                 .oncePerUser(request.oncePerUser())
                 .assignedToUsers(request.assignedToUsers())
-                .maxDiscount(CommonUtils.rupeeToPaise(request.maxDiscount()))
-                .minCartValue(request.minCartValue() == null ? 0L : CommonUtils.rupeeToPaise(request.minCartValue()))
+                .maxDiscount(request.maxDiscount() == null ? null : CommonUtils.rupeeToPaise(request.maxDiscount()))
+                .minCartValue(request.minCartValue() == null ? null : CommonUtils.rupeeToPaise(request.minCartValue()))
                 .build();
         couponService.create(entity, Defaults.RETOOL);
     }
