@@ -120,18 +120,19 @@ public class ManageCart_BLService {
         }
         BigDecimal discountAmount = cartBean.getDiscountAmount();
         if (freeDelivery) {
-            cartBean.setDiscountAmount(discountAmount.add(CommonUtils.paiseToRupee(fixedDeliveryCharge)));
+            discountAmount = discountAmount.add(CommonUtils.paiseToRupee(fixedDeliveryCharge));
         }
 
         BigDecimal difference = cartBean.getItem_total_mrp().subtract(cartBean.getTotal_amount());
 
+        discountAmount = discountAmount.add(difference);
 
         return FetchCartV2.builder()
                 .totalCount(cartBean.getTotal_count()) // Use actual count of valid items
                 .totalAmount(cartBean.getTotal_amount())
                 .freeDeliveryDiff(freeDeliveryDiff)
                 .deliveryFree(freeDelivery)
-                .savings(discountAmount.add(difference))
+                .savings(discountAmount.compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.ZERO : discountAmount)
                 .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
                 .build();
     }
