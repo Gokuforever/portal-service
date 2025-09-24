@@ -3,6 +3,7 @@ package com.sorted.portal.bl_services;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.phonepe.sdk.pg.payments.v2.models.response.StandardCheckoutPayResponse;
 import com.sorted.commons.beans.AddressDTO;
+import com.sorted.commons.beans.CartBean;
 import com.sorted.commons.beans.Item;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.*;
@@ -13,9 +14,7 @@ import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
-import com.sorted.commons.utils.CommonUtils;
-import com.sorted.commons.utils.GsonUtils;
-import com.sorted.commons.utils.PorterUtility;
+import com.sorted.commons.utils.*;
 import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.request.beans.PayNowBean;
 import com.sorted.portal.response.beans.AddressResponse;
@@ -34,6 +33,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.ws.rs.NotFoundException;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -54,6 +54,8 @@ public class ManageTransaction_BLService {
     private final OrderStatusCheckService orderStatusCheckService;
     private final PorterUtility porterUtility;
     private final DemandingPincodeService demandingPincodeService;
+    private final CouponUtility couponUtility;
+    private final CartUtility cartUtility;
 
     @Value("${se.minimum-cart-value.in-paise:10000}")
     private long minCartValueInPaise;
@@ -94,6 +96,8 @@ public class ManageTransaction_BLService {
                     .transactionId(order_Details.getTransaction_id())
                     .orderItems(orderItemResponseList)
                     .deliveryAddress(addressResponse)
+                    .couponCode(order_Details.getCoupon_code())
+                    .discountAmount(order_Details.getDiscount_amount() == null ? BigDecimal.ZERO : CommonUtils.paiseToRupee(order_Details.getDiscount_amount()))
                     .build();
         } catch (NotFoundException e) {
             log.error("status:: Order not found: {}", e.getMessage());
@@ -243,10 +247,19 @@ public class ManageTransaction_BLService {
 
             // Create order
             totalSum = totalSum + deliveryCharge;
+            Long discountAmount = 0L;
+            if (StringUtils.hasText(cart.getCouponCode())) {
+                log.info("pay:: Applying coupon code: {}", cart.getCouponCode());
+                CartBean cartBean = cartUtility.getCartBean(cart);
+                boolean isValidCoupon = couponUtility.validateCouponByCode(cart.getCouponCode(), cartBean);
+                if (isValidCoupon) {
+                    discountAmount = couponUtility.calculateDiscountAmount(cart.getCouponCode(), cartBean);
+                }
+            }
 
             log.debug("pay:: Creating order entity");
             Order_Details order = createOrder(usersBean, seller.getId(), totalSum, address, sellerAddress,
-                    deliveryCharge);
+                    deliveryCharge, cart.getCouponCode(), discountAmount);
             log.info("pay:: Order entity created with total amount: {} paise", totalSum);
 
             // Reduce product quantity
@@ -274,7 +287,7 @@ public class ManageTransaction_BLService {
             // Create payment order
             log.debug("pay:: Creating PhonePe payment order");
             Optional<StandardCheckoutPayResponse> checkoutPayResponseOptional =
-                    phonePeUtility.createOrder(order_Details.getId(), totalSum);
+                    phonePeUtility.createOrder(order_Details.getId(), totalSum - discountAmount);
 
             if (checkoutPayResponseOptional.isEmpty()) {
                 log.error("pay:: Failed to create PhonePe order for order ID: {}, amount: {}",
@@ -501,7 +514,7 @@ public class ManageTransaction_BLService {
         return sellerAddress;
     }
 
-    private Order_Details createOrder(UsersBean usersBean, String seller_id, long totalSum, Address deliveryAddress, Address sellerAddress, long deliveryCharges) {
+    private Order_Details createOrder(UsersBean usersBean, String seller_id, long totalSum, Address deliveryAddress, Address sellerAddress, long deliveryCharges, String couponCode, Long discountAmount) {
         Order_Details order = new Order_Details();
 
         if (StringUtils.hasText(usersBean.getId())) {
@@ -518,6 +531,8 @@ public class ManageTransaction_BLService {
         order.setDelivery_charges(deliveryCharges);
         order.setTotal_items_cost(totalSum - deliveryCharges);
         order.setEstimated_delivery_charges(deliveryCharges);
+        order.setCoupon_code(couponCode);
+        order.setDiscount_amount(discountAmount);
 
         return order;
     }
