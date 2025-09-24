@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 @Builder
 public record FetchCartV2(
         @JsonProperty("total_count")
-        Integer totalCount,
+        Long totalCount,
         @JsonProperty("total_amount")
         BigDecimal totalAmount,
         @JsonProperty("free_delivery_diff")

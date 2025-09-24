@@ -21,9 +21,9 @@ import com.sorted.portal.assisting.beans.CartItemsBean;
 import com.sorted.portal.request.beans.ApplyCouponBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
 import com.sorted.portal.request.beans.CartFetchReqBean;
-import com.sorted.portal.response.beans.FetchCartV2;
-import com.sorted.portal.response.beans.CouponListResponse;
 import com.sorted.portal.response.beans.ApplicableCoupon;
+import com.sorted.portal.response.beans.CouponListResponse;
+import com.sorted.portal.response.beans.FetchCartV2;
 import com.sorted.portal.response.beans.OtherCoupon;
 import com.sorted.portal.service.EstimateDeliveryService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,10 +35,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -66,7 +64,7 @@ public class ManageCart_BLService {
     private long fixedDeliveryCharge;
 
     @GetMapping("/v2/fetch")
-    public FetchCartV2 fetchV2(HttpServletRequest httpServletRequest) {
+    public FetchCartV2 fetchV2(HttpServletRequest httpServletRequest) throws JsonProcessingException {
         String req_user_id = httpServletRequest.getHeader("req_user_id");
         if (!StringUtils.hasText(req_user_id)) {
             throw new AccessDeniedException();
@@ -85,7 +83,7 @@ public class ManageCart_BLService {
 
             // Return early for empty cart to avoid unnecessary processing
             return FetchCartV2.builder()
-                    .totalCount(0)
+                    .totalCount(0L)
                     .totalAmount(BigDecimal.ZERO)
                     .freeDeliveryDiff(CommonUtils.paiseToRupee(minCartValueInPaise))
                     .deliveryFree(false)
@@ -98,7 +96,7 @@ public class ManageCart_BLService {
         if (CollectionUtils.isEmpty(cartItems)) {
             // Return early for empty cart
             return FetchCartV2.builder()
-                    .totalCount(0)
+                    .totalCount(0L)
                     .totalAmount(BigDecimal.ZERO)
                     .freeDeliveryDiff(CommonUtils.paiseToRupee(minCartValueInPaise))
                     .deliveryFree(false)
@@ -107,66 +105,23 @@ public class ManageCart_BLService {
                     .build();
         }
 
-        // Extract product IDs efficiently using parallel stream for large lists
-        List<String> productIds = cartItems.parallelStream()
-                .map(Item::getProduct_id)
-                .distinct() // Remove duplicates to reduce DB load
-                .collect(Collectors.toList());
+        CartBean cartBean = this.getCartBean(cart);
 
-        // Use projection to fetch only required fields: id, selling_price, mrp
-        SEFilter productFilter = new SEFilter(SEFilterType.AND);
-        productFilter.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productIds));
-        productFilter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        productFilter.addProjection(BaseMongoEntity.Fields.id, Products.Fields.selling_price, Products.Fields.mrp);
-
-        // Consider adding projection here if your service supports it:
-        // productFilter.setProjection(Arrays.asList("id", "selling_price", "mrp"));
-
-        List<Products> products = productService.repoFind(productFilter);
-
-        // Use more efficient map creation with proper initial capacity
-        Map<String, Products> productsMap = products.stream()
-                .collect(Collectors.toMap(
-                        Products::getId,
-                        Function.identity(),
-                        (existing, replacement) -> existing, // Handle potential duplicates
-                        HashMap::new
-                ));
-
-        // Calculate totals using single pass with primitive operations
-        long totalCartValueInPaise = 0L;
-        long totalMrpInPaise = 0L;
-        int totalCount = 0;
-
-        for (Item item : cartItems) {
-            Products product = productsMap.get(item.getProduct_id());
-            if (product != null) {
-                long quantity = item.getQuantity();
-                totalCartValueInPaise += product.getSelling_price() * quantity;
-                totalMrpInPaise += product.getMrp() * quantity;
-                totalCount++;
-            }
+        BigDecimal freeDeliveryDiff = BigDecimal.ZERO;
+        boolean freeDelivery = cartBean.is_free_delivery();
+        if (!freeDelivery) {
+            freeDeliveryDiff = CommonUtils.paiseToRupee(minCartValueInPaise).subtract(cartBean.getTotal_amount());
         }
-
-        // Calculate derived values
-        BigDecimal totalCartValue = CommonUtils.paiseToRupee(totalCartValueInPaise);
-        BigDecimal freeDeliveryDiff = totalCartValueInPaise < minCartValueInPaise
-                ? CommonUtils.paiseToRupee(minCartValueInPaise - totalCartValueInPaise)
-                : BigDecimal.ZERO;
-
-        long moneySavedInPaise = totalMrpInPaise - totalCartValueInPaise;
-        boolean isDeliveryFree = totalCartValueInPaise >= minCartValueInPaise; // Use >= for boundary case
-
-        if (isDeliveryFree) {
-            moneySavedInPaise += fixedDeliveryCharge;
+        if (freeDelivery) {
+            cartBean.setDiscountAmount(cartBean.getDiscountAmount().add(CommonUtils.paiseToRupee(fixedDeliveryCharge)));
         }
 
         return FetchCartV2.builder()
-                .totalCount(totalCount) // Use actual count of valid items
-                .totalAmount(totalCartValue)
+                .totalCount(cartBean.getTotal_count()) // Use actual count of valid items
+                .totalAmount(cartBean.getTotal_amount())
                 .freeDeliveryDiff(freeDeliveryDiff)
-                .deliveryFree(isDeliveryFree)
-                .savings(CommonUtils.paiseToRupee(moneySavedInPaise))
+                .deliveryFree(freeDelivery)
+                .savings(cartBean.getDiscountAmount())
                 .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
                 .build();
     }
@@ -422,7 +377,17 @@ public class ManageCart_BLService {
         cartBean.set_free_delivery(freeDelivery);
         cartBean.setStoreOperational(storeActivityService.isStoreOperational(seller_id));
 
+        cartBean.setDiscountAmount(BigDecimal.ZERO);
         if (StringUtils.hasText(cart.getCouponCode()) && summed > 0) {
+            boolean valid = couponUtility.validateCouponByCode(cart.getCouponCode(), cartBean);
+            if (valid) {
+                Long discountAmount = couponUtility.calculateDiscountAmount(cart.getCouponCode(), cartBean);
+                cartBean.setDiscountAmount(CommonUtils.paiseToRupee(discountAmount));
+            } else {
+                cart.setCouponCode(null);
+                cartBean.setDiscountAmount(BigDecimal.ZERO);
+            }
+
 //            Long discountAmount = couponUtility.validateCouponAndGetDiscount(cartBean, coupon, usersBean.getId());
 //            cart.setCouponCode(coupon.getCode());
 //            cartBean.setCouponCode(coupon.getCode());
