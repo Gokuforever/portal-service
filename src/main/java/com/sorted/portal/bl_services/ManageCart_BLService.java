@@ -38,7 +38,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -49,7 +52,6 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 @Slf4j
-@RequestMapping("/cart")
 @RestController
 @RequiredArgsConstructor
 public class ManageCart_BLService {
@@ -67,7 +69,70 @@ public class ManageCart_BLService {
     @Value("${se.fixed-delivery-charge.in-paise:5900}")
     private long fixedDeliveryCharge;
 
-    @GetMapping("/v2/fetch")
+    @GetMapping("/v2/cart/fetch")
+    public FetchCartV2 v2fetch(HttpServletRequest httpServletRequest) throws JsonProcessingException {
+        String req_user_id = httpServletRequest.getHeader("req_user_id");
+        if (!StringUtils.hasText(req_user_id)) {
+            throw new AccessDeniedException();
+        }
+
+        // Use more efficient query with projection to get only needed fields
+        SEFilter cartFilter = new SEFilter(SEFilterType.AND);
+        cartFilter.addClause(WhereClause.eq(Cart.Fields.user_id, req_user_id));
+        cartFilter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        Cart cart = cart_Service.repoFindOne(cartFilter);
+        if (cart == null) {
+            cart = new Cart();
+            cart.setUser_id(req_user_id);
+            cart_Service.create(cart, req_user_id);
+
+            // Return early for empty cart to avoid unnecessary processing
+            return FetchCartV2.builder()
+                    .totalCount(0L)
+                    .totalAmount(BigDecimal.ZERO)
+                    .freeDeliveryDiff(CommonUtils.paiseToRupee(minCartValueInPaise))
+                    .deliveryFree(false)
+                    .savings(BigDecimal.ZERO)
+                    .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
+                    .build();
+        }
+
+        List<Item> cartItems = cart.getCart_items();
+        if (CollectionUtils.isEmpty(cartItems)) {
+            // Return early for empty cart
+            return FetchCartV2.builder()
+                    .totalCount(0L)
+                    .totalAmount(BigDecimal.ZERO)
+                    .freeDeliveryDiff(CommonUtils.paiseToRupee(minCartValueInPaise))
+                    .deliveryFree(false)
+                    .savings(BigDecimal.ZERO)
+                    .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
+                    .build();
+        }
+
+        CartBean cartBean = cartUtility.getCartBean(cart);
+
+        BigDecimal freeDeliveryDiff = BigDecimal.ZERO;
+        boolean freeDelivery = cartBean.is_free_delivery();
+        if (!freeDelivery) {
+            freeDeliveryDiff = CommonUtils.paiseToRupee(minCartValueInPaise).subtract(cartBean.getTotal_amount());
+        }
+        if (freeDelivery) {
+            cartBean.setDiscountAmount(cartBean.getDiscountAmount().add(CommonUtils.paiseToRupee(fixedDeliveryCharge)));
+        }
+
+        return FetchCartV2.builder()
+                .totalCount(cartBean.getTotal_count()) // Use actual count of valid items
+                .totalAmount(cartBean.getTotal_amount())
+                .freeDeliveryDiff(freeDeliveryDiff)
+                .deliveryFree(freeDelivery)
+                .savings(cartBean.getDiscountAmount())
+                .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
+                .build();
+    }
+
+    @GetMapping("/cart/v2/fetch")
     public FetchCartV2 fetchV2(HttpServletRequest httpServletRequest) throws JsonProcessingException {
         String req_user_id = httpServletRequest.getHeader("req_user_id");
         if (!StringUtils.hasText(req_user_id)) {
@@ -130,7 +195,7 @@ public class ManageCart_BLService {
                 .build();
     }
 
-    @PostMapping("/clear")
+    @PostMapping("/cart/clear")
     public SEResponse clear(HttpServletRequest httpServletRequest) {
         try {
             String req_user_id = httpServletRequest.getHeader("req_user_id");
@@ -166,7 +231,7 @@ public class ManageCart_BLService {
         }
     }
 
-    @PostMapping("/fetch")
+    @PostMapping("/cart/fetch")
     public SEResponse fetch(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
             CartFetchReqBean fetchReqBean = request.getGenericRequestDataObject(CartFetchReqBean.class);
@@ -201,7 +266,7 @@ public class ManageCart_BLService {
         }
     }
 
-    @PostMapping("/add/v2")
+    @PostMapping("v2/cart/add")
     public SEResponse addV2(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
             CartCRUDBean req = request.getGenericRequestDataObject(CartCRUDBean.class);
@@ -348,7 +413,7 @@ public class ManageCart_BLService {
         return updatedItems;
     }
 
-    @PostMapping("/add")
+    @PostMapping("/cart/add")
     public SEResponse update(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
             CartCRUDBean req = request.getGenericRequestDataObject(CartCRUDBean.class);
@@ -454,7 +519,7 @@ public class ManageCart_BLService {
         return is_secure_item;
     }
 
-    @PostMapping("/applyCoupon")
+    @PostMapping("/cart/applyCoupon")
     public void applyCoupon(@RequestBody ApplyCouponBean request, HttpServletRequest httpServletRequest) throws JsonProcessingException {
         CommonUtils.extractHeaders(httpServletRequest, request);
         UsersBean usersBean = users_Service.validateUserForActivity(request.getReq_user_id(), Activity.CART_MANAGEMENT);
@@ -489,7 +554,7 @@ public class ManageCart_BLService {
 
     }
 
-    @GetMapping("/getAllCoupons")
+    @GetMapping("/cart/getAllCoupons")
     public CouponListResponse getAllCoupons(HttpServletRequest httpServletRequest) throws JsonProcessingException {
         String reqUserId = httpServletRequest.getHeader("req_user_id");
         Preconditions.check(StringUtils.hasText(reqUserId), new AccessDeniedException());
