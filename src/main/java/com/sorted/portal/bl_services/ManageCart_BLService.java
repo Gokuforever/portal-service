@@ -1,9 +1,7 @@
 package com.sorted.portal.bl_services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.sorted.commons.beans.CartBean;
-import com.sorted.commons.beans.Item;
-import com.sorted.commons.beans.UsersBean;
+import com.sorted.commons.beans.*;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Cart;
 import com.sorted.commons.entity.mongo.CouponEntity;
@@ -111,28 +109,20 @@ public class ManageCart_BLService {
                     .build();
         }
 
-        CartBean cartBean = cartUtility.getCartBean(cart);
+        CartBeanV2 cartBean = cartUtility.getCartBeanV2(cart);
+        BillingSummary billingSummary = cartBean.getBillingSummary();
 
         BigDecimal freeDeliveryDiff = BigDecimal.ZERO;
-        boolean freeDelivery = cartBean.is_free_delivery();
-        if (!freeDelivery) {
-            freeDeliveryDiff = CommonUtils.paiseToRupee(minCartValueInPaise).subtract(cartBean.getTotal_amount());
+        if (!cartBean.isFreeDelivery()) {
+            freeDeliveryDiff = CommonUtils.paiseToRupee(minCartValueInPaise).subtract(billingSummary.getToPay());
         }
-        BigDecimal discountAmount = cartBean.getDiscountAmount();
-        if (freeDelivery) {
-            discountAmount = discountAmount.add(CommonUtils.paiseToRupee(fixedDeliveryCharge));
-        }
-
-        BigDecimal difference = cartBean.getItem_total_mrp().subtract(cartBean.getTotal_amount());
-
-        discountAmount = discountAmount.add(difference);
 
         return FetchCartV2.builder()
-                .totalCount(cartBean.getTotal_count()) // Use actual count of valid items
-                .totalAmount(cartBean.getTotal_amount())
+                .totalCount(cartBean.getTotalItemCount()) // Use actual count of valid items
+                .totalAmount(billingSummary.getToPay())
                 .freeDeliveryDiff(freeDeliveryDiff)
-                .deliveryFree(freeDelivery)
-                .savings(discountAmount.compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.ZERO : discountAmount)
+                .deliveryFree(cartBean.isFreeDelivery())
+                .savings(billingSummary.getSavings())
                 .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
                 .build();
     }
@@ -205,7 +195,7 @@ public class ManageCart_BLService {
     }
 
     @PostMapping("/cart/clear")
-    public SEResponse clear(HttpServletRequest httpServletRequest) {
+    public CartBeanV2 clear(HttpServletRequest httpServletRequest) {
         try {
             String req_user_id = httpServletRequest.getHeader("req_user_id");
             UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Permission.VIEW,
@@ -229,8 +219,7 @@ public class ManageCart_BLService {
             cart.setCart_items(new ArrayList<>());
             cart_Service.update(cart.getId(), cart, req_user_id);
 
-            CartBean cartBean = cartUtility.getCartBean(cart);
-            return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
+            return cartUtility.getCartBeanV2(cart);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
@@ -276,7 +265,7 @@ public class ManageCart_BLService {
     }
 
     @PostMapping("v2/cart/add")
-    public SEResponse addV2(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+    public CartBeanV2 addV2(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
             CartCRUDBean req = request.getGenericRequestDataObject(CartCRUDBean.class);
             CommonUtils.extractHeaders(httpServletRequest, req);
@@ -308,8 +297,7 @@ public class ManageCart_BLService {
             cart.setCart_items(updatedCartItems);
             cart_Service.update(cart.getId(), cart, usersBean.getId());
 
-            CartBean cartBean = cartUtility.getCartBean(cart);
-            return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
+            return cartUtility.getCartBeanV2(cart);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
@@ -529,7 +517,7 @@ public class ManageCart_BLService {
     }
 
     @PostMapping("/cart/applyCoupon")
-    public void applyCoupon(@RequestBody ApplyCouponBean request, HttpServletRequest httpServletRequest) throws JsonProcessingException {
+    public CartBeanV2 applyCoupon(@RequestBody ApplyCouponBean request, HttpServletRequest httpServletRequest) throws JsonProcessingException {
         CommonUtils.extractHeaders(httpServletRequest, request);
         UsersBean usersBean = users_Service.validateUserForActivity(request.getReq_user_id(), Activity.CART_MANAGEMENT);
         UserType userType = usersBean.getRole().getUser_type();
@@ -540,12 +528,6 @@ public class ManageCart_BLService {
                 throw new AccessDeniedException();
         }
         Preconditions.check(StringUtils.hasText(request.getCouponCode()), ResponseCode.MISSING_COUPON_CODE);
-        SEFilter filter = new SEFilter(SEFilterType.AND);
-        filter.addClause(WhereClause.eq(CouponEntity.Fields.code, request.getCouponCode()));
-        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-        CouponEntity coupon = couponService.repoFindOne(filter);
-        Preconditions.check(coupon != null, ResponseCode.COUPON_CODE_NOT_FOUND);
 
         SEFilter filterC = new SEFilter(SEFilterType.AND);
         filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
@@ -554,13 +536,19 @@ public class ManageCart_BLService {
         Cart cart = cart_Service.repoFindOne(filterC);
         Preconditions.check(cart != null, ResponseCode.NO_RECORD);
 
-        CartBean cartBean = cartUtility.getCartBean(cart);
+        if (StringUtils.hasText(cart.getCouponCode())) {
+            cart.setCouponCode(null);
+            cart_Service.update(cart.getId(), cart, usersBean.getId());
+        }
 
-        Long discountAmount = couponUtility.validateCouponAndGetDiscount(cartBean, coupon, usersBean.getId());
-        cart.setCouponCode(coupon.getCode());
-        cartBean.setCouponCode(coupon.getCode());
-        cartBean.setDiscountAmount(CommonUtils.paiseToRupee(discountAmount));
+        CartBeanV2 cartBeanV2 = cartUtility.getCartBeanV2(cart);
 
+        couponUtility.validateCouponAndThrowException(request.getCouponCode(), CommonUtils.rupeeToPaise(cartBeanV2.getBillingSummary().getToPay()), usersBean.getId(), cartBeanV2.isFreeDelivery());
+
+        cart.setCouponCode(request.getCouponCode());
+        cart_Service.update(cart.getId(), cart, usersBean.getId());
+
+        return cartUtility.getCartBeanV2(cart);
     }
 
     @GetMapping("/cart/getAllCoupons")
