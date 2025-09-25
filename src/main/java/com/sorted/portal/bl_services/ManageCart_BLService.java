@@ -264,6 +264,40 @@ public class ManageCart_BLService {
         }
     }
 
+    @PostMapping("/cart/fetch/all")
+    public CartBeanV2 fetchAll(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+        try {
+            CartFetchReqBean fetchReqBean = request.getGenericRequestDataObject(CartFetchReqBean.class);
+            CommonUtils.extractHeaders(httpServletRequest, fetchReqBean);
+            String address_id = StringUtils.hasText(fetchReqBean.getAddress_id()) ? fetchReqBean.getAddress_id() : null;
+            UsersBean usersBean = users_Service.validateUserForActivity(fetchReqBean.getReq_user_id(), Permission.VIEW,
+                    Activity.CART_MANAGEMENT);
+            switch (usersBean.getRole().getUser_type()) {
+                case CUSTOMER, GUEST:
+                    break;
+                default:
+                    throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+            }
+            SEFilter filterC = new SEFilter(SEFilterType.AND);
+            filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
+            filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+            Cart cart = cart_Service.repoFindOne(filterC);
+            if (cart == null) {
+                cart = new Cart();
+                cart.setUser_id(usersBean.getId());
+                cart = cart_Service.create(cart, usersBean.getId());
+            }
+            return cartUtility.getCartBeanV2(cart, address_id, usersBean.getFirst_name() + " " + usersBean.getLast_name());
+        } catch (CustomIllegalArgumentsException ex) {
+            throw ex;
+        } catch (Exception e) {
+            log.error("/fetch:: exception occurred");
+            log.error("/fetch:: {}", e.getMessage());
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        }
+    }
+
     @PostMapping("v2/cart/add")
     public CartBeanV2 addV2(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
