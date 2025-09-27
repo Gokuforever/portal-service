@@ -6,6 +6,7 @@ import com.sorted.commons.entity.mongo.Order_Item;
 import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.mongo.Seller;
 import com.sorted.commons.enums.WeekDay;
+import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
 import com.sorted.portal.response.beans.FindOrderResBean;
@@ -49,7 +50,10 @@ public class OrderResponseMapper {
                 .id(orderDetails.getId())
                 .code(orderDetails.getCode())
                 .status(orderDetails.getStatus().getInternal_status())
-                .total_amount(orderDetails.getTotal_amount())
+                .total_amount(CommonUtils.paiseToRupee(orderDetails.getTotal_amount()))
+                .deliveryFee(CommonUtils.paiseToRupee(orderDetails.getDelivery_charges()))
+                .handlingFee(CommonUtils.paiseToRupee(orderDetails.getHandling_charges()))
+                .smallCartFee(CommonUtils.paiseToRupee(orderDetails.getSmall_cart_fee()))
                 .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap))
                 .creation_date_str(orderDetails.getCreation_date_str())
                 .build();
@@ -81,7 +85,10 @@ public class OrderResponseMapper {
                 .id(orderDetails.getId())
                 .code(orderDetails.getCode())
                 .status(orderDetails.getStatus().getCustomer_status())
-                .total_amount(orderDetails.getTotal_amount())
+                .total_amount(CommonUtils.paiseToRupee(orderDetails.getTotal_amount()))
+                .deliveryFee(CommonUtils.paiseToRupee(orderDetails.getDelivery_charges()))
+                .handlingFee(CommonUtils.paiseToRupee(orderDetails.getHandling_charges()))
+                .smallCartFee(CommonUtils.paiseToRupee(orderDetails.getSmall_cart_fee()))
                 .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap))
                 .non_operational_days(nonWorkingDays)
                 .max_return_days(maxReturnDays)
