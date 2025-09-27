@@ -299,7 +299,7 @@ public class ManageCart_BLService {
     }
 
     @PostMapping("v2/cart/add")
-    public CartBeanV2 addV2(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+    public void addV2(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         try {
             CartCRUDBean req = request.getGenericRequestDataObject(CartCRUDBean.class);
             CommonUtils.extractHeaders(httpServletRequest, req);
@@ -331,7 +331,6 @@ public class ManageCart_BLService {
             cart.setCart_items(updatedCartItems);
             cart_Service.update(cart.getId(), cart, usersBean.getId());
 
-            return cartUtility.getCartBeanV2(cart);
         } catch (CustomIllegalArgumentsException ex) {
             throw ex;
         } catch (Exception e) {
