@@ -1,6 +1,7 @@
 package com.sorted.portal.bl_services;
 
 import com.sorted.commons.beans.ReferralDetails;
+import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Role;
 import com.sorted.commons.entity.mongo.Users;
@@ -12,6 +13,7 @@ import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.utils.ReferralUtility;
 import com.sorted.portal.request.beans.CreateReferralBean;
+import com.sorted.portal.request.beans.MakeAmbassadorBean;
 import com.sorted.portal.response.beans.AmbassadorDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.util.CollectionUtils;
@@ -92,6 +94,25 @@ public class ManageReferral_BLService {
         }
 
         return ambassadors.stream().map(this::mapResponse).toList();
+    }
+
+    @PostMapping("/make/ambassador")
+    public void makeAmbassador(@RequestBody MakeAmbassadorBean request) {
+
+        SEFilter filterRole = new SEFilter(SEFilterType.AND);
+        filterRole.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterRole.addClause(WhereClause.eq(Role.Fields.user_type_id, UserType.CUSTOMER.getId()));
+
+        Role role = roleService.repoFindOne(filterRole);
+
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, request.userId()));
+        filter.addClause(WhereClause.eq(Users.Fields.role_id, role.getId()));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        Users user = usersService.repoFindOne(filter);
+        
+        user.setAmbassador(true);
+        usersService.update(user.getId(), user, Defaults.RETOOL);
     }
 
 }
