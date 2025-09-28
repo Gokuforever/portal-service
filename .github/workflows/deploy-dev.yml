@@ -126,4 +126,7 @@ jobs:
           echo "*** Verifying deployment ***"
           docker ps | grep portal-service || (docker logs portal-service && exit 1)
           
+          echo "*** Cleaning up old images ***"
+          docker image prune -af || true
+          
           echo "======== DEPLOYMENT COMPLETED ========"

@@ -593,7 +593,7 @@ public class ManageCart_BLService {
         return cartUtility.getCartBeanV2(cart);
     }
 
-    @PostMapping("/coupon/remove")
+    @PostMapping("/cart/coupon/remove")
     public void removeCoupon(HttpServletRequest httpServletRequest) throws JsonProcessingException {
         String req_user_id = httpServletRequest.getHeader("req_user_id");
         UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.CART_MANAGEMENT);
