@@ -75,7 +75,7 @@ public class ManageReferral_BLService {
         return ReferralCodeDetails.builder()
                 .id(referralEntity.getId())
                 .code(referralEntity.getCode())
-                .mobile(user.getMobile_no())
+                .mobile("91" + user.getMobile_no())
                 .name(StringUtils.hasText(user.getFirst_name()) ? user.getFirst_name() + " " + user.getLast_name() : "")
                 .count(referralEntity.getCount())
                 .build();
