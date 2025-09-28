@@ -644,6 +644,8 @@ public class ManageCart_BLService {
                     .build();
         }
 
+        String couponCode = cart.getCouponCode();
+
         cart.setCouponCode(null);
 
         CartBeanV2 cartBean = cartUtility.getCartBeanV2(cart);
@@ -655,11 +657,11 @@ public class ManageCart_BLService {
                     .build();
         }
 
-        Long cartValueInPaise = CommonUtils.rupeeToPaise(cartBean.getBillingSummary().getToPay());
-        List<ApplicableCoupon> applicableCoupons = new ArrayList<>();
-        List<OtherCoupon> otherCoupons = new ArrayList<>();
+        cart.setCouponCode(couponCode);
 
-        return couponUtility.getApplicableCoupons(coupons, usersBean.getId(), cartValueInPaise, cartBean.getBillingSummary().getToPay().compareTo(CommonUtils.paiseToRupee(minCartValueInPaise)) > 0);
+        Long cartValueInPaise = CommonUtils.rupeeToPaise(cartBean.getBillingSummary().getToPay());
+
+        return couponUtility.getApplicableCoupons(coupons, usersBean.getId(), cartValueInPaise, cartBean.getBillingSummary().getToPay().compareTo(CommonUtils.paiseToRupee(minCartValueInPaise)) > 0, cart);
 
 //        for (CouponEntity coupon : coupons) {
 //
