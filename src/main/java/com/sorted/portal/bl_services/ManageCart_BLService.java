@@ -117,10 +117,11 @@ public class ManageCart_BLService {
         CartBeanV2 cartBean = cartUtility.getCartBeanV2(cart);
         BillingSummary billingSummary = cartBean.getBillingSummary();
 
+        BigDecimal itemCost = billingSummary.getToPay();
         BigDecimal freeDeliveryDiff = BigDecimal.ZERO;
         if (!cartBean.isFreeDelivery()) {
             BigDecimal platformFee = CommonUtils.paiseToRupee(fixedDeliveryFee).add(CommonUtils.paiseToRupee(fixedHandlingFee)).add(CommonUtils.paiseToRupee(fixedSmallCartFee));
-            BigDecimal itemCost = billingSummary.getToPay().subtract(platformFee);
+            itemCost = billingSummary.getToPay().subtract(platformFee);
             freeDeliveryDiff = CommonUtils.paiseToRupee(minCartValueInPaise).subtract(itemCost);
         }
 
@@ -131,6 +132,7 @@ public class ManageCart_BLService {
                 .deliveryFree(cartBean.isFreeDelivery())
                 .savings(billingSummary.getSavings())
                 .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
+                .totalItemCost(itemCost)
                 .build();
     }
 

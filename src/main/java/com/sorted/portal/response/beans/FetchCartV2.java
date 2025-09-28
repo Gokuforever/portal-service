@@ -11,6 +11,8 @@ public record FetchCartV2(
         Long totalCount,
         @JsonProperty("total_amount")
         BigDecimal totalAmount,
+        @JsonProperty("total_item_cost")
+        BigDecimal totalItemCost,
         @JsonProperty("free_delivery_diff")
         BigDecimal freeDeliveryDiff,
         @JsonProperty("is_delivery_free")
