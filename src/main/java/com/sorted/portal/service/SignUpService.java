@@ -7,7 +7,7 @@ import com.sorted.commons.entity.mongo.Cart;
 import com.sorted.commons.entity.service.Address_Service;
 import com.sorted.commons.entity.service.Cart_Service;
 import com.sorted.commons.enums.UserType;
-import com.sorted.commons.helper.AggregationFilter;
+import com.sorted.commons.helper.AggregationFilter.*;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -28,13 +28,21 @@ public class SignUpService {
 
     @Async
     public void migrateAddressForCustomer(String guest_user_id, String customer_user_id) {
-        AggregationFilter.SEFilter filter = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-        filter.addClause(AggregationFilter.WhereClause.eq(Address.Fields.entity_id, guest_user_id));
-        filter.addClause(AggregationFilter.WhereClause.eq(Address.Fields.user_type, UserType.GUEST.name()));
-        filter.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(Address.Fields.entity_id, guest_user_id));
+        filter.addClause(WhereClause.eq(Address.Fields.user_type, UserType.GUEST.name()));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         List<Address> addresses = addressService.repoFind(filter);
         if (CollectionUtils.isEmpty(addresses)) {
+            return;
+        }
+
+        SEFilter filterC = new SEFilter(SEFilterType.AND);
+        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.user_id, customer_user_id));
+        List<Address> customerAddresses = addressService.repoFind(filterC);
+        if (!CollectionUtils.isEmpty(customerAddresses)) {
             return;
         }
 
@@ -50,9 +58,9 @@ public class SignUpService {
         Cart new_cart = new Cart();
         new_cart.setUser_id(customer_user_id);
         if (StringUtils.hasText(guest_user_id)) {
-            AggregationFilter.SEFilter filterC = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-            filterC.addClause(AggregationFilter.WhereClause.eq(Cart.Fields.user_id, guest_user_id));
-            filterC.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            SEFilter filterC = new SEFilter(SEFilterType.AND);
+            filterC.addClause(WhereClause.eq(Cart.Fields.user_id, guest_user_id));
+            filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
             Cart cart = cartService.repoFindOne(filterC);
             if (cart != null) {

@@ -22,6 +22,7 @@ import com.sorted.portal.request.beans.AddressBean;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -217,6 +218,8 @@ public class ManageAddress_BLService {
                 default:
                     throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
             }
+            boolean isDefault = false;
+
             List<AddressDTO> listA = new ArrayList<>();
             SEFilter filterA = new SEFilter(SEFilterType.AND);
             filterA.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -224,24 +227,18 @@ public class ManageAddress_BLService {
 
             List<Address> addresses = address_Service.repoFind(filterA);
             if (!CollectionUtils.isEmpty(addresses)) {
-                addresses.forEach(e -> {
-                    AddressDTO dto = new AddressDTO();
-                    dto.setId(e.getId());
-                    dto.setStreet_1(e.getStreet_1());
-                    dto.setStreet_2(e.getStreet_2());
-                    dto.setLandmark(e.getLandmark());
-                    dto.setCity(e.getCity());
-                    dto.setState(e.getState());
-                    dto.setPincode(e.getPincode());
-                    dto.setAddress_type(e.getAddress_type().getType());
-                    dto.setAddress_type_desc(e.getAddress_type_desc());
-                    dto.setCode(e.getCode());
-                    dto.setLat(e.getLat());
-                    dto.setLng(e.getLng());
-                    dto.setIs_default(e.getIs_default());
-                    dto.setPhone_no(e.getPhone_no());
+
+                for (Address address : addresses) {
+                    if (isDefault && address.getIs_default()) {
+                        address.setIs_default(false);
+                        address_Service.update(address.getId(), address, req.getReq_user_id());
+                    }
+                    AddressDTO dto = getAddressDTO(address);
                     listA.add(dto);
-                });
+
+                    isDefault = address.getIs_default();
+                }
+
             }
             return SEResponse.getBasicSuccessResponseList(listA, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
@@ -251,6 +248,26 @@ public class ManageAddress_BLService {
             log.error("add/fetch:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
+    }
+
+    @NotNull
+    private static AddressDTO getAddressDTO(Address address) {
+        AddressDTO dto = new AddressDTO();
+        dto.setId(address.getId());
+        dto.setStreet_1(address.getStreet_1());
+        dto.setStreet_2(address.getStreet_2());
+        dto.setLandmark(address.getLandmark());
+        dto.setCity(address.getCity());
+        dto.setState(address.getState());
+        dto.setPincode(address.getPincode());
+        dto.setAddress_type(address.getAddress_type().getType());
+        dto.setAddress_type_desc(address.getAddress_type_desc());
+        dto.setCode(address.getCode());
+        dto.setLat(address.getLat());
+        dto.setLng(address.getLng());
+        dto.setIs_default(address.getIs_default());
+        dto.setPhone_no(address.getPhone_no());
+        return dto;
     }
 
     @PostMapping("/remove")
