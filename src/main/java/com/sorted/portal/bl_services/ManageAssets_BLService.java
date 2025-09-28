@@ -51,6 +51,7 @@ public class ManageAssets_BLService {
         assets.setType(AssetType.HOME_PROMO_BANNER);
         assets.setUrl(cdnUrl);
         assets.setOrder(existingOrder + 1);
+        assets.setAltText(request.getAltText());
 
         assetsService.create(assets, Defaults.RETOOL);
     }
