@@ -39,7 +39,7 @@ public class ManageReferral_BLService {
     private final RoleService roleService;
     private final ReferralService referralService;
 
-    @PostMapping("/codes/all")
+    @GetMapping("/codes/all")
     public List<ReferralCodeDetails> getAllReferrals() {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
