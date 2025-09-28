@@ -593,6 +593,21 @@ public class ManageCart_BLService {
         return cartUtility.getCartBeanV2(cart);
     }
 
+    @PostMapping("/coupon/remove")
+    public void removeCoupon(HttpServletRequest httpServletRequest) throws JsonProcessingException {
+        String req_user_id = httpServletRequest.getHeader("req_user_id");
+        UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.CART_MANAGEMENT);
+        SEFilter filterC = new SEFilter(SEFilterType.AND);
+        filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
+        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        Cart cart = cart_Service.repoFindOne(filterC);
+        Preconditions.check(cart != null, ResponseCode.NO_RECORD);
+
+        cart.setCouponCode(null);
+        cart_Service.update(cart.getId(), cart, usersBean.getId());
+    }
+
     @GetMapping("/cart/getAllCoupons")
     public CouponListResponse getAllCoupons(HttpServletRequest httpServletRequest) throws JsonProcessingException {
         String reqUserId = httpServletRequest.getHeader("req_user_id");
