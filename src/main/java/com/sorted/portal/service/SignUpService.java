@@ -38,14 +38,6 @@ public class SignUpService {
             return;
         }
 
-        SEFilter filterC = new SEFilter(SEFilterType.AND);
-        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.user_id, customer_user_id));
-        List<Address> customerAddresses = addressService.repoFind(filterC);
-        if (!CollectionUtils.isEmpty(customerAddresses)) {
-            return;
-        }
-
         List<Address> addressList = addresses.stream().map(address ->
                 new Address(address, UserType.CUSTOMER, customer_user_id)
         ).toList();
