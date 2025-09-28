@@ -5,9 +5,11 @@ import com.sorted.commons.beans.ProductCarousel;
 import com.sorted.commons.beans.SelectedSubCategories;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.*;
+import com.sorted.commons.entity.service.AssetsService;
 import com.sorted.commons.entity.service.Category_MasterService;
 import com.sorted.commons.entity.service.Product_Master_Service;
 import com.sorted.commons.entity.service.Users_Service;
+import com.sorted.commons.enums.AssetType;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter;
@@ -18,10 +20,7 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.repository.mongo.ProductRepository;
 import com.sorted.commons.utils.CommonUtils;
-import com.sorted.portal.assisting.beans.config.GroupComponentBean;
-import com.sorted.portal.assisting.beans.config.HomeProductsBean;
-import com.sorted.portal.assisting.beans.config.ProductBean;
-import com.sorted.portal.assisting.beans.config.ProductCarouselBean;
+import com.sorted.portal.assisting.beans.config.*;
 import com.sorted.portal.request.beans.MetaDataReq;
 import com.sorted.portal.response.beans.Config;
 import com.sorted.portal.response.beans.MetaData;
@@ -54,6 +53,7 @@ public class ManageMetaData_BLService {
     private final ProductRepository productRepository;
     private final HomeConfigService homeConfigService;
     private final CategoryFilterService categoryFilterService;
+    private final AssetsService assetsService;
 
     // Cache for /preferences response
     private volatile Config preferencesCache = null;
@@ -159,10 +159,31 @@ public class ManageMetaData_BLService {
             homeProductsBeans.add(homeProductsBean);
         }
 
+        List<PromoBanners> promoBanners = new ArrayList<>();
+
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filter.addClause(WhereClause.eq(AssetsEntity.Fields.type, AssetType.HOME_PROMO_BANNER.name()));
+
+        List<AssetsEntity> assetsEntities = assetsService.repoFind(filter);
+        if (!CollectionUtils.isEmpty(assetsEntities)) {
+            for (AssetsEntity assetsEntity : assetsEntities) {
+                promoBanners.add(PromoBanners.builder()
+                        .url(assetsEntity.getUrl())
+                        .order(assetsEntity.getOrder())
+                        .altText(assetsEntity.getAltText())
+                        .build());
+            }
+        }
+
+        Assets assets = Assets.builder()
+                .homePromoBanners(promoBanners)
+                .build();
 
         Config config = Config.builder()
                 .categories(categoryMasterData)
                 .homeProducts(homeProductsBeans)
+                .assets(assets)
                 .build();
 
         // Update cache
