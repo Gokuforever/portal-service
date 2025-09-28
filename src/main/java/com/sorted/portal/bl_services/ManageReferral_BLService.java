@@ -68,6 +68,7 @@ public class ManageReferral_BLService {
 
     private AmbassadorDetails mapResponse(Users ambassador) {
         return AmbassadorDetails.builder()
+                .id(ambassador.getId())
                 .mobileNo("+91" + ambassador.getMobile_no())
                 .name(StringUtils.hasText(ambassador.getFirst_name()) ? ambassador.getFirst_name() + " " + ambassador.getLast_name() : "")
                 .build();
@@ -110,7 +111,7 @@ public class ManageReferral_BLService {
         filter.addClause(WhereClause.eq(Users.Fields.role_id, role.getId()));
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         Users user = usersService.repoFindOne(filter);
-        
+
         user.setAmbassador(true);
         usersService.update(user.getId(), user, Defaults.RETOOL);
     }

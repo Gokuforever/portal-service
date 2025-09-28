@@ -4,6 +4,7 @@ import lombok.Builder;
 
 @Builder
 public record AmbassadorDetails(
+        String id,
         String mobileNo,
         String name
 ) {
