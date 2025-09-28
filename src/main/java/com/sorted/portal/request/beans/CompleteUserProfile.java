@@ -33,4 +33,7 @@ public class CompleteUserProfile extends ReqBaseBean {
     private EducationCategoryBean educationDetails;
 
     private AuthV2Bean auth;
+
+    @JsonProperty("referral_code")
+    private String referralCode;
 }

@@ -63,8 +63,14 @@ public class ManageCart_BLService {
     @Value("${se.minimum-cart-value.in-paise:10000}")
     private long minCartValueInPaise;
 
-    @Value("${se.fixed-delivery-charge.in-paise:5900}")
-    private long fixedDeliveryCharge;
+    @Value("${se.fixed-delivery-charge.in-paise:4000}")
+    private long fixedDeliveryFee;
+
+    @Value("${se.small-cart-fee.in-paise:1000}")
+    private long fixedSmallCartFee;
+
+    @Value("${se.handling-fee.in-paise:900}")
+    private long fixedHandlingFee;
 
     @GetMapping("/v2/cart/fetch")
     public FetchCartV2 v2fetch(HttpServletRequest httpServletRequest) throws JsonProcessingException {
@@ -113,7 +119,9 @@ public class ManageCart_BLService {
 
         BigDecimal freeDeliveryDiff = BigDecimal.ZERO;
         if (!cartBean.isFreeDelivery()) {
-            freeDeliveryDiff = CommonUtils.paiseToRupee(minCartValueInPaise).subtract(billingSummary.getToPay());
+            BigDecimal platformFee = CommonUtils.paiseToRupee(fixedDeliveryFee).add(CommonUtils.paiseToRupee(fixedHandlingFee)).add(CommonUtils.paiseToRupee(fixedSmallCartFee));
+            BigDecimal itemCost = billingSummary.getToPay().subtract(platformFee);
+            freeDeliveryDiff = CommonUtils.paiseToRupee(minCartValueInPaise).subtract(itemCost);
         }
 
         return FetchCartV2.builder()
@@ -177,7 +185,7 @@ public class ManageCart_BLService {
         }
         BigDecimal discountAmount = cartBean.getDiscountAmount();
         if (freeDelivery) {
-            cartBean.setDiscountAmount(discountAmount.add(CommonUtils.paiseToRupee(fixedDeliveryCharge)));
+            cartBean.setDiscountAmount(discountAmount.add(CommonUtils.paiseToRupee(fixedDeliveryFee)));
         }
 
         BigDecimal difference = cartBean.getItem_total_mrp().subtract(cartBean.getTotal_amount());

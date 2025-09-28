@@ -16,6 +16,7 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.manage.otp.ManageOTPManagerService;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.Preconditions;
+import com.sorted.commons.utils.ReferralUtility;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.request.beans.CompleteUserProfile;
 import com.sorted.portal.response.beans.CompleteProfileRes;
@@ -35,6 +36,7 @@ public class ManageUserProfileV2_BLService {
     private final EducationDetailsValidationService validationService;
     private final ManageOTPManagerService manageOtp;
     private final AuthService authService;
+    private final ReferralUtility referralUtility;
 
     @PostMapping("/complete")
     public CompleteProfileRes completeProfile(@RequestBody CompleteUserProfile request, HttpServletRequest httpServletRequest) {
@@ -76,6 +78,10 @@ public class ManageUserProfileV2_BLService {
         users.setEducationDetails(request.getEducationDetails());
 
         usersService.update(users.getId(), users, users.getId());
+
+        if (StringUtils.hasText(request.getReferralCode())) {
+            referralUtility.refer(request.getReq_user_id(), request.getReferralCode());
+        }
         UsersBean userInfo = usersService.validateAndGetUserInfo(users.getId());
         return CompleteProfileRes.builder().userInfo(userInfo).build();
     }
@@ -101,6 +107,10 @@ public class ManageUserProfileV2_BLService {
         EducationCategoryBean educationDetails = request.getEducationDetails();
         Preconditions.check(educationDetails != null, ResponseCode.MANDATE_EDUCATION_LEVEL_DETAILS);
         validationService.validate(educationDetails);
+
+        if (StringUtils.hasText(request.getReferralCode())) {
+            referralUtility.validateReferralCode(request.getReq_user_id(), request.getReferralCode());
+        }
     }
 
     private CompleteProfileRes verifyUniqueMobile(CompleteUserProfile request) {
