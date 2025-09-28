@@ -66,7 +66,7 @@ public class ManageReferral_BLService {
 
     private AmbassadorDetails mapResponse(Users ambassador) {
         return AmbassadorDetails.builder()
-                .mobileNo(ambassador.getMobile_no())
+                .mobileNo("+91" + ambassador.getMobile_no())
                 .name(StringUtils.hasText(ambassador.getFirst_name()) ? ambassador.getFirst_name() + " " + ambassador.getLast_name() : "")
                 .build();
     }
