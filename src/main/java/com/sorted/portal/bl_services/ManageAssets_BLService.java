@@ -46,9 +46,12 @@ public class ManageAssets_BLService {
 
         List<AssetsEntity> assetsEntities = assetsService.repoFind(filter);
         if (!CollectionUtils.isEmpty(assetsEntities)) {
-            existingOrder = assetsEntities.stream()
-                    .sorted(Comparator.comparing(AssetsEntity::getOrder).reversed())
-                    .toList().get(0).getOrder();
+            assetsEntities = assetsEntities.stream().filter(asset -> asset.isMobileView() == request.isMobileView()).toList();
+            if (!CollectionUtils.isEmpty(assetsEntities)) {
+                existingOrder = assetsEntities.stream()
+                        .sorted(Comparator.comparing(AssetsEntity::getOrder).reversed())
+                        .toList().get(0).getOrder();
+            }
         }
 
         AssetsEntity assets = new AssetsEntity();
@@ -99,6 +102,11 @@ public class ManageAssets_BLService {
 
         List<AssetsEntity> assetsEntities = assetsService.repoFind(filter);
 
+        if (CollectionUtils.isEmpty(assetsEntities)) {
+            return;
+        }
+
+        assetsEntities = assetsEntities.stream().filter(asset -> asset.isMobileView() == assetsEntity.isMobileView()).toList();
         if (CollectionUtils.isEmpty(assetsEntities)) {
             return;
         }
