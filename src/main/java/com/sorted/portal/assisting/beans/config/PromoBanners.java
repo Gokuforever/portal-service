@@ -6,6 +6,7 @@ import lombok.Builder;
 public record PromoBanners(
         String url,
         int order,
-        String altText
+        String altText,
+        boolean mobileView
 ) {
 }

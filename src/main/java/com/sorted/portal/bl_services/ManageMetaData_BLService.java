@@ -172,6 +172,7 @@ public class ManageMetaData_BLService {
                         .url(assetsEntity.getUrl())
                         .order(assetsEntity.getOrder())
                         .altText(assetsEntity.getAltText())
+                        .mobileView(assetsEntity.isMobileView())
                         .build());
             }
         }
