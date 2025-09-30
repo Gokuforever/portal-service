@@ -6,6 +6,7 @@ import lombok.Builder;
 public record AssetDetails(
         String id,
         String url,
-        int order
+        int order,
+        boolean mobileView
 ) {
 }
