@@ -81,6 +81,7 @@ public class ManageAssets_BLService {
                 .id(assetsEntity.getId())
                 .url(assetsEntity.getUrl())
                 .order(assetsEntity.getOrder())
+                .mobileView(assetsEntity.isMobileView())
                 .build();
     }
 
