@@ -56,6 +56,7 @@ public class ManageAssets_BLService {
         assets.setUrl(cdnUrl);
         assets.setOrder(existingOrder + 1);
         assets.setAltText(request.getAltText());
+        assets.setMobileView(request.isMobileView());
 
         assetsService.create(assets, Defaults.RETOOL);
     }

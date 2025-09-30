@@ -9,4 +9,5 @@ public class UploadAssetBean {
     private String fileName;
     private String contentType;
     private String altText;
+    private boolean mobileView;
 }
