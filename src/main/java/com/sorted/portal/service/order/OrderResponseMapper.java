@@ -6,6 +6,7 @@ import com.sorted.commons.entity.mongo.Order_Item;
 import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.mongo.Seller;
 import com.sorted.commons.enums.WeekDay;
+import com.sorted.commons.utils.ComboUtility;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
@@ -14,10 +15,12 @@ import com.sorted.portal.response.beans.OrderItemDTO;
 import com.sorted.portal.response.beans.OrderItemReportsDTO;
 import com.sorted.portal.response.beans.OrderReportDTO;
 import com.sorted.portal.service.FileGeneratorUtil;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -28,10 +31,12 @@ import java.util.stream.Collectors;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class OrderResponseMapper {
 
     @Value("${se.secure.max-return-days:150}")
     private Integer maxReturnDays;
+    private final ComboUtility comboUtility;
 
     /**
      * Convert order details entity to response bean for internal users
@@ -54,7 +59,7 @@ public class OrderResponseMapper {
                 .deliveryFee(CommonUtils.paiseToRupee(orderDetails.getDelivery_charges()))
                 .handlingFee(CommonUtils.paiseToRupee(orderDetails.getHandling_charges()))
                 .smallCartFee(CommonUtils.paiseToRupee(orderDetails.getSmall_cart_fee()))
-                .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap))
+                .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap, false))
                 .creation_date_str(orderDetails.getCreation_date_str())
                 .build();
     }
@@ -89,7 +94,7 @@ public class OrderResponseMapper {
                 .deliveryFee(CommonUtils.paiseToRupee(orderDetails.getDelivery_charges()))
                 .handlingFee(CommonUtils.paiseToRupee(orderDetails.getHandling_charges()))
                 .smallCartFee(CommonUtils.paiseToRupee(orderDetails.getSmall_cart_fee()))
-                .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap))
+                .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap, true))
                 .non_operational_days(nonWorkingDays)
                 .max_return_days(maxReturnDays)
                 .creation_date_str(orderDetails.getCreation_date_str())
@@ -106,13 +111,41 @@ public class OrderResponseMapper {
      */
     private List<OrderItemDTO> mapOrderItems(
             String orderId,
-            Map<String, List<Order_Item>> orderItemsMap) {
+            Map<String, List<Order_Item>> orderItemsMap,
+            boolean isCustomer) {
 
+        List<OrderItemDTO> orderItemDTOS = new ArrayList<>();
         List<Order_Item> orderItems = orderItemsMap.getOrDefault(orderId, List.of());
 
-        return orderItems.stream()
-                .map(this::mapOrderItem)
-                .toList();
+        if (isCustomer) {
+
+            boolean hasCombo = orderItems.stream().anyMatch(Order_Item::isCombo);
+            if (hasCombo) {
+                Map<String, List<Order_Item>> comboItems = orderItems.stream()
+                        .filter(Order_Item::isCombo)
+                        .collect(Collectors.groupingBy(Order_Item::getCombo_id));
+                for (Map.Entry<String, List<Order_Item>> entry : comboItems.entrySet()) {
+                    orderItemDTOS.add(this.mapOrderItemForCombo(entry.getValue()));
+                }
+            }
+        }
+
+        List<OrderItemDTO> list;
+        if (isCustomer) {
+            list = orderItems.stream()
+                    .filter(orderItem -> !orderItem.isCombo())
+                    .map(this::mapOrderItem)
+                    .toList();
+        } else {
+            list = orderItems.stream()
+                    .map(this::mapOrderItem)
+                    .toList();
+        }
+        if (list.isEmpty()) {
+            return orderItemDTOS;
+        }
+        orderItemDTOS.addAll(list);
+        return orderItemDTOS;
     }
 
     /**
@@ -135,6 +168,26 @@ public class OrderResponseMapper {
                 .type(orderItem.getType())
                 .status(orderItem.getStatus())
                 .status_id(orderItem.getStatus_id())
+                .combo(orderItem.isCombo())
+                .build();
+    }
+
+    private OrderItemDTO mapOrderItemForCombo(List<Order_Item> comboItems) {
+
+        Order_Item orderItem = comboItems.get(0);
+        return OrderItemDTO.builder()
+                .id(orderItem.getId())
+                .product_id(orderItem.getCombo_id())
+                .product_name(orderItem.getCombo_name())
+                .cdn_url(orderItem.getCombo_img_src())
+                .product_code(orderItem.getProduct_code())
+                .quantity(orderItem.getQuantity())
+                .total_cost(orderItem.getCombo_mrp())
+                .selling_price(orderItem.getCombo_selling_price())
+                .type(orderItem.getType())
+                .status(orderItem.getStatus())
+                .status_id(orderItem.getStatus_id())
+                .combo(orderItem.isCombo())
                 .build();
     }
 

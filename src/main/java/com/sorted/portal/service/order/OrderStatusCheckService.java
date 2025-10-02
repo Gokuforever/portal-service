@@ -49,7 +49,7 @@ public class OrderStatusCheckService {
     private final OrderService orderService;
     private final SmsTraceHelper smsTraceHelper;
     private final SMSService smsService;
-    private final ComboService comboService;
+    private final ComboUtility comboUtility;
     @Value("${se.enable.sms:false}")
     private boolean enableSms;
 
@@ -224,7 +224,21 @@ public class OrderStatusCheckService {
             Cart cart = cart_Service.repoFindOne(filterC);
             if (cart != null) {
                 List<Item> cartItems = cart.getCart_items();
-                for (Order_Item orderItem : orderItems) {
+                Map<String, List<Order_Item>> comboMap = orderItems.stream().filter(Order_Item::isCombo).collect(Collectors.groupingBy(Order_Item::getCombo_id));
+                if (!CollectionUtils.isEmpty(comboMap)) {
+                    for (Map.Entry<String, List<Order_Item>> entry : comboMap.entrySet()) {
+                        Order_Item orderItem = entry.getValue().get(0);
+                        Item item = new Item();
+                        item.setProduct_id(orderItem.getProduct_id());
+                        item.setQuantity(orderItem.getQuantity());
+                        item.setProduct_code(orderItem.getProduct_code());
+                        item.set_secure(orderItem.getType().equals(PurchaseType.SECURE));
+                        item.setCombo(orderItem.isCombo());
+                        cartItems.add(item);
+                    }
+                }
+                List<Order_Item> normalList = orderItems.stream().filter(orderItem -> !orderItem.isCombo()).toList();
+                for (Order_Item orderItem : normalList) {
                     Item item = new Item();
                     item.setProduct_id(orderItem.getProduct_id());
                     item.setQuantity(orderItem.getQuantity());
@@ -236,12 +250,7 @@ public class OrderStatusCheckService {
                 cart.setCart_items(cartItems);
                 cart_Service.update(cart.getId(), cart, Defaults.SYSTEM_ADMIN);
 
-
-                List<String> comboIds = orderItems.stream().filter(Order_Item::isCombo).map(Order_Item::getProduct_id).toList();
-                if (!CollectionUtils.isEmpty(comboIds)) {
-
-                }
-                List<String> products = orderItems.stream().filter(orderItem -> !orderItem.isCombo()).map(Order_Item::getProduct_id).toList();
+                List<String> products = orderItems.stream().map(Order_Item::getProduct_id).toList();
                 Map<String, Long> mapPQ = new HashMap<>();
                 for (Order_Item orderItem : orderItems) {
                     Long quantity = mapPQ.getOrDefault(orderItem.getProduct_id(), 0L);
@@ -271,7 +280,27 @@ public class OrderStatusCheckService {
 
         List<Order_Item> orderItems = order_Item_Service.repoFind(filterOI);
         if (!CollectionUtils.isEmpty(orderItems)) {
+            List<Order_Item> comboItems = orderItems.stream().filter(Order_Item::isCombo).toList();
+            if (!CollectionUtils.isEmpty(comboItems)) {
+                Map<String, List<Order_Item>> comboMap = comboItems.stream().filter(Order_Item::isCombo)
+                        .collect(Collectors.groupingBy(Order_Item::getCombo_id));
+                for (Map.Entry<String, List<Order_Item>> entry : comboMap.entrySet()) {
+                    Order_Item orderItem = entry.getValue().get(0);
+                    orderItemResponseList.add(OrderItemResponse.builder()
+                            .productCode(orderItem.getCombo_code())
+                            .productId(orderItem.getCombo_id())
+                            .productName(orderItem.getCombo_name())
+                            .cdnUrl(orderItem.getCombo_img_src())
+                            .purchaseType(PurchaseType.BUY.name())
+                            .quantity(orderItem.getQuantity())
+                            .sellingPrice(orderItem.getCombo_selling_price())
+                            .totalCost(orderItem.getCombo_mrp())
+                            .build());
+                }
+            }
+
             List<String> productIds = orderItems.stream()
+                    .filter(orderItem -> !orderItem.isCombo())
                     .map(Order_Item::getProduct_id)
                     .filter(StringUtils::hasText)
                     .distinct()
@@ -292,6 +321,9 @@ public class OrderStatusCheckService {
 
 
                 for (Order_Item item : orderItems) {
+                    if (item.isCombo()) {
+                        continue;
+                    }
                     OrderItemResponse response = convertToResponse(mapP, item);
                     if (response != null) {
                         orderItemResponseList.add(response);

@@ -22,4 +22,5 @@ public class OrderItemDTO {
     private OrderStatus status;
     private LocalDateTime return_date;
     private Return_Details return_details;
+    private boolean combo;
 }

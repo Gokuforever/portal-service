@@ -337,8 +337,12 @@ public class ManageCart_BLService {
                     updatedCartItems = removeComboItems(cart.getCart_items(), itemBean.getProduct_id());
                 }
             } else {
-                Products product = fetchProduct(itemBean.getProduct_id());
-                updatedCartItems = addOrUpdateCartItem(cart.getCart_items(), itemBean, product);
+                if (add) {
+                    Products product = fetchProduct(itemBean.getProduct_id());
+                    updatedCartItems = addOrUpdateCartItem(cart.getCart_items(), itemBean, product);
+                } else {
+                    updatedCartItems = removeProductItems(cart.getCart_items(), itemBean.getProduct_id());
+                }
             }
 
             cart.setCart_items(updatedCartItems);
@@ -350,6 +354,10 @@ public class ManageCart_BLService {
             log.error("/add/v2:: exception occurred", e);
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
+    }
+
+    private List<Item> removeProductItems(List<Item> cartItems, String productId) {
+        return cartItems.stream().filter(e -> !e.getProduct_id().equals(productId)).toList();
     }
 
     @PostMapping("/cart/add")
@@ -602,7 +610,7 @@ public class ManageCart_BLService {
     private List<Item> removeComboItems(List<Item> cartItems, String comboId) {
         if (CollectionUtils.isEmpty(cartItems)) return new ArrayList<>();
         return cartItems.stream()
-                .filter(cartItem -> comboId.equals(cartItem.getProduct_id()))
+                .filter(cartItem -> !comboId.equals(cartItem.getProduct_id()))
                 .toList();
     }
 
