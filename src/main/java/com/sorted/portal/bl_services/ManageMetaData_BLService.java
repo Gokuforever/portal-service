@@ -194,15 +194,25 @@ public class ManageMetaData_BLService {
                         .id(combo.getId())
                         .name(combo.getName())
                         .secure(false)
-                        .image(!CollectionUtils.isEmpty(combo.getMedia()) && !combo.getMedia().isEmpty() ? combo.getMedia().get(0).getCdn_url() : "")
+                        .image(!CollectionUtils.isEmpty(combo.getMedia()) && !combo.getMedia().isEmpty() ? combo.getMedia().get(0).getCdn_url() : products.stream().anyMatch(p -> !CollectionUtils.isEmpty(p.getMedia())) ? products.stream().filter(p -> !CollectionUtils.isEmpty(p.getMedia())).findFirst().get().getMedia().get(0).getCdn_url() : "")
                         .mrp(CommonUtils.paiseToRupee(combo.getMrp()))
                         .sellingPrice(CommonUtils.paiseToRupee(combo.getSelling_price()))
                         .quantity(averageQuantity)
                         .build();
                 comboBeans.add(productBean);
             }
-
-
+            HomeProductsBean homeProductsBean = HomeProductsBean.builder()
+                    .combo(true)
+                    .mainBadge("Combo Badge")
+                    .mainTitle("Combo Main Title")
+                    .mainSubtitle("Combo Main Subtitle")
+                    .productCarousel(ProductCarouselBean.builder()
+                            .title("Combo Carousel Title")
+                            .subtitle("Combo Carousel Subtitle")
+                            .products(comboBeans)
+                            .build())
+                    .build();
+            homeProductsBeans.add(homeProductsBean);
         }
 
         Assets assets = Assets.builder()
