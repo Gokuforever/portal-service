@@ -134,7 +134,7 @@ public class ManageAuth_BLService {
             }
 
 
-            String uuid = manageOTPManagerService.resendOtp(process_type, reference_id, users_Service.isSeller(entity_id));
+            String uuid = manageOTPManagerService.resendOtp(process_type, reference_id);
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setEntity_id(entity_id);
@@ -172,7 +172,7 @@ public class ManageAuth_BLService {
             if (User_Status.ACTIVE.getId() != users.getStatus()) {
                 throw new CustomIllegalArgumentsException(ResponseCode.USER_BLOCKED);
             }
-            String uuid = manageOTPManagerService.send(users.getMobile_no(), ProcessType.FORGOT_PASS, users.getId(), users_Service.isSeller(users.getId()));
+            String uuid = manageOTPManagerService.send(users.getMobile_no(), ProcessType.FORGOT_PASS, users.getId());
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setProcess_type(ProcessType.FORGOT_PASS.name());

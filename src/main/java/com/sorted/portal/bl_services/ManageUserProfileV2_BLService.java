@@ -123,7 +123,7 @@ public class ManageUserProfileV2_BLService {
         }
 
         validateRequest(request);
-        String referenceId = manageOtp.send(request.getMobile(), ProcessType.PROFILE, request.getReq_user_id(), usersService.isSeller(request.getMobile()));
+        String referenceId = manageOtp.send(request.getMobile(), ProcessType.PROFILE, request.getReq_user_id());
         return CompleteProfileRes.builder().referenceId(referenceId).otpVerificationRequired(true).build();
     }
 

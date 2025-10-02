@@ -101,7 +101,7 @@ public class ManageUserProfile_BLService {
             if (User_Status.ACTIVE.getId() != usersBean.getStatus()) {
                 throw new CustomIllegalArgumentsException(ResponseCode.USER_BLOCKED);
             }
-            String uuid = manageOTPManagerService.send(usersBean.getMobile_no(), ProcessType.UPDATE_PASS, usersBean.getId(), users_Service.isSeller(usersBean));
+            String uuid = manageOTPManagerService.send(usersBean.getMobile_no(), ProcessType.UPDATE_PASS, usersBean.getId());
             OTPResponse response = new OTPResponse();
             response.setReference_id(uuid);
             response.setProcess_type(ProcessType.UPDATE_PASS.name());
