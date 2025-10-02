@@ -700,6 +700,28 @@ public class ManageProduct_BLService {
 
                 List<ProductDetailsBeanList> relatedProducts = products.stream().map(storeProductService::getResponseBean).toList();
                 bean.setRelated_products(relatedProducts);
+                if (usersBean.getRole().getUser_type() == UserType.CUSTOMER
+                        || usersBean.getRole().getUser_type() == UserType.GUEST) {
+                    SEFilter filterC = new SEFilter(SEFilterType.AND);
+                    filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
+                    filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+                    Cart cart = cart_Service.repoFindOne(filterC);
+                    if (cart == null) {
+                        cart = new Cart();
+                        cart.setUser_id(usersBean.getId());
+                        cart = cart_Service.create(cart, usersBean.getId());
+                    }
+                    List<Item> cart_items = cart.getCart_items();
+                    CartDetailsBuilder cartDetailsBuilder = CartDetails.builder();
+                    if (!CollectionUtils.isEmpty(cart_items)) {
+                        Optional<Item> itemOptional = cart_items.stream().filter(item -> item.getProduct_id().equals(bean.getId())).findFirst();
+                        if (itemOptional.isPresent()) {
+                            Item item = itemOptional.get();
+                            cartDetailsBuilder.secure_items(item.is_secure() ? item.getQuantity() : 0);
+                        }
+                    }
+                }
                 return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
             }
             SEFilter filterSE = new SEFilter(SEFilterType.AND);
