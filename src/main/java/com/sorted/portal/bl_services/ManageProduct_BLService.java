@@ -721,6 +721,7 @@ public class ManageProduct_BLService {
                             cartDetailsBuilder.secure_items(item.is_secure() ? item.getQuantity() : 0);
                         }
                     }
+                    bean.setCart_info(cartDetailsBuilder.build());
                 }
                 return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
             }
