@@ -4,12 +4,15 @@ import com.sorted.commons.beans.SelectedSubCategories;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Category_Master;
+import com.sorted.commons.entity.mongo.Combo;
 import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.service.Category_MasterService;
+import com.sorted.commons.entity.service.ComboService;
 import com.sorted.commons.entity.service.ProductService;
-import com.sorted.commons.helper.AggregationFilter;
+import com.sorted.commons.helper.AggregationFilter.*;
 import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
+import com.sorted.commons.utils.ComboUtility;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
 import com.sorted.portal.request.beans.FindProductBean;
@@ -20,57 +23,73 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class StoreProductService {
 
+    private final ComboService comboService;
     private final ProductService productService;
     @Value("${se.default.seller:68711a63a2dcdf55ed170972}")
     private String defaultSeller;
     private final SearchHistoryAsyncHelper searchHistoryAsyncHelper;
     private final Category_MasterService category_MasterService;
+    private final ComboUtility comboUtility;
 
     public List<ProductDetailsBeanList> getProductDetailsBeanLists(FindProductBean req, UsersBean usersBean) {
-        AggregationFilter.SEFilter filterSE = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-        filterSE.addClause(AggregationFilter.WhereClause.eq(Products.Fields.seller_id, defaultSeller));
+        List<ProductDetailsBeanList> comboProducts = new ArrayList<>();
+        SEFilter filterSE = new SEFilter(SEFilterType.AND);
+        filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, defaultSeller));
         if (StringUtils.hasText(req.getName())) {
-            filterSE.addClause(AggregationFilter.WhereClause.like(Products.Fields.name, req.getName()));
+            filterSE.addClause(WhereClause.like(Products.Fields.name, req.getName()));
         }
+        SEFilter filterCombo = new SEFilter(SEFilterType.AND);
+        filterCombo.addClause(WhereClause.like(Combo.Fields.name, req.getName()));
+        filterCombo.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Combo> combos = comboService.repoFind(filterCombo);
+        if (!CollectionUtils.isEmpty(combos)) {
+            Map<String, Long> resultMap = combos.stream()
+                    .collect(Collectors.toMap(
+                            Combo::getId,
+                            combo -> {
+                                List<Products> products = comboUtility.getProductsByCombo(combo);
+                                return products.stream().map(Products::getQuantity).toList().stream().sorted().toList().get(0);
+                            }
+                    ));
+            comboProducts.addAll(combos.stream().map(combo -> this.getResponseBean(combo, resultMap.get(combo.getId()))).toList());
+        }
+
         if (StringUtils.hasText(req.getCategory_id())) {
-            filterSE.addClause(AggregationFilter.WhereClause.eq(Products.Fields.category_id, req.getCategory_id()));
+            filterSE.addClause(WhereClause.eq(Products.Fields.category_id, req.getCategory_id()));
         }
         if (req.getGroup_id() != null && req.getGroup_id() > 0) {
-            filterSE.addClause(AggregationFilter.WhereClause.eq(Products.Fields.group_id, req.getGroup_id()));
+            filterSE.addClause(WhereClause.eq(Products.Fields.group_id, req.getGroup_id()));
         }
         if (!CollectionUtils.isEmpty(req.getFilters())) {
-            List<AggregationFilter.SEFilterNode> filterNodes = new ArrayList<>();
+            List<SEFilterNode> filterNodes = new ArrayList<>();
             for (Map.Entry<String, List<String>> entry : req.getFilters().entrySet()) {
                 entry.getValue().removeIf(e -> !StringUtils.hasText(e));
                 if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
-                    AggregationFilter.SEFilterNode node = new AggregationFilter.SEFilterNode(AggregationFilter.SEFilterType.OR);
+                    SEFilterNode node = new SEFilterNode(SEFilterType.OR);
                     Map<String, Object> map = new HashMap<>();
                     map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
                     map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
-                    node.addClause(AggregationFilter.WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+                    node.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
                     filterNodes.add(node);
                 }
             }
             filterSE.addNodes(filterNodes);
         }
-        filterSE.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         if (StringUtils.hasText(req.getSort_by())) {
-            AggregationFilter.OrderBy sort = switch (req.getSort_by()) {
-                case "price_low_to_high" ->
-                        new AggregationFilter.OrderBy(Products.Fields.selling_price, AggregationFilter.SortOrder.ASC);
-                case "price_high_to_low" ->
-                        new AggregationFilter.OrderBy(Products.Fields.selling_price, AggregationFilter.SortOrder.DESC);
-                case "newest" ->
-                        new AggregationFilter.OrderBy(BaseMongoEntity.Fields.creation_date, AggregationFilter.SortOrder.DESC);
-                case "oldest" ->
-                        new AggregationFilter.OrderBy(BaseMongoEntity.Fields.creation_date, AggregationFilter.SortOrder.ASC);
-                default ->
-                        new AggregationFilter.OrderBy(BaseMongoEntity.Fields.modification_date, AggregationFilter.SortOrder.DESC);
+            OrderBy sort = switch (req.getSort_by()) {
+                case "price_low_to_high" -> new OrderBy(Products.Fields.selling_price, SortOrder.ASC);
+                case "price_high_to_low" -> new OrderBy(Products.Fields.selling_price, SortOrder.DESC);
+                case "newest" -> new OrderBy(BaseMongoEntity.Fields.creation_date, SortOrder.DESC);
+                case "oldest" -> new OrderBy(BaseMongoEntity.Fields.creation_date, SortOrder.ASC);
+                default -> new OrderBy(BaseMongoEntity.Fields.modification_date, SortOrder.DESC);
             };
             filterSE.setOrderBy(sort);
         }
@@ -78,12 +97,13 @@ public class StoreProductService {
                 filterSE);
         List<Products> listP = productService.repoFind(filterSE);
         if (CollectionUtils.isEmpty(listP)) {
-            return Collections.emptyList();
+            return comboProducts;
         }
         List<ProductDetailsBeanList> list = new ArrayList<>();
         for (Products p : listP) {
             list.add(getResponseBean(p));
         }
+        list.addAll(comboProducts);
         return list;
     }
 
@@ -103,7 +123,7 @@ public class StoreProductService {
                     relatedFilters.get(s.getSub_category()).addAll(s.getSelected_attributes());
                 });
 
-        AggregationFilter.SEFilter filterRI = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
+        SEFilter filterRI = new SEFilter(SEFilterType.AND);
         if (!CollectionUtils.isEmpty(relatedFilters)) {
             this.makeValuesUnique(relatedFilters);
 
@@ -115,12 +135,12 @@ public class StoreProductService {
                 }
             }
             if (!map.isEmpty()) {
-                filterRI.addClause(AggregationFilter.WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+                filterRI.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
             }
         }
-        filterRI.addClause(AggregationFilter.WhereClause.eq(Products.Fields.group_id, product.getGroup_id()));
-        filterRI.addClause(AggregationFilter.WhereClause.notEq(BaseMongoEntity.Fields.id, product.getId()));
-        filterRI.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterRI.addClause(WhereClause.eq(Products.Fields.group_id, product.getGroup_id()));
+        filterRI.addClause(WhereClause.notEq(BaseMongoEntity.Fields.id, product.getId()));
+        filterRI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         Pagination pagination = new Pagination(0, 12);
         filterRI.setPagination(pagination);
@@ -138,7 +158,20 @@ public class StoreProductService {
 
     }
 
-    private static ProductDetailsBeanList getResponseBean(Products p) {
+    public ProductDetailsBeanList getResponseBean(Combo c, long quantity) {
+        return ProductDetailsBeanList.builder()
+                .name(c.getName())
+                .id(c.getId())
+                .mrp(CommonUtils.paiseToRupee(c.getMrp()))
+                .sellingPrice(CommonUtils.paiseToRupee(c.getSelling_price()))
+                .quantity(quantity)
+                .image(CollectionUtils.isEmpty(c.getMedia()) ? "" : c.getMedia().get(0).getCdn_url())
+                .secure(false)
+                .is_combo(true)
+                .build();
+    }
+
+    public ProductDetailsBeanList getResponseBean(Products p) {
         return ProductDetailsBeanList.builder()
                 .name(p.getName())
                 .id(p.getId())

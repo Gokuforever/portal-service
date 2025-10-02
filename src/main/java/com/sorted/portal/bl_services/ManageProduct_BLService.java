@@ -15,11 +15,13 @@ import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
 import com.sorted.commons.repository.mongo.ProductRepository;
 import com.sorted.commons.utils.AwsS3Service;
+import com.sorted.commons.utils.ComboUtility;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDetailsBuilder;
+import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
 import com.sorted.portal.enums.ReportType;
@@ -78,6 +80,7 @@ public class ManageProduct_BLService {
     private final ProductRepository productRepository;
     private final StoreProductService storeProductService;
     private final EducationCategoriesService educationCategoriesService;
+    private final ComboUtility comboUtility;
 
 
     @GetMapping("/curated")
@@ -673,6 +676,31 @@ public class ManageProduct_BLService {
                     Activity.INVENTORY_MANAGEMENT);
             if (!StringUtils.hasText(req.getId())) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
+            }
+
+            boolean isCombo = comboUtility.isCombo(req.getId());
+            if (isCombo) {
+                Combo combo = comboUtility.validateAndGetCombo(req.getId());
+                List<Products> products = comboUtility.getProductsByCombo(combo);
+                long averageQuantity = products.stream().map(Products::getQuantity).toList().stream().sorted().toList().get(0);
+                List<Media> media = products.stream().filter(e -> !CollectionUtils.isEmpty(e.getMedia()) && !e.getMedia().isEmpty()).flatMap(m -> m.getMedia().stream()).toList();
+
+                ProductDetailsBean bean = new ProductDetailsBean();
+                bean.setName(combo.getName());
+                bean.setId(combo.getId());
+                bean.setProduct_code(combo.getCode());
+                bean.setSelling_price(CommonUtils.paiseToRupee(combo.getSelling_price()));
+                bean.setMrp(CommonUtils.paiseToRupee(combo.getMrp()));
+                bean.setSelected_sub_catagories(new ArrayList<>());
+                bean.setQuantity(averageQuantity);
+                bean.setDescription(combo.getDescription());
+                bean.setSecure(false);
+                bean.setMedia(media);
+                bean.set_combo(true);
+
+                List<ProductDetailsBeanList> relatedProducts = products.stream().map(storeProductService::getResponseBean).toList();
+                bean.setRelated_products(relatedProducts);
+                return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
             }
             SEFilter filterSE = new SEFilter(SEFilterType.AND);
             filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getId()));

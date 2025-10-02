@@ -10,11 +10,12 @@ import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
-import com.sorted.commons.helper.AggregationFilter;
+import com.sorted.commons.helper.AggregationFilter.*;
 import com.sorted.commons.helper.MailBuilder;
 import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.notifications.SMSService;
 import com.sorted.commons.notifications.helper.SmsTraceHelper;
+import com.sorted.commons.utils.ComboUtility;
 import com.sorted.commons.utils.OrderService;
 import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.response.beans.OrderItemResponse;
@@ -48,6 +49,7 @@ public class OrderStatusCheckService {
     private final OrderService orderService;
     private final SmsTraceHelper smsTraceHelper;
     private final SMSService smsService;
+    private final ComboService comboService;
     @Value("${se.enable.sms:false}")
     private boolean enableSms;
 
@@ -71,9 +73,9 @@ public class OrderStatusCheckService {
 
     private void newOrderNotificationToSeller(@NotNull Order_Details order_Details) {
 
-        AggregationFilter.SEFilter filterU = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-        filterU.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        filterU.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getUser_id()));
+        SEFilter filterU = new SEFilter(SEFilterType.AND);
+        filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getUser_id()));
 
         Users user = usersService.repoFindOne(filterU);
         if (user == null) {
@@ -105,9 +107,9 @@ public class OrderStatusCheckService {
             );
         }
 
-        AggregationFilter.SEFilter filterS = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-        filterS.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getSeller_id()));
-        filterS.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        SEFilter filterS = new SEFilter(SEFilterType.AND);
+        filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, order_Details.getSeller_id()));
+        filterS.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         Seller seller = seller_Service.repoFindOne(filterS);
         if (seller != null) {
@@ -202,9 +204,9 @@ public class OrderStatusCheckService {
     }
 
     private void updateOrderItems(Order_Details order_Details, OrderStatus status) {
-        AggregationFilter.SEFilter filterOI = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-        filterOI.addClause(AggregationFilter.WhereClause.eq(Order_Item.Fields.order_id, order_Details.getId()));
-        filterOI.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        SEFilter filterOI = new SEFilter(SEFilterType.AND);
+        filterOI.addClause(WhereClause.eq(Order_Item.Fields.order_id, order_Details.getId()));
+        filterOI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         List<Order_Item> orderItems = order_Item_Service.repoFind(filterOI);
         if (!CollectionUtils.isEmpty(orderItems)) {
@@ -215,9 +217,9 @@ public class OrderStatusCheckService {
         }
 
         if (status.equals(OrderStatus.TRANSACTION_FAILED)) {
-            AggregationFilter.SEFilter filterC = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-            filterC.addClause(AggregationFilter.WhereClause.eq(Cart.Fields.user_id, order_Details.getUser_id()));
-            filterC.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            SEFilter filterC = new SEFilter(SEFilterType.AND);
+            filterC.addClause(WhereClause.eq(Cart.Fields.user_id, order_Details.getUser_id()));
+            filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
             Cart cart = cart_Service.repoFindOne(filterC);
             if (cart != null) {
@@ -228,22 +230,27 @@ public class OrderStatusCheckService {
                     item.setQuantity(orderItem.getQuantity());
                     item.setProduct_code(orderItem.getProduct_code());
                     item.set_secure(orderItem.getType().equals(PurchaseType.SECURE));
+                    item.setCombo(orderItem.isCombo());
                     cartItems.add(item);
                 }
                 cart.setCart_items(cartItems);
                 cart_Service.update(cart.getId(), cart, Defaults.SYSTEM_ADMIN);
 
 
-                List<String> products = orderItems.stream().map(Order_Item::getProduct_id).toList();
+                List<String> comboIds = orderItems.stream().filter(Order_Item::isCombo).map(Order_Item::getProduct_id).toList();
+                if (!CollectionUtils.isEmpty(comboIds)) {
+
+                }
+                List<String> products = orderItems.stream().filter(orderItem -> !orderItem.isCombo()).map(Order_Item::getProduct_id).toList();
                 Map<String, Long> mapPQ = new HashMap<>();
                 for (Order_Item orderItem : orderItems) {
                     Long quantity = mapPQ.getOrDefault(orderItem.getProduct_id(), 0L);
                     mapPQ.put(orderItem.getProduct_id(), quantity + orderItem.getQuantity());
                 }
 
-                AggregationFilter.SEFilter filterP = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-                filterP.addClause(AggregationFilter.WhereClause.in(BaseMongoEntity.Fields.id, products));
-                filterP.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+                SEFilter filterP = new SEFilter(SEFilterType.AND);
+                filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, products));
+                filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
                 List<Products> productsList = productService.repoFind(filterP);
                 if (!CollectionUtils.isEmpty(productsList)) {
                     for (Products product : productsList) {
@@ -258,9 +265,9 @@ public class OrderStatusCheckService {
     private List<OrderItemResponse> getOrderItemResponses(Order_Details order_Details) {
         List<OrderItemResponse> orderItemResponseList = new ArrayList<>();
 
-        AggregationFilter.SEFilter filterOI = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-        filterOI.addClause(AggregationFilter.WhereClause.eq(Order_Item.Fields.order_id, order_Details.getId()));
-        filterOI.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        SEFilter filterOI = new SEFilter(SEFilterType.AND);
+        filterOI.addClause(WhereClause.eq(Order_Item.Fields.order_id, order_Details.getId()));
+        filterOI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         List<Order_Item> orderItems = order_Item_Service.repoFind(filterOI);
         if (!CollectionUtils.isEmpty(orderItems)) {
@@ -302,9 +309,9 @@ public class OrderStatusCheckService {
      * @param productIds List of product IDs to remove from cart
      */
     private void updateCartAfterTransaction(String userId, List<String> productIds) {
-        AggregationFilter.SEFilter filterC = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-        filterC.addClause(AggregationFilter.WhereClause.eq(Cart.Fields.user_id, userId));
-        filterC.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        SEFilter filterC = new SEFilter(SEFilterType.AND);
+        filterC.addClause(WhereClause.eq(Cart.Fields.user_id, userId));
+        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         Cart cart = cart_Service.repoFindOne(filterC);
 
         if (cart == null) {
@@ -331,9 +338,9 @@ public class OrderStatusCheckService {
      * @return Map of product IDs to Products
      */
     private Map<String, Products> getProductsMap(List<String> productIds) {
-        AggregationFilter.SEFilter filterP = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-        filterP.addClause(AggregationFilter.WhereClause.in(BaseMongoEntity.Fields.id, productIds));
-        filterP.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        SEFilter filterP = new SEFilter(SEFilterType.AND);
+        filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productIds));
+        filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         List<Products> products = productService.repoFind(filterP);
         return !CollectionUtils.isEmpty(products) ?

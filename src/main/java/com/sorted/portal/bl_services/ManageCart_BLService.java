@@ -2,10 +2,7 @@ package com.sorted.portal.bl_services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sorted.commons.beans.*;
-import com.sorted.commons.entity.mongo.BaseMongoEntity;
-import com.sorted.commons.entity.mongo.Cart;
-import com.sorted.commons.entity.mongo.CouponEntity;
-import com.sorted.commons.entity.mongo.Products;
+import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.Cart_Service;
 import com.sorted.commons.entity.service.CouponService;
 import com.sorted.commons.entity.service.ProductService;
@@ -21,10 +18,7 @@ import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
-import com.sorted.commons.utils.CartUtility;
-import com.sorted.commons.utils.CommonUtils;
-import com.sorted.commons.utils.CouponUtility;
-import com.sorted.commons.utils.Preconditions;
+import com.sorted.commons.utils.*;
 import com.sorted.portal.assisting.beans.CartItemsBean;
 import com.sorted.portal.request.beans.ApplyCouponBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
@@ -59,6 +53,7 @@ public class ManageCart_BLService {
     private final CouponService couponService;
     private final CouponUtility couponUtility;
     private final CartUtility cartUtility;
+    private final ComboUtility comboUtility;
 
     @Value("${se.minimum-cart-value.in-paise:10000}")
     private long minCartValueInPaise;
@@ -318,22 +313,31 @@ public class ManageCart_BLService {
             }
 
             CartItemsBean itemBean = req.getItem();
+
             if (!StringUtils.hasText(itemBean.getProduct_id())) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_ID);
             }
+
             if (itemBean.getQuantity() == null || itemBean.getQuantity() < 0) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_QUANTITY);
             }
 
             Cart cart = fetchUserCart(usersBean.getId());
-            Products product = fetchProduct(itemBean.getProduct_id());
+
+            boolean add = itemBean.isAdd() && itemBean.getQuantity() != null && itemBean.getQuantity() > 0;
+
+            boolean isCombo = comboUtility.isCombo(itemBean.getProduct_id());
 
             List<Item> updatedCartItems;
-            if (itemBean.getQuantity() <= 0) {
-                // Remove item from cart
-                updatedCartItems = removeCartItem(cart.getCart_items(), itemBean);
+            if (isCombo) {
+                if (add) {
+                    Combo combo = comboUtility.validateAndGetCombo(itemBean.getProduct_id());
+                    updatedCartItems = addOrUpdateCartItems(cart.getCart_items(), itemBean, combo);
+                } else {
+                    updatedCartItems = removeComboItems(cart.getCart_items(), itemBean.getProduct_id());
+                }
             } else {
-                // Add or update item in cart
+                Products product = fetchProduct(itemBean.getProduct_id());
                 updatedCartItems = addOrUpdateCartItem(cart.getCart_items(), itemBean, product);
             }
 
@@ -346,110 +350,6 @@ public class ManageCart_BLService {
             log.error("/add/v2:: exception occurred", e);
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
-    }
-
-    /**
-     * Fetches the user's cart or throws if not found.
-     */
-    private Cart fetchUserCart(String userId) {
-        SEFilter filterC = new SEFilter(SEFilterType.AND);
-        filterC.addClause(WhereClause.eq(Cart.Fields.user_id, userId));
-        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        Cart cart = cart_Service.repoFindOne(filterC);
-        if (cart == null) {
-            throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
-        }
-        if (CollectionUtils.isEmpty(cart.getCart_items())) {
-            cart.setCart_items(new ArrayList<>());
-        }
-        return cart;
-    }
-
-    /**
-     * Fetches the product or throws if not found.
-     */
-    private Products fetchProduct(String productId) {
-        SEFilter filterP = new SEFilter(SEFilterType.AND);
-        filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, productId));
-        filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-        Products product = productService.repoFindOne(filterP);
-        if (product == null) {
-            throw new CustomIllegalArgumentsException(ResponseCode.ITEM_NOT_FOUND);
-        }
-        return product;
-    }
-
-    /**
-     * Removes the specified item (by productId and secure flag) from the cart.
-     */
-    private List<Item> removeCartItem(List<Item> cartItems, CartItemsBean itemBean) {
-        if (CollectionUtils.isEmpty(cartItems)) return new ArrayList<>();
-        return cartItems.stream()
-                .filter(cartItem -> !cartItem.getProduct_id().equals(itemBean.getProduct_id()) || cartItem.is_secure() != itemBean.isSecure_item())
-                .toList();
-    }
-
-    /**
-     * Adds or updates the specified item in the cart, handling secure/non-secure logic.
-     */
-    private List<Item> addOrUpdateCartItem(List<Item> cartItems, CartItemsBean itemBean, Products product) {
-        List<Item> updatedItems = new ArrayList<>();
-        if (cartItems == null) cartItems = new ArrayList<>();
-        String productId = itemBean.getProduct_id();
-        boolean isSecure = itemBean.isSecure_item();
-
-        Predicate<Item> sameProduct = x -> x.getProduct_id().equals(productId);
-        Predicate<Item> sameSecure = x -> x.is_secure() == isSecure;
-        Predicate<Item> diffSecure = x -> x.is_secure() != isSecure;
-
-        Optional<Item> sameItemOpt = cartItems.stream().filter(sameProduct.and(sameSecure)).findFirst();
-        Optional<Item> diffSecureOpt = cartItems.stream().filter(sameProduct.and(diffSecure)).findFirst();
-
-        // Calculate new quantity
-        long newQuantity = itemBean.getQuantity();
-        if (sameItemOpt.isPresent()) {
-            if (itemBean.isAdd()) {
-                newQuantity += sameItemOpt.get().getQuantity();
-            } else {
-                newQuantity = sameItemOpt.get().getQuantity() - newQuantity;
-            }
-        }
-
-        // If after update, quantity is zero or less, remove the item
-        if (newQuantity <= 0) {
-            return cartItems.stream()
-                    .filter(cartItem -> !sameProduct.and(sameSecure).test(cartItem))
-                    .toList();
-        }
-
-        // Calculate total_item for secure logic
-        long total_item = newQuantity;
-        if (diffSecureOpt.isPresent()) {
-            if (itemBean.isAdd()) {
-                total_item += diffSecureOpt.get().getQuantity();
-            } else {
-                total_item -= diffSecureOpt.get().getQuantity();
-            }
-        }
-        boolean is_secure_item = isIsSecureItem(product, total_item, itemBean);
-
-        if (!itemBean.isAdd() && sameItemOpt.isEmpty() && diffSecureOpt.isEmpty()) {
-            return cartItems;
-        }
-
-        // Add or update the item
-        Item item = new Item();
-        item.setProduct_id(product.getId());
-        item.setQuantity(newQuantity);
-        item.setProduct_code(product.getProduct_code());
-        item.set_secure(is_secure_item);
-        updatedItems.add(item);
-
-        // Add all other items (excluding the updated/removed one)
-        updatedItems.addAll(cartItems.stream()
-                .filter(cartItem -> !cartItem.getProduct_id().equals(productId) || cartItem.is_secure() != is_secure_item)
-                .toList());
-        return updatedItems;
     }
 
     @PostMapping("/cart/add")
@@ -540,22 +440,6 @@ public class ManageCart_BLService {
             log.error("/add:: {}", e.getMessage());
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
-    }
-
-    private static boolean isIsSecureItem(Products product, long total_item, CartItemsBean itemBean) {
-        if (product.getQuantity().compareTo(total_item) < 0) {
-            String message = product.getQuantity().compareTo(0L) > 0
-                    ? "We only have " + product.getQuantity() + " in stock"
-                    : ResponseCode.OUT_OF_STOCK.getUserMessage();
-            throw new CustomIllegalArgumentsException(message);
-        }
-
-        boolean secure_item = product.getIs_secure();
-        boolean is_secure_item = itemBean.isSecure_item();
-        if (is_secure_item && !secure_item) {
-            throw new CustomIllegalArgumentsException(ResponseCode.CANNOT_SECURE);
-        }
-        return is_secure_item;
     }
 
     @PostMapping("/cart/applyCoupon")
@@ -662,193 +546,164 @@ public class ManageCart_BLService {
         Long cartValueInPaise = CommonUtils.rupeeToPaise(cartBean.getBillingSummary().getToPay());
 
         return couponUtility.getApplicableCoupons(coupons, usersBean.getId(), cartValueInPaise, cartBean.getBillingSummary().getToPay().compareTo(CommonUtils.paiseToRupee(minCartValueInPaise)) > 0, cart);
-
-//        for (CouponEntity coupon : coupons) {
-//
-//            long discountAmount = couponUtility.calculateDiscountAmount(coupon, CommonUtils.rupeeToPaise(cartBean.getBillingSummary().getToPay()), cartBean.isFreeDelivery(), usersBean.getId());
-////
-////            // Check couponEntity scope
-////            CouponScope couponScope = coupon.getCouponScope();
-////            if (couponScope != null && couponScope.equals(CouponScope.USER_SPECIFIC)) {
-////                if (CollectionUtils.isEmpty(coupon.getAssignedToUsers())) {
-////                    continue;
-////                }
-////                boolean match = coupon.getAssignedToUsers().stream()
-////                        .anyMatch(user -> user.equals(usersBean.getId()));
-////                if (!match) {
-////                    continue;
-////                }
-////            }
-////
-////            // Check if user has already used this couponEntity (if once per user)
-////            if (coupon.isOncePerUser() && !CollectionUtils.isEmpty(coupon.getCouponUsages())) {
-////                boolean alreadyUsed = coupon.getCouponUsages().stream()
-////                        .anyMatch(usage -> usage.getUserId().equals(usersBean.getId()));
-////                if (alreadyUsed) {
-////                    continue;
-////                }
-////            }
-////
-////            // Check max uses
-////            if (coupon.getMaxUses() != null && coupon.getUsedCount() != null
-////                    && coupon.getUsedCount() >= coupon.getMaxUses()) {
-////                continue;
-////            }
-////
-////            // Check minimum cart value
-////            Long minCartValue = coupon.getMinCartValue() != null ? coupon.getMinCartValue() : 0L;
-//
-//            if (discountAmount > 0) {
-//                // CouponEntity is applicable
-//                ApplicableCoupon applicableCoupon = createApplicableCoupon(coupon, cartValueInPaise);
-//                applicableCoupons.add(applicableCoupon);
-//            } else {
-//                // CouponEntity needs more cart value
-//                OtherCoupon otherCoupon = createOtherCoupon(coupon, cartValueInPaise, minCartValue);
-//                otherCoupons.add(otherCoupon);
-//            }
-//        }
-//
-//        // Sort applicable coupons by discount amount (highest first)
-//        applicableCoupons.sort((a, b) -> b.getCalculatedDiscount().compareTo(a.getCalculatedDiscount()));
-//
-//        // Mark the best offer
-//        if (!applicableCoupons.isEmpty()) {
-//            applicableCoupons.get(0).setBestOffer(true);
-//        }
-//
-//        // Set sort order
-//        for (int i = 0; i < applicableCoupons.size(); i++) {
-//            applicableCoupons.get(i).setSortOrder(i + 1);
-//        }
-//
-//        // Sort other coupons by additional amount needed (lowest first)
-//        otherCoupons.sort(Comparator.comparing(OtherCoupon::getAdditionalAmountNeeded));
-//
-//        // Set sort order for other coupons
-//        for (int i = 0; i < otherCoupons.size(); i++) {
-//            otherCoupons.get(i).setSortOrder(i + 1);
-//        }
-//
-//        return CouponListResponse.builder()
-//                .applicableCoupons(applicableCoupons)
-//                .otherCoupons(otherCoupons)
-//                .currentCartValue(cartBean.getItem_total())
-//                .deliveryCharge(cartBean.getDelivery_charge())
-//                .totalAmount(cartBean.getTotal_amount())
-//                .build();
     }
 
-    private ApplicableCoupon createApplicableCoupon(CouponEntity coupon, BigDecimal calculatedDiscount, BigDecimal finalCartValue) {
 
-        String savingsText = generateSavingsText(coupon, calculatedDiscount);
-
-        return ApplicableCoupon.builder()
-                .code(coupon.getCode())
-                .name(coupon.getName())
-                .description(coupon.getDescription())
-                .discountType(coupon.getDiscountType())
-                .discountValue(coupon.getDiscountValue() != null ?
-                        CommonUtils.paiseToRupee(coupon.getDiscountValue()) : null)
-                .discountPercentage(coupon.getDiscountPercentage())
-                .calculatedDiscount(calculatedDiscount)
-                .finalCartValue(finalCartValue)
-                .maxDiscount(coupon.getMaxDiscount() != null ?
-                        CommonUtils.paiseToRupee(coupon.getMaxDiscount()) : null)
-                .minCartValue(coupon.getMinCartValue() != null ?
-                        CommonUtils.paiseToRupee(coupon.getMinCartValue()) : BigDecimal.ZERO)
-                .endDate(coupon.getEndDate())
-                .savingsText(savingsText)
-                .isBestOffer(false)
-                .build();
-    }
-
-    private OtherCoupon createOtherCoupon(CouponEntity coupon, Long cartValueInPaise, Long minCartValue) {
-        BigDecimal additionalAmountNeeded = CommonUtils.paiseToRupee(minCartValue - cartValueInPaise);
-        BigDecimal potentialDiscount = calculateCouponDiscount(coupon, minCartValue);
-
-        String eligibilityText = String.format("Add ₹%.2f more to unlock this offer",
-                additionalAmountNeeded.doubleValue());
-        String notApplicableReason = "Minimum cart value not met";
-
-        return OtherCoupon.builder()
-                .code(coupon.getCode())
-                .name(coupon.getName())
-                .description(coupon.getDescription())
-                .discountType(coupon.getDiscountType())
-                .discountValue(coupon.getDiscountValue() != null ?
-                        CommonUtils.paiseToRupee(coupon.getDiscountValue()) : null)
-                .discountPercentage(coupon.getDiscountPercentage())
-                .minCartValue(CommonUtils.paiseToRupee(minCartValue))
-                .additionalAmountNeeded(additionalAmountNeeded)
-                .potentialDiscount(potentialDiscount)
-                .maxDiscount(coupon.getMaxDiscount() != null ?
-                        CommonUtils.paiseToRupee(coupon.getMaxDiscount()) : null)
-                .endDate(coupon.getEndDate())
-                .eligibilityText(eligibilityText)
-                .notApplicableReason(notApplicableReason)
-                .build();
-    }
-
-    private BigDecimal calculateCouponDiscount(CouponEntity coupon, Long cartValueInPaise) {
-        BigDecimal discount = BigDecimal.ZERO;
-
-        if (coupon.getDiscountType() == null) {
-            return discount;
+    private static boolean isIsSecureItem(Products product, long total_item, CartItemsBean itemBean) {
+        if (product.getQuantity().compareTo(total_item) < 0) {
+            String message = product.getQuantity().compareTo(0L) > 0
+                    ? "We only have " + product.getQuantity() + " in stock"
+                    : ResponseCode.OUT_OF_STOCK.getUserMessage();
+            throw new CustomIllegalArgumentsException(message);
         }
 
-        switch (coupon.getDiscountType()) {
-            case PERCENTAGE:
-                if (coupon.getDiscountPercentage() != null) {
-                    BigDecimal cartValue = CommonUtils.paiseToRupee(cartValueInPaise);
-                    discount = cartValue.multiply(coupon.getDiscountPercentage()).divide(BigDecimal.valueOf(100)).setScale(2, BigDecimal.ROUND_HALF_UP);
-
-                    // Apply max discount cap if present
-                    if (coupon.getMaxDiscount() != null && coupon.getMaxDiscount() > 0) {
-                        BigDecimal maxDiscountInRupees = CommonUtils.paiseToRupee(coupon.getMaxDiscount());
-                        discount = discount.min(maxDiscountInRupees);
-                    }
-                }
-                break;
-
-            case FIXED:
-                if (coupon.getDiscountValue() != null) {
-                    discount = CommonUtils.paiseToRupee(coupon.getDiscountValue());
-
-                    // Ensure discount doesn't exceed cart value
-                    BigDecimal cartValue = CommonUtils.paiseToRupee(cartValueInPaise);
-                    discount = discount.min(cartValue);
-                }
-                break;
-
-            default:
-                // Handle any other discount types if they exist
-                break;
+        boolean secure_item = product.getIs_secure();
+        boolean is_secure_item = itemBean.isSecure_item();
+        if (is_secure_item && !secure_item) {
+            throw new CustomIllegalArgumentsException(ResponseCode.CANNOT_SECURE);
         }
-
-        return discount.setScale(2, BigDecimal.ROUND_HALF_UP);
+        return is_secure_item;
     }
 
-    private String generateSavingsText(CouponEntity coupon, BigDecimal calculatedDiscount) {
-        if (coupon.getDiscountType() == null) {
-            return "";
+    /**
+     * Fetches the user's cart or throws if not found.
+     */
+    private Cart fetchUserCart(String userId) {
+        SEFilter filterC = new SEFilter(SEFilterType.AND);
+        filterC.addClause(WhereClause.eq(Cart.Fields.user_id, userId));
+        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        Cart cart = cart_Service.repoFindOne(filterC);
+        if (cart == null) {
+            throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
         }
+        if (CollectionUtils.isEmpty(cart.getCart_items())) {
+            cart.setCart_items(new ArrayList<>());
+        }
+        return cart;
+    }
 
-        return switch (coupon.getDiscountType()) {
-            case PERCENTAGE -> {
-                if (coupon.getMaxDiscount() != null && coupon.getMaxDiscount() > 0) {
-                    BigDecimal maxDiscountInRupees = CommonUtils.paiseToRupee(coupon.getMaxDiscount());
-                    if (calculatedDiscount.compareTo(maxDiscountInRupees) >= 0) {
-                        yield String.format("You've saved ₹%.2f (Max discount reached)",
-                                calculatedDiscount.doubleValue());
-                    }
-                }
-                yield String.format("You've saved %s%% - ₹%.2f",
-                        coupon.getDiscountPercentage().toPlainString(),
-                        calculatedDiscount.doubleValue());
+    /**
+     * Fetches the product or throws if not found.
+     */
+    private Products fetchProduct(String productId) {
+        SEFilter filterP = new SEFilter(SEFilterType.AND);
+        filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, productId));
+        filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        Products product = productService.repoFindOne(filterP);
+        if (product == null) {
+            throw new CustomIllegalArgumentsException(ResponseCode.ITEM_NOT_FOUND);
+        }
+        return product;
+    }
+
+    /**
+     * Removes the specified item (by productId and secure flag) from the cart.
+     */
+    private List<Item> removeComboItems(List<Item> cartItems, String comboId) {
+        if (CollectionUtils.isEmpty(cartItems)) return new ArrayList<>();
+        return cartItems.stream()
+                .filter(cartItem -> comboId.equals(cartItem.getProduct_id()))
+                .toList();
+    }
+
+    private List<Item> addOrUpdateCartItems(List<Item> cartItems, CartItemsBean itemBean, Combo combo) {
+        List<Item> updatedItems = new ArrayList<>();
+        if (cartItems == null) cartItems = new ArrayList<>();
+        Predicate<Item> getCombo = x -> x.getProduct_id().equals(combo.getId());
+        Predicate<Item> removeCombo = x -> !x.getProduct_id().equals(combo.getId());
+
+        Optional<Item> comboOpt = cartItems.stream().filter(getCombo).findFirst();
+
+        // Calculate new quantity
+        long newQuantity = itemBean.getQuantity();
+        if (comboOpt.isPresent()) {
+            if (itemBean.isAdd()) {
+                newQuantity += comboOpt.get().getQuantity();
+            } else {
+                newQuantity -= comboOpt.get().getQuantity();
             }
-            case FIXED -> String.format("Flat ₹%.2f off", calculatedDiscount.doubleValue());
-            default -> String.format("You've saved ₹%.2f", calculatedDiscount.doubleValue());
-        };
+        }
+
+        // If after update, quantity is zero or less, remove the item
+        if (newQuantity <= 0) {
+            return cartItems.stream().filter(removeCombo).toList();
+        }
+
+        // Add or update the item
+        Item item = new Item();
+        item.setProduct_id(combo.getId());
+        item.setQuantity(newQuantity);
+        item.setProduct_code(combo.getCode());
+        item.set_secure(false);
+        item.setCombo(true);
+        updatedItems.add(item);
+
+        // Add all other items (excluding the updated/removed one)
+        updatedItems.addAll(cartItems.stream().filter(removeCombo).toList());
+        return updatedItems;
+    }
+
+    /**
+     * Adds or updates the specified item in the cart, handling secure/non-secure logic.
+     */
+    private List<Item> addOrUpdateCartItem(List<Item> cartItems, CartItemsBean itemBean, Products product) {
+        List<Item> updatedItems = new ArrayList<>();
+        if (cartItems == null) cartItems = new ArrayList<>();
+        String productId = itemBean.getProduct_id();
+        boolean isSecure = itemBean.isSecure_item();
+
+        Predicate<Item> sameProduct = x -> x.getProduct_id().equals(productId);
+        Predicate<Item> sameSecure = x -> x.is_secure() == isSecure;
+        Predicate<Item> diffSecure = x -> x.is_secure() != isSecure;
+
+        Optional<Item> sameItemOpt = cartItems.stream().filter(sameProduct.and(sameSecure)).findFirst();
+        Optional<Item> diffSecureOpt = cartItems.stream().filter(sameProduct.and(diffSecure)).findFirst();
+
+        // Calculate new quantity
+        long newQuantity = itemBean.getQuantity();
+        if (sameItemOpt.isPresent()) {
+            if (itemBean.isAdd()) {
+                newQuantity += sameItemOpt.get().getQuantity();
+            } else {
+                newQuantity = sameItemOpt.get().getQuantity() - newQuantity;
+            }
+        }
+
+        // If after update, quantity is zero or less, remove the item
+        if (newQuantity <= 0) {
+            return cartItems.stream()
+                    .filter(cartItem -> !sameProduct.and(sameSecure).test(cartItem))
+                    .toList();
+        }
+
+        // Calculate total_item for secure logic
+        long total_item = newQuantity;
+        if (diffSecureOpt.isPresent()) {
+            if (itemBean.isAdd()) {
+                total_item += diffSecureOpt.get().getQuantity();
+            } else {
+                total_item -= diffSecureOpt.get().getQuantity();
+            }
+        }
+        boolean is_secure_item = isIsSecureItem(product, total_item, itemBean);
+
+        if (!itemBean.isAdd() && sameItemOpt.isEmpty() && diffSecureOpt.isEmpty()) {
+            return cartItems;
+        }
+
+        // Add or update the item
+        Item item = new Item();
+        item.setProduct_id(product.getId());
+        item.setQuantity(newQuantity);
+        item.setProduct_code(product.getProduct_code());
+        item.set_secure(is_secure_item);
+        item.setCombo(false);
+        updatedItems.add(item);
+
+        // Add all other items (excluding the updated/removed one)
+        updatedItems.addAll(cartItems.stream()
+                .filter(cartItem -> !cartItem.getProduct_id().equals(productId) || cartItem.is_secure() != is_secure_item)
+                .toList());
+        return updatedItems;
     }
 }

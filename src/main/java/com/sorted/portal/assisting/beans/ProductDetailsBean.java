@@ -17,7 +17,7 @@ public class ProductDetailsBean {
     private BigDecimal mrp;
     private BigDecimal selling_price;
     private String description;
-    private int quantity;
+    private long quantity;
     private List<SelectedSubCategories> selected_sub_catagories;
     private List<ProductDetailsBean> varients;
     private List<ProductDetailsBeanList> related_products;
@@ -30,6 +30,7 @@ public class ProductDetailsBean {
     private String seller_name;
     private String modification_date;
     private Integer group_id;
+    private boolean is_combo;
 
     @Builder
     @Data

@@ -5,10 +5,7 @@ import com.sorted.commons.beans.ProductCarousel;
 import com.sorted.commons.beans.SelectedSubCategories;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.*;
-import com.sorted.commons.entity.service.AssetsService;
-import com.sorted.commons.entity.service.Category_MasterService;
-import com.sorted.commons.entity.service.Product_Master_Service;
-import com.sorted.commons.entity.service.Users_Service;
+import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.AssetType;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
@@ -19,6 +16,7 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.repository.mongo.ProductRepository;
+import com.sorted.commons.utils.ComboUtility;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.assisting.beans.config.*;
 import com.sorted.portal.request.beans.MetaDataReq;
@@ -54,6 +52,8 @@ public class ManageMetaData_BLService {
     private final HomeConfigService homeConfigService;
     private final CategoryFilterService categoryFilterService;
     private final AssetsService assetsService;
+    private final ComboService comboService;
+    private final ComboUtility comboUtility;
 
     // Cache for /preferences response
     private volatile Config preferencesCache = null;
@@ -155,6 +155,7 @@ public class ManageMetaData_BLService {
                 groupComponentBeans.add(groupComponentBean);
             }
             HomeProductsBean homeProductsBean = homeProductsBeanBuilder.groupComponent(groupComponentBeans)
+                    .combo(false)
                     .build();
             homeProductsBeans.add(homeProductsBean);
         }
@@ -175,6 +176,33 @@ public class ManageMetaData_BLService {
                         .mobileView(assetsEntity.isMobileView())
                         .build());
             }
+        }
+
+        List<ProductBean> comboBeans = new ArrayList<>();
+
+        SEFilter filterC = new SEFilter(SEFilterType.AND);
+        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Combo> combos = comboService.repoFind(filterC);
+        if (!CollectionUtils.isEmpty(combos)) {
+            Combo combo = combos.get(0);
+            boolean valid = comboUtility.validateCombo(combo);
+            if (valid) {
+                List<Products> products = comboUtility.getProductsByCombo(combo);
+                long averageQuantity = products.stream().map(Products::getQuantity).toList().stream().sorted().toList().get(0);
+                ProductBean productBean = ProductBean.builder()
+                        .id(combo.getId())
+                        .name(combo.getName())
+                        .secure(false)
+                        .image(!CollectionUtils.isEmpty(combo.getMedia()) && !combo.getMedia().isEmpty() ? combo.getMedia().get(0).getCdn_url() : "")
+                        .mrp(CommonUtils.paiseToRupee(combo.getMrp()))
+                        .sellingPrice(CommonUtils.paiseToRupee(combo.getSelling_price()))
+                        .quantity(averageQuantity)
+                        .build();
+                comboBeans.add(productBean);
+            }
+
+
         }
 
         Assets assets = Assets.builder()

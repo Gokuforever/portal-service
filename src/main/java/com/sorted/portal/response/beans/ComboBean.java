@@ -13,7 +13,8 @@ public record ComboBean(
         String id,
         String name,
         String description,
-        BigDecimal price,
+        BigDecimal sellingPrice,
+        BigDecimal mrp,
         @JsonProperty("creation_date")
         String creationDate,
         @JsonProperty("combo_status")

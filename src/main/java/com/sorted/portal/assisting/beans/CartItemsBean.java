@@ -1,5 +1,6 @@
 package com.sorted.portal.assisting.beans;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data

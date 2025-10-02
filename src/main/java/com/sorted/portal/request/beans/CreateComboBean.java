@@ -13,6 +13,7 @@ public class CreateComboBean extends ReqBaseBean {
 
     private String name;
     private String description;
-    private BigDecimal price;
+    private BigDecimal sellingPrice;
+    private BigDecimal mrp;
     private List<String> item_ids;
 }

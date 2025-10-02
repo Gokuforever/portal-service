@@ -74,17 +74,6 @@ public class ManageCombo_BLService {
             log.debug("Headers extracted successfully");
 
             log.info("Validating user for combo creation activity");
-//            UsersBean usersBean = usersService.validateUserForActivity(req, Permission.EDIT, Activity.MANAGE_COMBO);
-//            log.debug("User validation successful for user: {}", usersBean.getId());
-
-//            Role role = usersBean.getRole();
-//            UserType userType = role.getUser_type();
-//            log.debug("User type: {}", userType);
-//
-//            if (userType != UserType.SELLER) {
-//                log.warn("Access denied - user type {} is not SELLER", userType);
-//                throw new AccessDeniedException();
-//            }
 
             log.info("Validating combo creation request parameters");
             Preconditions.check(StringUtils.hasText(req.getName()), ResponseCode.MANDATE_COMBO_NAME);
@@ -96,8 +85,8 @@ public class ManageCombo_BLService {
             Preconditions.check(CollectionUtils.isNotEmpty(req.getItem_ids()), ResponseCode.MANDATE_COMBO_PRODUCTS);
             log.debug("Combo items validation passed, item count: {}", req.getItem_ids().size());
 
-            Preconditions.check(req.getPrice() != null && BigDecimal.ZERO.compareTo(req.getPrice()) < 0, ResponseCode.MANDATE_COMBO_PRICE);
-            log.debug("Combo price validation passed: {}", req.getPrice());
+            Preconditions.check(req.getSellingPrice() != null && BigDecimal.ZERO.compareTo(req.getSellingPrice()) < 0, ResponseCode.MANDATE_COMBO_PRICE);
+            log.debug("Combo sellingPrice validation passed: {}", req.getSellingPrice());
 
             HashSet<String> itemIds = new HashSet<>(req.getItem_ids());
             itemIds.remove(null);
@@ -121,12 +110,13 @@ public class ManageCombo_BLService {
             Combo combo = new Combo();
             combo.setName(req.getName());
             combo.setDescription(req.getDescription());
-            combo.setPrice(CommonUtils.rupeeToPaise(req.getPrice()));
+            combo.setSelling_price(CommonUtils.rupeeToPaise(req.getSellingPrice()));
             combo.setSeller_id("68711a63a2dcdf55ed170972");
             combo.setItem_ids(req.getItem_ids());
             combo.setActive(true);
-            log.debug("Combo entity prepared: name={}, price={}, seller_id={}",
-                    combo.getName(), combo.getPrice(), combo.getSeller_id());
+            combo.setMrp(CommonUtils.rupeeToPaise(req.getMrp()));
+            log.debug("Combo entity prepared: name={}, sellingPrice={}, seller_id={}",
+                    combo.getName(), combo.getSelling_price(), combo.getSeller_id());
 
             log.info("Saving combo to database");
             comboService.create(combo, "/combo/create");
@@ -212,7 +202,8 @@ public class ManageCombo_BLService {
             comboBeans.add(ComboBean.builder()
                     .name(combo.getName())
                     .description(combo.getDescription())
-                    .price(CommonUtils.paiseToRupee(combo.getPrice()))
+                    .sellingPrice(CommonUtils.paiseToRupee(combo.getSelling_price()))
+                    .mrp(CommonUtils.paiseToRupee(combo.getMrp()))
                     .creationDate(combo.getCreation_date_str())
                     .id(combo.getId())
                     .comboStatus(comboStatus)
