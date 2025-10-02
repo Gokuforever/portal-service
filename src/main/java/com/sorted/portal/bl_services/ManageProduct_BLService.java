@@ -718,7 +718,7 @@ public class ManageProduct_BLService {
                         Optional<Item> itemOptional = cart_items.stream().filter(item -> item.getProduct_id().equals(bean.getId())).findFirst();
                         if (itemOptional.isPresent()) {
                             Item item = itemOptional.get();
-                            cartDetailsBuilder.secure_items(item.is_secure() ? item.getQuantity() : 0);
+                            cartDetailsBuilder.normal_items(item.is_secure() ? item.getQuantity() : 0);
                         }
                     }
                     bean.setCart_info(cartDetailsBuilder.build());
