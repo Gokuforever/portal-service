@@ -199,18 +199,18 @@ public class ManageMetaData_BLService {
                         .build();
                 comboBeans.add(productBean);
             }
-            HomeProductsBean homeProductsBean = HomeProductsBean.builder()
-                    .combo(true)
-                    .mainBadge("Best Seller Combo")
-                    .mainTitle("Engineering Starter Pack")
-                    .mainSubtitle("Get all essentials in one bundle")
-                    .productCarousel(ProductCarouselBean.builder()
-                            .title("Included in this Combo")
-                            .subtitle("Handpicked books to kickstart your semester")
-                            .products(comboBeans)
-                            .build())
-                    .build();
-            homeProductsBeans.add(homeProductsBean);
+//            HomeProductsBean homeProductsBean = HomeProductsBean.builder()
+//                    .combo(true)
+//                    .mainBadge("Best Seller Combo")
+//                    .mainTitle("Engineering Starter Pack")
+//                    .mainSubtitle("Get all essentials in one bundle")
+//                    .productCarousel(ProductCarouselBean.builder()
+//                            .title("Included in this Combo")
+//                            .subtitle("Handpicked books to kickstart your semester")
+//                            .products(comboBeans)
+//                            .build())
+//                    .build();
+//            homeProductsBeans.add(homeProductsBean);
         }
 
         Assets assets = Assets.builder()
