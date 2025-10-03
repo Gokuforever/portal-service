@@ -35,10 +35,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Slf4j
 @RestController
@@ -168,7 +165,8 @@ public class ManageMetaData_BLService {
 
         List<AssetsEntity> assetsEntities = assetsService.repoFind(filter);
         if (!CollectionUtils.isEmpty(assetsEntities)) {
-            for (AssetsEntity assetsEntity : assetsEntities) {
+            List<AssetsEntity> entities = assetsEntities.stream().sorted(Comparator.comparing(AssetsEntity::getOrder)).toList();
+            for (AssetsEntity assetsEntity : entities) {
                 promoBanners.add(PromoBanners.builder()
                         .url(assetsEntity.getUrl())
                         .order(assetsEntity.getOrder())
