@@ -201,12 +201,12 @@ public class ManageMetaData_BLService {
             }
             HomeProductsBean homeProductsBean = HomeProductsBean.builder()
                     .combo(true)
-                    .mainBadge("Combo Badge")
-                    .mainTitle("Combo Main Title")
-                    .mainSubtitle("Combo Main Subtitle")
+                    .mainBadge("Best Seller Combo")
+                    .mainTitle("Engineering Starter Pack")
+                    .mainSubtitle("Get all essentials in one bundle")
                     .productCarousel(ProductCarouselBean.builder()
-                            .title("Combo Carousel Title")
-                            .subtitle("Combo Carousel Subtitle")
+                            .title("Included in this Combo")
+                            .subtitle("Handpicked books to kickstart your semester")
                             .products(comboBeans)
                             .build())
                     .build();
