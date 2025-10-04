@@ -173,7 +173,7 @@ public class OrderProcessingService {
         }
 
         long nanoseconds = CommonUtils.getNanoseconds();
-        String refundTxnId = "REF-" +
+        String refundTxnId = "REF" +
                 LocalDate.now().getMonth() +
                 Year.now() +
                 nanoseconds;
