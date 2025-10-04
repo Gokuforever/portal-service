@@ -55,7 +55,7 @@ public class OrderResponseMapper {
                 .id(orderDetails.getId())
                 .code(orderDetails.getCode())
                 .status(orderDetails.getStatus().getInternal_status())
-                .total_amount(CommonUtils.paiseToRupee(orderDetails.getTotal_amount()))
+                .total_amount(CommonUtils.paiseToRupee(orderDetails.getTotal_items_cost()))
                 .deliveryFee(CommonUtils.paiseToRupee(orderDetails.getDelivery_charges()))
                 .handlingFee(CommonUtils.paiseToRupee(orderDetails.getHandling_charges()))
                 .smallCartFee(CommonUtils.paiseToRupee(orderDetails.getSmall_cart_fee()))
