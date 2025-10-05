@@ -103,7 +103,7 @@ public class ManageUserProfileV2_BLService {
             throw new CustomIllegalArgumentsException(ResponseCode.DUPLICATE_EMAIL);
         }
 
-        Preconditions.check(request.getGender() != null, ResponseCode.MANDATE_GENDER);
+//        Preconditions.check(request.getGender() != null, ResponseCode.MANDATE_GENDER);
         EducationCategoryBean educationDetails = request.getEducationDetails();
         Preconditions.check(educationDetails != null, ResponseCode.MANDATE_EDUCATION_LEVEL_DETAILS);
         validationService.validate(educationDetails);
