@@ -41,7 +41,7 @@ public class ManageUserProfileV2_BLService {
     @PostMapping("/complete")
     public CompleteProfileRes completeProfile(@RequestBody CompleteUserProfile request, HttpServletRequest httpServletRequest) {
         CommonUtils.extractHeaders(httpServletRequest, request);
-        UsersBean usersBean = usersService.validateUserForActivity(request.getReq_user_id(), Activity.USER_PROFILE);
+        UsersBean usersBean = usersService.validateAndGetUserInfo(request.getReq_user_id());
 
         switch (usersBean.getRole().getUser_type()) {
             case CUSTOMER:
