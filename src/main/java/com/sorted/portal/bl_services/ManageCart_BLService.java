@@ -20,6 +20,7 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.*;
 import com.sorted.portal.assisting.beans.CartItemsBean;
+import com.sorted.portal.enums.CartAction;
 import com.sorted.portal.request.beans.ApplyCouponBean;
 import com.sorted.portal.request.beans.CartCRUDBean;
 import com.sorted.portal.request.beans.CartFetchReqBean;
@@ -324,25 +325,38 @@ public class ManageCart_BLService {
 
             Cart cart = fetchUserCart(usersBean.getId());
 
-            boolean add = itemBean.isAdd() && itemBean.getQuantity() != null && itemBean.getQuantity() > 0;
+            CartAction cartAction = getCartAction(itemBean);
 
             boolean isCombo = comboUtility.isCombo(itemBean.getProduct_id());
-
-            List<Item> updatedCartItems;
+            Combo combo = null;
             if (isCombo) {
-                if (add) {
-                    Combo combo = comboUtility.validateAndGetCombo(itemBean.getProduct_id());
-                    updatedCartItems = addOrUpdateCartItems(cart.getCart_items(), itemBean, combo);
-                } else {
-                    updatedCartItems = removeComboItems(cart.getCart_items(), itemBean.getProduct_id());
-                }
-            } else {
-                if (add) {
-                    Products product = fetchProduct(itemBean.getProduct_id());
-                    updatedCartItems = addOrUpdateCartItem(cart.getCart_items(), itemBean, product);
-                } else {
-                    updatedCartItems = removeProductItems(cart.getCart_items(), itemBean.getProduct_id());
-                }
+                combo = comboUtility.validateAndGetCombo(itemBean.getProduct_id());
+            }
+            List<Item> updatedCartItems;
+            switch (cartAction) {
+                case ADD_ONE:
+                    if (isCombo) {
+                        updatedCartItems = addOrRemoveOne(cart.getCart_items(), itemBean, combo, true);
+                    } else {
+                        Products product = fetchProduct(itemBean.getProduct_id());
+                        updatedCartItems = addOrRemove(cart.getCart_items(), itemBean, product, true);
+                    }
+                    break;
+                case REMOVE_ONE:
+                    if (isCombo) {
+                        updatedCartItems = addOrRemoveOne(cart.getCart_items(), itemBean, combo, false);
+                    } else {
+                        Products product = fetchProduct(itemBean.getProduct_id());
+                        updatedCartItems = addOrRemove(cart.getCart_items(), itemBean, product, false);
+                    }
+                    break;
+                default:
+                    if (isCombo) {
+                        updatedCartItems = removeComboItems(cart.getCart_items(), itemBean.getProduct_id());
+                    } else {
+                        updatedCartItems = removeProductItems(cart.getCart_items(), itemBean.getProduct_id());
+                    }
+                    break;
             }
 
             cart.setCart_items(updatedCartItems);
@@ -354,6 +368,15 @@ public class ManageCart_BLService {
             log.error("/add/v2:: exception occurred", e);
             throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
+    }
+
+    private CartAction getCartAction(CartItemsBean itemBean) {
+        if (itemBean.isAdd() && itemBean.getQuantity() != null && itemBean.getQuantity() > 0) {
+            return CartAction.ADD_ONE;
+        } else if (!itemBean.isAdd() && itemBean.getQuantity() != null && itemBean.getQuantity() > 0) {
+            return CartAction.REMOVE_ONE;
+        }
+        return CartAction.REMOVE_ALL;
     }
 
     private List<Item> removeProductItems(List<Item> cartItems, String productId) {
@@ -614,7 +637,7 @@ public class ManageCart_BLService {
                 .toList();
     }
 
-    private List<Item> addOrUpdateCartItems(List<Item> cartItems, CartItemsBean itemBean, Combo combo) {
+    private List<Item> addOrRemoveOne(List<Item> cartItems, CartItemsBean itemBean, Combo combo, boolean add) {
         List<Item> updatedItems = new ArrayList<>();
         if (cartItems == null) cartItems = new ArrayList<>();
         Predicate<Item> getCombo = x -> x.getProduct_id().equals(combo.getId());
@@ -625,7 +648,7 @@ public class ManageCart_BLService {
         // Calculate new quantity
         long newQuantity = itemBean.getQuantity();
         if (comboOpt.isPresent()) {
-            if (itemBean.isAdd()) {
+            if (add) {
                 newQuantity += comboOpt.get().getQuantity();
             } else {
                 newQuantity -= comboOpt.get().getQuantity();
@@ -654,7 +677,71 @@ public class ManageCart_BLService {
     /**
      * Adds or updates the specified item in the cart, handling secure/non-secure logic.
      */
-    private List<Item> addOrUpdateCartItem(List<Item> cartItems, CartItemsBean itemBean, Products product) {
+    private List<Item> addOrRemove(List<Item> cartItems, CartItemsBean itemBean, Products product, boolean add) {
+        List<Item> updatedItems = new ArrayList<>();
+        if (cartItems == null) cartItems = new ArrayList<>();
+        String productId = itemBean.getProduct_id();
+        boolean isSecure = itemBean.isSecure_item();
+
+        Predicate<Item> sameProduct = x -> x.getProduct_id().equals(productId);
+        Predicate<Item> sameSecure = x -> x.is_secure() == isSecure;
+        Predicate<Item> diffSecure = x -> x.is_secure() != isSecure;
+
+        Optional<Item> sameItemOpt = cartItems.stream().filter(sameProduct.and(sameSecure)).findFirst();
+        Optional<Item> diffSecureOpt = cartItems.stream().filter(sameProduct.and(diffSecure)).findFirst();
+
+        // Calculate new quantity
+        long newQuantity = itemBean.getQuantity();
+        if (sameItemOpt.isPresent()) {
+            if (add) {
+                newQuantity += sameItemOpt.get().getQuantity();
+            } else {
+                newQuantity = sameItemOpt.get().getQuantity() - newQuantity;
+            }
+        }
+
+        // If after update, quantity is zero or less, remove the item
+        if (newQuantity <= 0) {
+            return cartItems.stream()
+                    .filter(cartItem -> !sameProduct.and(sameSecure).test(cartItem))
+                    .toList();
+        }
+
+        // Calculate total_item for secure logic
+        long total_item = newQuantity;
+        if (diffSecureOpt.isPresent()) {
+            if (add) {
+                total_item += diffSecureOpt.get().getQuantity();
+            } else {
+                total_item -= diffSecureOpt.get().getQuantity();
+            }
+        }
+        boolean is_secure_item = isIsSecureItem(product, total_item, itemBean);
+
+        if (!itemBean.isAdd() && sameItemOpt.isEmpty() && diffSecureOpt.isEmpty()) {
+            return cartItems;
+        }
+
+        // Add or update the item
+        Item item = new Item();
+        item.setProduct_id(product.getId());
+        item.setQuantity(newQuantity);
+        item.setProduct_code(product.getProduct_code());
+        item.set_secure(is_secure_item);
+        item.setCombo(false);
+        updatedItems.add(item);
+
+        // Add all other items (excluding the updated/removed one)
+        updatedItems.addAll(cartItems.stream()
+                .filter(cartItem -> !cartItem.getProduct_id().equals(productId) || cartItem.is_secure() != is_secure_item)
+                .toList());
+        return updatedItems;
+    }
+
+    /**
+     * Adds or updates the specified item in the cart, handling secure/non-secure logic.
+     */
+    private List<Item> removeOne(List<Item> cartItems, CartItemsBean itemBean, Products product) {
         List<Item> updatedItems = new ArrayList<>();
         if (cartItems == null) cartItems = new ArrayList<>();
         String productId = itemBean.getProduct_id();

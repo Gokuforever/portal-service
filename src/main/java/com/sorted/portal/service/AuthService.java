@@ -7,6 +7,7 @@ import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.ProcessType;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.helper.AggregationFilter;
+import com.sorted.commons.helper.RewardsUtility;
 import com.sorted.commons.manage.otp.ManageOtp;
 import com.sorted.commons.utils.Preconditions;
 import com.sorted.commons.utils.SERegExpUtils;
@@ -28,6 +29,7 @@ public class AuthService {
     @Value("${se.guest.role_id}")
     private String guest_role_id;
     private final SignUpService signUpService;
+    private final RewardsUtility rewardsUtility;
 
     public Users verifyAuth(AuthV2Bean auth, ProcessType processType, HttpServletRequest httpServletRequest) {
         Preconditions.check(StringUtils.hasText(auth.mobileNo()), ResponseCode.MISSING_MN);
@@ -46,6 +48,9 @@ public class AuthService {
             user.setMobile_no(auth.mobileNo());
             user = users_Service.create(user, Defaults.AUTH);
         }
+//        if (!user.getIs_verified()) {
+//            rewardsUtility.creditOnSignUp(user.getId());
+//        }
         user.setRole_id(customer_signup_role);
         user.setIs_verified(true);
         Users users = users_Service.update(user.getId(), user, Defaults.AUTH);
