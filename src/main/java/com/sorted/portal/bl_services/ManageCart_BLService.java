@@ -573,10 +573,14 @@ public class ManageCart_BLService {
         }
 
         cart.setCouponCode(couponCode);
+        BigDecimal totalSellingPrice = cartBean.getBillingSummary().getTotalSellingPrice();
 
-        Long cartValueInPaise = CommonUtils.rupeeToPaise(cartBean.getBillingSummary().getToPay());
-
-        return couponUtility.getApplicableCoupons(coupons, usersBean.getId(), cartValueInPaise, cartBean.getBillingSummary().getToPay().compareTo(CommonUtils.paiseToRupee(minCartValueInPaise)) > 0, cart);
+        boolean notSmallCart = totalSellingPrice.compareTo(CommonUtils.paiseToRupee(minCartValueInPaise)) < 0;
+        long platformFee = 0;
+        if (notSmallCart) {
+            platformFee = fixedDeliveryFee + fixedHandlingFee + fixedSmallCartFee;
+        }
+        return couponUtility.getApplicableCoupons(coupons, usersBean.getId(), CommonUtils.rupeeToPaise(totalSellingPrice), platformFee, notSmallCart, cart);
     }
 
 
