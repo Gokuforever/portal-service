@@ -106,6 +106,7 @@ public class ManageCoupon_BLService {
                 .maxDiscount(request.maxDiscount() == null ? null : CommonUtils.rupeeToPaise(request.maxDiscount()))
                 .minCartValue(request.minCartValue() == null ? null : CommonUtils.rupeeToPaise(request.minCartValue()))
                 .active(true)
+                .isDeliveryFree(request.freeDelivery())
                 .build();
         couponService.create(entity, Defaults.RETOOL);
     }
