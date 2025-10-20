@@ -243,7 +243,8 @@ public class ManageMetaData_BLService {
                     .id(product.getId())
                     .name(product.getName())
                     .quantity(product.getQuantity())
-                    .secure(Boolean.TRUE.equals(product.getIs_secure()))
+//                    .secure(Boolean.TRUE.equals(product.getIs_secure()))
+                    .secure(false)
                     .build();
             productBeans.add(productBean);
         }
