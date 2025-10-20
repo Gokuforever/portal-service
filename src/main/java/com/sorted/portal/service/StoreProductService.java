@@ -36,6 +36,8 @@ public class StoreProductService {
     private final SearchHistoryAsyncHelper searchHistoryAsyncHelper;
     private final Category_MasterService category_MasterService;
     private final ComboUtility comboUtility;
+    @Value("${se.store.allowed.categories:660194cde437f74a756be5f7,6858628aa520924ecbaa7ad5,687b6f241e9e6eb839f72cd5,687c94224323c53b054eafea}")
+    private String allowedCategories;
 
     public List<ProductDetailsBeanList> getProductDetailsBeanLists(FindProductBean req, UsersBean usersBean) {
         List<ProductDetailsBeanList> comboProducts = new ArrayList<>();
@@ -60,10 +62,13 @@ public class StoreProductService {
                     ));
             comboProducts.addAll(combos.stream().map(combo -> this.getResponseBean(combo, resultMap.get(combo.getId()))).toList());
         }
-
-        if (StringUtils.hasText(req.getCategory_id())) {
+        List<String> allowedCategoryList = List.of(this.allowedCategories.split(","));
+        if (StringUtils.hasText(req.getCategory_id()) && allowedCategoryList.contains(req.getCategory_id())) {
             filterSE.addClause(WhereClause.eq(Products.Fields.category_id, req.getCategory_id()));
+        } else {
+            filterSE.addClause(WhereClause.in(Products.Fields.category_id, allowedCategoryList));
         }
+
         if (req.getGroup_id() != null && req.getGroup_id() > 0) {
             filterSE.addClause(WhereClause.eq(Products.Fields.group_id, req.getGroup_id()));
         }
