@@ -186,7 +186,7 @@ public class StoreProductService {
                 .image(CollectionUtils.isEmpty(p.getMedia()) ? "" : p.getMedia().stream().filter(e -> e.getOrder() == 0).findFirst().get().getCdn_url())
                 .categoryId(p.getCategory_id())
                 .groupId(p.getGroup_id())
-                .secure(p.getIs_secure())
+                .secure(false)
                 .build();
     }
 
