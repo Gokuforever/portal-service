@@ -165,4 +165,23 @@ public class ManageReferral_BLService {
         usersService.update(user.getId(), user, Defaults.RETOOL);
     }
 
+    @PostMapping("/remove/ambassador")
+    public void removeAmbassador(@RequestBody MakeAmbassadorBean request) {
+
+        SEFilter filterRole = new SEFilter(SEFilterType.AND);
+        filterRole.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterRole.addClause(WhereClause.eq(Role.Fields.user_type_id, UserType.CUSTOMER.getId()));
+
+        Role role = roleService.repoFindOne(filterRole);
+
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, request.userId()));
+        filter.addClause(WhereClause.eq(Users.Fields.role_id, role.getId()));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        Users user = usersService.repoFindOne(filter);
+
+        user.setAmbassador(false);
+        usersService.update(user.getId(), user, Defaults.RETOOL);
+    }
+
 }
