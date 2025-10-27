@@ -19,10 +19,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
@@ -111,6 +108,7 @@ public class ManageReferral_BLService {
         }
 
         Map<String, Integer> countMap = ambassadors.stream().collect(Collectors.toMap(Users::getId, u -> 0));
+        Map<String, String> mapCoupons = new HashMap<>();
 
         SEFilter filterC = new SEFilter(SEFilterType.AND);
         filterC.addClause(WhereClause.in(CouponEntity.Fields.ambassadorId, ambassadors.stream().map(Users::getId).toList()));
@@ -118,7 +116,7 @@ public class ManageReferral_BLService {
 
         List<CouponEntity> couponEntities = couponService.repoFind(filterC);
         if (!CollectionUtils.isEmpty(couponEntities)) {
-            Map<String, String> mapCoupons = couponEntities.stream().collect(Collectors.toMap(CouponEntity::getCode, CouponEntity::getAmbassadorId));
+            mapCoupons.putAll(couponEntities.stream().collect(Collectors.toMap(CouponEntity::getCode, CouponEntity::getAmbassadorId)));
             SEFilter filterOD = new SEFilter(SEFilterType.AND);
             filterOD.addClause(WhereClause.eq(Order_Details.Fields.status_id, OrderStatus.DELIVERED.getId()));
             filterOD.addClause(WhereClause.in(Order_Details.Fields.coupon_code, mapCoupons.keySet().stream().toList()));
@@ -132,7 +130,7 @@ public class ManageReferral_BLService {
             }
         }
 
-        return ambassadors.stream().map(u -> mapResponse(u, countMap)).toList();
+        return ambassadors.stream().map(u -> mapResponse(u, countMap, mapCoupons)).toList();
     }
 
     private AmbassadorDetails mapResponse(Users ambassador) {
@@ -143,12 +141,13 @@ public class ManageReferral_BLService {
                 .build();
     }
 
-    private AmbassadorDetails mapResponse(Users ambassador, Map<String, Integer> countMap) {
+    private AmbassadorDetails mapResponse(Users ambassador, Map<String, Integer> countMap, Map<String, String> mapCoupons) {
         return AmbassadorDetails.builder()
                 .id(ambassador.getId())
                 .mobileNo("+91" + ambassador.getMobile_no())
                 .name(StringUtils.hasText(ambassador.getFirst_name()) ? ambassador.getFirst_name() + " " + ambassador.getLast_name() : "")
                 .referredCount(countMap.get(ambassador.getId()))
+                .couponCode(mapCoupons.getOrDefault(ambassador.getId(), ""))
                 .build();
     }
 
