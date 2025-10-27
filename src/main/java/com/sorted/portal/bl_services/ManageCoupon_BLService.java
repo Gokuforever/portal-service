@@ -80,6 +80,8 @@ public class ManageCoupon_BLService {
     public void create(@RequestBody CreateCouponBean request) {
         validate(request);
 
+        boolean ambassadorCode = StringUtils.hasText(request.ambassadorId());
+
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         filter.addClause(WhereClause.eq(CouponEntity.Fields.code, request.code()));
@@ -89,6 +91,17 @@ public class ManageCoupon_BLService {
         if (count > 0) {
             throw new CustomIllegalArgumentsException(ResponseCode.COUPON_CODE_EXISTS);
         }
+
+        if (ambassadorCode) {
+            SEFilter filter1 = new SEFilter(SEFilterType.AND);
+            filter1.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            filter1.addClause(WhereClause.eq(CouponEntity.Fields.ambassadorId, request.ambassadorId()));
+            long count1 = couponService.countByFilter(filter1);
+            if (count1 > 0) {
+                throw new CustomIllegalArgumentsException(ResponseCode.AMBASSADOR_COUPON_EXISTS);
+            }
+        }
+
 
         CouponEntity entity = CouponEntity.builder()
                 .code(request.code())
@@ -107,7 +120,13 @@ public class ManageCoupon_BLService {
                 .minCartValue(request.minCartValue() == null ? null : CommonUtils.rupeeToPaise(request.minCartValue()))
                 .active(true)
                 .isDeliveryFree(request.freeDelivery())
+                .isVisibleInCart(!ambassadorCode)
                 .build();
+
+        if (ambassadorCode) {
+            entity.setAmbassadorId(request.ambassadorId());
+            entity.setVisibleInCart(false);
+        }
         couponService.create(entity, Defaults.RETOOL);
     }
 

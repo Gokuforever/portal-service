@@ -536,6 +536,7 @@ public class ManageCart_BLService {
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         filter.addClause(WhereClause.lte(CouponEntity.Fields.startDate, now));
         filter.addClause(WhereClause.gte(CouponEntity.Fields.endDate, now));
+        filter.addClause(WhereClause.gte(CouponEntity.Fields.isVisibleInCart, true));
 
         List<CouponEntity> coupons = couponService.repoFind(filter);
         if (CollectionUtils.isEmpty(coupons)) {

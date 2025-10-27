@@ -34,7 +34,9 @@ public record CreateCouponBean(
         @JsonProperty("min_cart_value")
         BigDecimal minCartValue,
         @JsonProperty("free_delivery")
-        boolean freeDelivery
+        boolean freeDelivery,
+        @JsonProperty("ambassador_id")
+        String ambassadorId
 
 ) {
 }
