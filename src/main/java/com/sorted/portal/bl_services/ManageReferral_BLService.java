@@ -2,13 +2,9 @@ package com.sorted.portal.bl_services;
 
 import com.sorted.commons.beans.ReferralDetails;
 import com.sorted.commons.constants.Defaults;
-import com.sorted.commons.entity.mongo.BaseMongoEntity;
-import com.sorted.commons.entity.mongo.ReferralEntity;
-import com.sorted.commons.entity.mongo.Role;
-import com.sorted.commons.entity.mongo.Users;
-import com.sorted.commons.entity.service.ReferralService;
-import com.sorted.commons.entity.service.RoleService;
-import com.sorted.commons.entity.service.Users_Service;
+import com.sorted.commons.entity.mongo.*;
+import com.sorted.commons.entity.service.*;
+import com.sorted.commons.enums.OrderStatus;
 import com.sorted.commons.enums.UserType;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
@@ -38,6 +34,8 @@ public class ManageReferral_BLService {
     private final Users_Service usersService;
     private final RoleService roleService;
     private final ReferralService referralService;
+    private final CouponService couponService;
+    private final Order_Details_Service orderDetailsService;
 
     @GetMapping("/codes/all")
     public List<ReferralCodeDetails> getAllReferrals() {
@@ -112,7 +110,29 @@ public class ManageReferral_BLService {
             return Collections.emptyList();
         }
 
-        return ambassadors.stream().map(this::mapResponse).toList();
+        Map<String, Integer> countMap = ambassadors.stream().collect(Collectors.toMap(Users::getId, u -> 0));
+
+        SEFilter filterC = new SEFilter(SEFilterType.AND);
+        filterC.addClause(WhereClause.in(CouponEntity.Fields.ambassadorId, ambassadors.stream().map(Users::getId).toList()));
+        filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<CouponEntity> couponEntities = couponService.repoFind(filterC);
+        if (!CollectionUtils.isEmpty(couponEntities)) {
+            Map<String, String> mapCoupons = couponEntities.stream().collect(Collectors.toMap(CouponEntity::getCode, CouponEntity::getAmbassadorId));
+            SEFilter filterOD = new SEFilter(SEFilterType.AND);
+            filterOD.addClause(WhereClause.eq(Order_Details.Fields.status_id, OrderStatus.DELIVERED.getId()));
+            filterOD.addClause(WhereClause.in(Order_Details.Fields.coupon_code, mapCoupons.keySet().stream().toList()));
+
+            List<Order_Details> orderDetails = orderDetailsService.repoFind(filterOD);
+            if (!CollectionUtils.isEmpty(orderDetails)) {
+                Map<String, List<Order_Details>> mapOrderDetails = orderDetails.stream().collect(Collectors.groupingBy(Order_Details::getCoupon_code));
+                for (Map.Entry<String, List<Order_Details>> entry : mapOrderDetails.entrySet()) {
+                    countMap.put(entry.getKey(), entry.getValue().size());
+                }
+            }
+        }
+
+        return ambassadors.stream().map(u -> mapResponse(u, countMap)).toList();
     }
 
     private AmbassadorDetails mapResponse(Users ambassador) {
@@ -120,6 +140,15 @@ public class ManageReferral_BLService {
                 .id(ambassador.getId())
                 .mobileNo("+91" + ambassador.getMobile_no())
                 .name(StringUtils.hasText(ambassador.getFirst_name()) ? ambassador.getFirst_name() + " " + ambassador.getLast_name() : "")
+                .build();
+    }
+
+    private AmbassadorDetails mapResponse(Users ambassador, Map<String, Integer> countMap) {
+        return AmbassadorDetails.builder()
+                .id(ambassador.getId())
+                .mobileNo("+91" + ambassador.getMobile_no())
+                .name(StringUtils.hasText(ambassador.getFirst_name()) ? ambassador.getFirst_name() + " " + ambassador.getLast_name() : "")
+                .referredCount(countMap.get(ambassador.getId()))
                 .build();
     }
 
