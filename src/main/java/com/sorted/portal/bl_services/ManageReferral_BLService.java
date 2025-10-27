@@ -135,6 +135,9 @@ public class ManageReferral_BLService {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(Users.Fields.role_id, role.getId()));
         filter.addClause(WhereClause.eq(Users.Fields.ambassador, false));
+        filter.addClause(WhereClause.isNotNull(Users.Fields.email_id));
+        filter.addClause(WhereClause.isNotNull(Users.Fields.first_name));
+        filter.addClause(WhereClause.isNotNull(Users.Fields.last_name));
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         List<Users> ambassadors = usersService.repoFind(filter);
