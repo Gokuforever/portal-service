@@ -1,5 +1,6 @@
 package com.sorted.portal.response.beans;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.sorted.commons.enums.Gender;
 import com.sorted.commons.enums.UserType;
 import lombok.Data;
@@ -18,5 +19,7 @@ public class UserProfileBean {
     private Gender gender;
     private UserType user_type;
     private int user_type_id;
+    @JsonProperty("enable_referral")
+    private boolean enableReferral;
 
 }

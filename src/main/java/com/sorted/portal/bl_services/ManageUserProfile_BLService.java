@@ -76,6 +76,7 @@ public class ManageUserProfile_BLService {
 
     @NotNull
     private static UserProfileBean getUserProfileBean(UsersBean usersBean) {
+
         UserProfileBean bean = new UserProfileBean();
         bean.setFirst_name(usersBean.getFirst_name());
         bean.setLast_name(usersBean.getLast_name());
@@ -85,6 +86,7 @@ public class ManageUserProfile_BLService {
         bean.setGender(usersBean.getGender());
         bean.setUser_type(usersBean.getRole().getUser_type());
         bean.setUser_type_id(usersBean.getRole().getUser_type().getId());
+        bean.setEnableReferral(!StringUtils.hasText(usersBean.getEmail_id()));
         return bean;
     }
 
