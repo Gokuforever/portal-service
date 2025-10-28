@@ -19,7 +19,6 @@ public class UserProfileBean {
     private Gender gender;
     private UserType user_type;
     private int user_type_id;
-    @JsonProperty("enable_referral")
-    private boolean enableReferral;
+    private boolean enable_referral;
 
 }
