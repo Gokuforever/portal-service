@@ -107,9 +107,6 @@ public class ManageUserProfileV2_BLService {
         Preconditions.check(educationDetails != null, ResponseCode.MANDATE_EDUCATION_LEVEL_DETAILS);
         validationService.validate(educationDetails);
 
-        if (StringUtils.hasText(request.getReferralCode())) {
-            referralUtility.validateReferralCode(request.getReq_user_id(), request.getReferralCode());
-        }
     }
 
     private CompleteProfileRes verifyUniqueMobile(CompleteUserProfile request) {
