@@ -42,25 +42,27 @@ public class StoreProductService {
     public List<ProductDetailsBeanList> getProductDetailsBeanLists(FindProductBean req, UsersBean usersBean) {
         List<ProductDetailsBeanList> comboProducts = new ArrayList<>();
         SEFilter filterSE = new SEFilter(SEFilterType.AND);
-        filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, defaultSeller));
-        if (StringUtils.hasText(req.getName())) {
-            filterSE.addClause(WhereClause.like(Products.Fields.name, req.getName()));
-        }
         SEFilter filterCombo = new SEFilter(SEFilterType.AND);
-        filterCombo.addClause(WhereClause.like(Combo.Fields.name, req.getName()));
-        filterCombo.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, defaultSeller));
+        String name = req.getName();
+        if (StringUtils.hasText(name)) {
+            String productName = name.trim().replaceAll("\\s+", " ");
+            filterSE.addClause(WhereClause.like(Products.Fields.name, productName));
+            filterCombo.addClause(WhereClause.like(Combo.Fields.name, productName));
+            filterCombo.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
-        List<Combo> combos = comboService.repoFind(filterCombo);
-        if (!CollectionUtils.isEmpty(combos)) {
-            Map<String, Long> resultMap = combos.stream()
-                    .collect(Collectors.toMap(
-                            Combo::getId,
-                            combo -> {
-                                List<Products> products = comboUtility.getProductsByCombo(combo);
-                                return products.stream().map(Products::getQuantity).toList().stream().sorted().toList().get(0);
-                            }
-                    ));
-            comboProducts.addAll(combos.stream().map(combo -> this.getResponseBean(combo, resultMap.get(combo.getId()))).toList());
+            List<Combo> combos = comboService.repoFind(filterCombo);
+            if (!CollectionUtils.isEmpty(combos)) {
+                Map<String, Long> resultMap = combos.stream()
+                        .collect(Collectors.toMap(
+                                Combo::getId,
+                                combo -> {
+                                    List<Products> products = comboUtility.getProductsByCombo(combo);
+                                    return products.stream().map(Products::getQuantity).toList().stream().sorted().toList().get(0);
+                                }
+                        ));
+                comboProducts.addAll(combos.stream().map(combo -> this.getResponseBean(combo, resultMap.get(combo.getId()))).toList());
+            }
         }
         List<String> allowedCategoryList = List.of(this.allowedCategories.split(","));
         if (StringUtils.hasText(req.getCategory_id()) && allowedCategoryList.contains(req.getCategory_id())) {
