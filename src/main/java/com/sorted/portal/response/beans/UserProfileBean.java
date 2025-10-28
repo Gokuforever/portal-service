@@ -22,4 +22,5 @@ public class UserProfileBean {
     private boolean ambassador;
     private long total_sign_ups;
     private long total_orders;
+    private String coupon_code;
 }

@@ -127,6 +127,7 @@ public class ManageUserProfile_BLService {
                 if (!CollectionUtils.isEmpty(orderDetails)) {
                     bean.setTotal_orders(orderDetails.size());
                 }
+                bean.setCoupon_code(couponEntity.getCode());
             }
         }
         return bean;
