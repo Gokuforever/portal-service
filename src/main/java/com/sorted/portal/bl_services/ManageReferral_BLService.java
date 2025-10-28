@@ -4,11 +4,14 @@ import com.sorted.commons.beans.ReferralDetails;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
+import com.sorted.commons.enums.MailTemplate;
 import com.sorted.commons.enums.OrderStatus;
 import com.sorted.commons.enums.UserType;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
+import com.sorted.commons.helper.MailBuilder;
+import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.utils.ReferralUtility;
 import com.sorted.portal.request.beans.CreateReferralBean;
 import com.sorted.portal.request.beans.MakeAmbassadorBean;
@@ -33,6 +36,7 @@ public class ManageReferral_BLService {
     private final ReferralService referralService;
     private final CouponService couponService;
     private final Order_Details_Service orderDetailsService;
+    private final EmailSenderImpl emailSender;
 
     @GetMapping("/codes/all")
     public List<ReferralCodeDetails> getAllReferrals() {
@@ -206,6 +210,12 @@ public class ManageReferral_BLService {
 
         user.setAmbassador(true);
         usersService.update(user.getId(), user, Defaults.RETOOL);
+
+        MailBuilder builder = new MailBuilder();
+        builder.setTo(user.getEmail_id());
+        builder.setContent(user.getFirst_name());
+        builder.setTemplate(MailTemplate.AMBASSADOR_WELCOME_MAIL);
+        emailSender.sendEmailHtmlTemplate(builder);
     }
 
     @PostMapping("/remove/ambassador")
