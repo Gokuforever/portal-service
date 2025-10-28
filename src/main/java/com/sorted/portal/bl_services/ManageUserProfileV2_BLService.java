@@ -5,7 +5,6 @@ import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.Users_Service;
-import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.ProcessType;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.AccessDeniedException;
