@@ -4,10 +4,15 @@ import com.sorted.commons.beans.OTPResponse;
 import com.sorted.commons.beans.UsersBean;
 import com.sorted.commons.constants.Defaults;
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
+import com.sorted.commons.entity.mongo.CouponEntity;
+import com.sorted.commons.entity.mongo.Order_Details;
 import com.sorted.commons.entity.mongo.Users;
+import com.sorted.commons.entity.service.CouponService;
+import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.Activity;
 import com.sorted.commons.enums.All_Status.User_Status;
+import com.sorted.commons.enums.OrderStatus;
 import com.sorted.commons.enums.ProcessType;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
@@ -32,10 +37,12 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -45,6 +52,8 @@ import java.util.UUID;
 public class ManageUserProfile_BLService {
 
     private final Users_Service users_Service;
+    private final CouponService couponService;
+    private final Order_Details_Service orderDetailsService;
     private final ManageOtp manageOtp;
     private final ManageOTPManagerService manageOTPManagerService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
@@ -75,7 +84,10 @@ public class ManageUserProfile_BLService {
     }
 
     @NotNull
-    private static UserProfileBean getUserProfileBean(UsersBean usersBean) {
+    private UserProfileBean getUserProfileBean(UsersBean usersBean) {
+
+        boolean ambassador = usersBean.isAmbassador();
+
 
         UserProfileBean bean = new UserProfileBean();
         bean.setFirst_name(usersBean.getFirst_name());
@@ -86,7 +98,37 @@ public class ManageUserProfile_BLService {
         bean.setGender(usersBean.getGender());
         bean.setUser_type(usersBean.getRole().getUser_type());
         bean.setUser_type_id(usersBean.getRole().getUser_type().getId());
-        bean.setEnable_referral(!StringUtils.hasText(usersBean.getEmail_id()));
+        bean.setEnable_referral(!StringUtils.hasText(usersBean.getEmail_id()) && !ambassador);
+        bean.setAmbassador(ambassador);
+        if (ambassador) {
+
+            String ambassadorId = usersBean.getId();
+
+            SEFilter filterRU = new SEFilter(SEFilterType.AND);
+            filterRU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            filterRU.addClause(WhereClause.eq(Users.Fields.ambassadorId, ambassadorId));
+
+            List<Users> referredUsers = users_Service.repoFind(filterRU);
+            if (!CollectionUtils.isEmpty(referredUsers)) {
+                bean.setTotal_sign_ups(referredUsers.size());
+            }
+
+            SEFilter filterC = new SEFilter(SEFilterType.AND);
+            filterC.addClause(WhereClause.eq(CouponEntity.Fields.ambassadorId, ambassadorId));
+            filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+            CouponEntity couponEntity = couponService.repoFindOne(filterC);
+            if (couponEntity != null) {
+                SEFilter filterOD = new SEFilter(SEFilterType.AND);
+                filterOD.addClause(WhereClause.eq(Order_Details.Fields.status_id, OrderStatus.DELIVERED.getId()));
+                filterOD.addClause(WhereClause.eq(Order_Details.Fields.coupon_code, couponEntity.getCode()));
+
+                List<Order_Details> orderDetails = orderDetailsService.repoFind(filterOD);
+                if (!CollectionUtils.isEmpty(orderDetails)) {
+                    bean.setTotal_orders(orderDetails.size());
+                }
+            }
+        }
         return bean;
     }
 

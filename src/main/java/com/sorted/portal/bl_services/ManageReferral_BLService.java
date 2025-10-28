@@ -107,6 +107,17 @@ public class ManageReferral_BLService {
             return Collections.emptyList();
         }
 
+        Map<String, Long> signupCount = new HashMap<>();
+
+        SEFilter filterRU = new SEFilter(SEFilterType.AND);
+        filterRU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterRU.addClause(WhereClause.in(Users.Fields.ambassadorId, ambassadors.stream().map(Users::getId).toList()));
+
+        List<Users> referredUsers = usersService.repoFind(filterRU);
+        if (!CollectionUtils.isEmpty(referredUsers)) {
+            signupCount.putAll(referredUsers.stream().collect(Collectors.groupingBy(Users::getAmbassadorId, Collectors.counting())));
+        }
+
         Map<String, Integer> countMap = ambassadors.stream().collect(Collectors.toMap(Users::getId, u -> 0));
         Map<String, String> mapCoupons = new HashMap<>();
 
@@ -130,7 +141,7 @@ public class ManageReferral_BLService {
             }
         }
 
-        return ambassadors.stream().map(u -> mapResponse(u, countMap, mapCoupons)).toList();
+        return ambassadors.stream().map(u -> mapResponse(u, countMap, mapCoupons, signupCount)).toList();
     }
 
     private AmbassadorDetails mapResponse(Users ambassador) {
@@ -141,13 +152,14 @@ public class ManageReferral_BLService {
                 .build();
     }
 
-    private AmbassadorDetails mapResponse(Users ambassador, Map<String, Integer> countMap, Map<String, String> mapCoupons) {
+    private AmbassadorDetails mapResponse(Users ambassador, Map<String, Integer> countMap, Map<String, String> mapCoupons,Map<String, Long> signupCount) {
         return AmbassadorDetails.builder()
                 .id(ambassador.getId())
                 .mobileNo("+91" + ambassador.getMobile_no())
                 .name(StringUtils.hasText(ambassador.getFirst_name()) ? ambassador.getFirst_name() + " " + ambassador.getLast_name() : "")
                 .referredCount(countMap.get(ambassador.getId()))
-                .couponCode(mapCoupons.getOrDefault(ambassador.getId(), ""))
+                .signupCount(signupCount.getOrDefault(ambassador.getId(), 0L))
+                .couponCode(mapCoupons.getOrDefault(ambassador.getId(), null))
                 .build();
     }
 

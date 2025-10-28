@@ -14,10 +14,7 @@ import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.manage.otp.ManageOTPManagerService;
-import com.sorted.commons.utils.CommonUtils;
-import com.sorted.commons.utils.Preconditions;
-import com.sorted.commons.utils.ReferralUtility;
-import com.sorted.commons.utils.SERegExpUtils;
+import com.sorted.commons.utils.*;
 import com.sorted.portal.request.beans.CompleteUserProfile;
 import com.sorted.portal.response.beans.CompleteProfileRes;
 import com.sorted.portal.service.AuthService;
@@ -37,6 +34,7 @@ public class ManageUserProfileV2_BLService {
     private final ManageOTPManagerService manageOtp;
     private final AuthService authService;
     private final ReferralUtility referralUtility;
+    private final CouponUtility couponUtility;
 
     @PostMapping("/complete")
     public CompleteProfileRes completeProfile(@RequestBody CompleteUserProfile request, HttpServletRequest httpServletRequest) {
@@ -71,6 +69,12 @@ public class ManageUserProfileV2_BLService {
         validateRequest(request);
 
         Users users = usersService.findById(usersBean.getId()).get();
+        boolean eligibleForReferral = !StringUtils.hasText(users.getEmail_id()) && StringUtils.hasText(request.getReferralCode());
+        if (eligibleForReferral) {
+            String ambassadorId = couponUtility.validateReferralCodeAndGetAmbassadorId(request.getReferralCode());
+            users.setAmbassadorId(ambassadorId);
+        }
+
         users.setFirst_name(request.getFirstname());
         users.setLast_name(request.getLastname());
         users.setEmail_id(request.getEmail());
@@ -78,10 +82,6 @@ public class ManageUserProfileV2_BLService {
         users.setEducationDetails(request.getEducationDetails());
 
         usersService.update(users.getId(), users, users.getId());
-
-        if (StringUtils.hasText(request.getReferralCode())) {
-            referralUtility.refer(request.getReq_user_id(), request.getReferralCode());
-        }
         UsersBean userInfo = usersService.validateAndGetUserInfo(users.getId());
         return CompleteProfileRes.builder().userInfo(userInfo).build();
     }

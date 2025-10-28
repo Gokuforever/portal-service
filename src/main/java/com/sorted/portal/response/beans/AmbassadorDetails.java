@@ -7,6 +7,7 @@ public record AmbassadorDetails(
         String id,
         String mobileNo,
         String name,
+        long signupCount,
         long referredCount,
         String couponCode
 ) {
