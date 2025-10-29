@@ -6,6 +6,6 @@ import java.math.BigDecimal;
 
 @Builder
 public record ProductDetailsBeanList(String name, String id, BigDecimal mrp, BigDecimal sellingPrice, Long quantity,
-                                     String image, String categoryId, Boolean secure, Integer groupId, boolean is_combo, String search_subtitle) {
+                                     String image, String categoryId, Boolean secure, Integer groupId, boolean is_combo, String search_sub_title) {
 
 }

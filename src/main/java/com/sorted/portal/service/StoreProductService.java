@@ -189,7 +189,7 @@ public class StoreProductService {
                 .categoryId(p.getCategory_id())
                 .groupId(p.getGroup_id())
                 .secure(false)
-                .search_subtitle(p.getSelected_sub_catagories().get(0).getSelected_attributes().get(0))
+                .search_sub_title(p.getSelected_sub_catagories().get(0).getSelected_attributes().get(0))
                 .build();
     }
 
