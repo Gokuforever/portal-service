@@ -132,6 +132,7 @@ public class ManageReferral_BLService {
         List<CouponEntity> couponEntities = couponService.repoFind(filterC);
         if (!CollectionUtils.isEmpty(couponEntities)) {
             mapCoupons.putAll(couponEntities.stream().collect(Collectors.toMap(CouponEntity::getAmbassadorId, CouponEntity::getCode)));
+            Map<String, String> ambassadorCouponMapping = couponEntities.stream().collect(Collectors.toMap(CouponEntity::getCode, CouponEntity::getAmbassadorId));
             SEFilter filterOD = new SEFilter(SEFilterType.AND);
             filterOD.addClause(WhereClause.eq(Order_Details.Fields.status_id, OrderStatus.DELIVERED.getId()));
             filterOD.addClause(WhereClause.in(Order_Details.Fields.coupon_code, mapCoupons.values().stream().toList()));
@@ -140,7 +141,7 @@ public class ManageReferral_BLService {
             if (!CollectionUtils.isEmpty(orderDetails)) {
                 Map<String, List<Order_Details>> mapOrderDetails = orderDetails.stream().collect(Collectors.groupingBy(Order_Details::getCoupon_code));
                 for (Map.Entry<String, List<Order_Details>> entry : mapOrderDetails.entrySet()) {
-                    countMap.put(entry.getKey(), entry.getValue().size());
+                    countMap.put(ambassadorCouponMapping.get(entry.getKey()), entry.getValue().size());
                 }
             }
         }
