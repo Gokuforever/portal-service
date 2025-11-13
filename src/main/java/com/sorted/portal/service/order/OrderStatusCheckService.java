@@ -153,30 +153,34 @@ public class OrderStatusCheckService {
             }
 
             OrderStatusResponse orderStatusResponse = orderStatusResponseOptional.get();
-            if (CollectionUtils.isEmpty(orderStatusResponse.getPaymentDetails())) {
+            OrderStatus status = null;
+            if (StringUtils.hasText(orderStatusResponse.getState()) && orderStatusResponse.getState().equals("FAILED")) {
+                status = OrderStatus.TRANSACTION_FAILED;
+            } else if (!CollectionUtils.isEmpty(orderStatusResponse.getPaymentDetails())) {
+
+                List<PaymentDetail> paymentDetails = orderStatusResponse.getPaymentDetails();
+                PaymentDetail paymentDetail = paymentDetails.get(paymentDetails.size() - 1);
+                String state = paymentDetail.getState();
+                PgV2InstrumentType paymentMode = paymentDetail.getPaymentMode();
+                String transactionId = paymentDetail.getTransactionId();
+
+                log.info("status:: Payment details - state: {}, mode: {}, transactionId: {}",
+                        state, paymentMode, transactionId);
+
+                order_Details.setPayment_status(state);
+                order_Details.setPayment_mode(paymentMode != null ? paymentMode.name() : null);
+                order_Details.setTransaction_id(transactionId);
+
+                // Update order status only if payment is successful
+                status = switch (state) {
+                    case "COMPLETED" -> OrderStatus.TRANSACTION_PROCESSED;
+                    case "FAILED" -> OrderStatus.TRANSACTION_FAILED;
+                    default -> OrderStatus.TRANSACTION_PENDING;
+                };
+            } else {
                 log.error("status:: Invalid response from PhonePe payment status check for order ID: {}", order_Details.getId());
                 throw new CustomIllegalArgumentsException(ResponseCode.PG_BAD_REQ);
             }
-
-            List<PaymentDetail> paymentDetails = orderStatusResponse.getPaymentDetails();
-            PaymentDetail paymentDetail = paymentDetails.get(paymentDetails.size() - 1);
-            String state = paymentDetail.getState();
-            PgV2InstrumentType paymentMode = paymentDetail.getPaymentMode();
-            String transactionId = paymentDetail.getTransactionId();
-
-            log.info("status:: Payment details - state: {}, mode: {}, transactionId: {}",
-                    state, paymentMode, transactionId);
-
-            order_Details.setPayment_status(state);
-            order_Details.setPayment_mode(paymentMode != null ? paymentMode.name() : null);
-            order_Details.setTransaction_id(transactionId);
-
-            // Update order status only if payment is successful
-            OrderStatus status = switch (state) {
-                case "COMPLETED" -> OrderStatus.TRANSACTION_PROCESSED;
-                case "FAILED" -> OrderStatus.TRANSACTION_FAILED;
-                default -> OrderStatus.TRANSACTION_PENDING;
-            };
             boolean isPaid = status.equals(OrderStatus.TRANSACTION_PROCESSED);
             if (isPaid) {
                 boolean storeOperational = storeActivityService.isStoreOperational(order_Details.getSeller_id());
