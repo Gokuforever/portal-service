@@ -82,6 +82,9 @@ public class ManageProduct_BLService {
     private final EducationCategoriesService educationCategoriesService;
     private final ComboUtility comboUtility;
 
+    @Value("${se.store.allowed.categories:660194cde437f74a756be5f7,6858628aa520924ecbaa7ad5,687b6f241e9e6eb839f72cd5,687c94224323c53b054eafea}")
+    private String allowedCategories;
+
 
     @GetMapping("/curated")
     public SEResponse getCuratedProduct(@RequestBody SERequest request, HttpServletRequest httpServletRequest) throws JsonProcessingException {
@@ -834,6 +837,8 @@ public class ManageProduct_BLService {
 //                if (StringUtils.hasText(nearest_seller_id)) {
 //                    filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, nearest_seller_id));
 //                }
+                List<String> allowedCategoryList = List.of(this.allowedCategories.split(","));
+                filterSE.addClause(WhereClause.in(Products.Fields.category_id, allowedCategoryList));
                 break;
 
             default:

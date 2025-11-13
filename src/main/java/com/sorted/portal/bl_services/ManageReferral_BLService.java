@@ -153,10 +153,11 @@ public class ManageReferral_BLService {
                 .id(ambassador.getId())
                 .mobileNo("+91" + ambassador.getMobile_no())
                 .name(StringUtils.hasText(ambassador.getFirst_name()) ? ambassador.getFirst_name() + " " + ambassador.getLast_name() : "")
+                .emailId(ambassador.getEmail_id())
                 .build();
     }
 
-    private AmbassadorDetails mapResponse(Users ambassador, Map<String, Integer> countMap, Map<String, String> mapCoupons,Map<String, Long> signupCount) {
+    private AmbassadorDetails mapResponse(Users ambassador, Map<String, Integer> countMap, Map<String, String> mapCoupons, Map<String, Long> signupCount) {
         return AmbassadorDetails.builder()
                 .id(ambassador.getId())
                 .mobileNo("+91" + ambassador.getMobile_no())
@@ -164,6 +165,7 @@ public class ManageReferral_BLService {
                 .referredCount(countMap.get(ambassador.getId()))
                 .signupCount(signupCount.getOrDefault(ambassador.getId(), 0L))
                 .couponCode(mapCoupons.getOrDefault(ambassador.getId(), null))
+                .emailId(ambassador.getEmail_id())
                 .build();
     }
 

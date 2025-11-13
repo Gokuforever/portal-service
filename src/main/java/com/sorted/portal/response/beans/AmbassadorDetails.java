@@ -6,6 +6,7 @@ import lombok.Builder;
 public record AmbassadorDetails(
         String id,
         String mobileNo,
+        String emailId,
         String name,
         long signupCount,
         long referredCount,
