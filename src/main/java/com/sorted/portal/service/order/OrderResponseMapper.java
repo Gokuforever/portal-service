@@ -61,6 +61,7 @@ public class OrderResponseMapper {
                 .smallCartFee(CommonUtils.paiseToRupee(orderDetails.getSmall_cart_fee()))
                 .orderItems(mapOrderItems(orderDetails.getId(), orderItemsMap, false))
                 .creation_date_str(orderDetails.getCreation_date_str())
+                .dp_order_id(orderDetails.getDp_order_id())
                 .build();
     }
 
@@ -98,7 +99,7 @@ public class OrderResponseMapper {
                 .non_operational_days(nonWorkingDays)
                 .max_return_days(maxReturnDays)
                 .creation_date_str(orderDetails.getCreation_date_str())
-                .delivery_partner_id(orderDetails.getDp_order_id())
+                .dp_order_id(orderDetails.getDp_order_id())
                 .build();
     }
 
