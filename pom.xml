@@ -30,7 +30,7 @@
         <dependency>
             <groupId>com.sorted</groupId>
             <artifactId>se-commons</artifactId>
-            <version>25.11.01-SNAPSHOT</version>
+            <version>25.11.03-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
