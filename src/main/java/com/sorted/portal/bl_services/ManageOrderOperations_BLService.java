@@ -2,8 +2,10 @@ package com.sorted.portal.bl_services;
 
 import com.sorted.commons.entity.mongo.BaseMongoEntity;
 import com.sorted.commons.entity.mongo.Order_Details;
+import com.sorted.commons.entity.mongo.Order_Item;
 import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.Order_Details_Service;
+import com.sorted.commons.entity.service.Order_Item_Service;
 import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.OrderStatus;
 import com.sorted.commons.enums.ResponseCode;
@@ -12,11 +14,13 @@ import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.utils.CommonUtils;
+import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.Preconditions;
 import com.sorted.portal.request.beans.CompleteRefundBean;
 import com.sorted.portal.response.beans.OrdersForOperationsBean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,7 +41,9 @@ import java.util.stream.Collectors;
 public class ManageOrderOperations_BLService {
 
     private final Order_Details_Service orderDetailsService;
+    private final Order_Item_Service orderItemService;
     private final Users_Service usersService;
+    private final PorterUtility porterUtility;
 
     @GetMapping("/fetch/rejected-orders")
     public List<OrdersForOperationsBean> fetchRejectedOrders() {
@@ -81,9 +87,73 @@ public class ManageOrderOperations_BLService {
 
                 // TODO: send email for refund completion
             }
+            case ORDER_CANCELLED -> {
+                porterUtility.cancelOrder(order, request.userName());
+            }
             default -> throw new CustomIllegalArgumentsException(ResponseCode.INVALID_ORDER_STATUS);
         }
     }
+
+    @PostMapping("/reattempt-order")
+    public void reattemptOrder(@RequestBody CompleteRefundBean request) {
+        Preconditions.check(StringUtils.hasText(request.orderId()), ResponseCode.MISSING_ORDER_ID);
+        Optional<Order_Details> optionalOrderDetails = orderDetailsService.findById(request.orderId());
+        Preconditions.check(optionalOrderDetails.isPresent(), ResponseCode.ORDER_NOT_FOUND);
+        Order_Details order = optionalOrderDetails.get();
+        Preconditions.check(order.getStatus().equals(OrderStatus.DELIVERY_FAILED) || order.getStatus().equals(OrderStatus.ORDER_CANCELLED), ResponseCode.ORDER_NOT_FOUND);
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(Order_Item.Fields.order_id, request.orderId()));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        List<Order_Item> orderItems = orderItemService.repoFind(filter);
+        Preconditions.check(!CollectionUtils.isEmpty(orderItems), ResponseCode.ORDER_NOT_FOUND);
+
+        order.setId(null);
+        order.setDp_order_id(null);
+        order.setOrder_status_history(null);
+        order.setStatus(OrderStatus.ORDER_PLACED, request.userName());
+        order.setStatus(OrderStatus.TRANSACTION_PROCESSED, request.userName());
+        order.setStatus(OrderStatus.ORDER_ACCEPTED, request.userName());
+
+        Order_Details orderDetails = orderDetailsService.create(order, request.userName());
+
+        orderItems.forEach(e -> createOrderItem(request, e, orderDetails));
+    }
+
+    @Async
+    private void createOrderItem(CompleteRefundBean request, Order_Item orderItem, Order_Details orderDetails) {
+        orderItem.setId(null);
+        orderItem.setStatus_history(null);
+        orderItem.setOrder_id(orderDetails.getId());
+        orderItem.setStatus(OrderStatus.ORDER_PLACED, request.userName());
+        orderItem.setStatus(OrderStatus.TRANSACTION_PROCESSED, request.userName());
+        orderItem.setStatus(OrderStatus.ORDER_ACCEPTED, request.userName());
+        orderItemService.create(orderItem, request.userName());
+    }
+
+    @GetMapping("/fetch/orders-in-transit")
+    public List<OrdersForOperationsBean> fetchOrdersInTransit() {
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.in(Order_Details.Fields.status_id, List.of(OrderStatus.OUT_FOR_DELIVERY.getId(), OrderStatus.READY_FOR_PICK_UP.getId(), OrderStatus.RIDER_ASSIGNED.getId(), OrderStatus.DELIVERY_FAILED.getId())));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Order_Details> orderDetails = orderDetailsService.repoFind(filter);
+        if (CollectionUtils.isEmpty(orderDetails)) {
+            return null;
+        }
+
+        Map<String, Users> usersMap = new HashMap<>();
+
+        SEFilter filterU = new SEFilter(SEFilterType.AND);
+        filterU.addClause(WhereClause.in(BaseMongoEntity.Fields.id, orderDetails.stream().map(Order_Details::getUser_id).toList()));
+        filterU.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        List<Users> users = usersService.repoFind(filterU);
+        if (!CollectionUtils.isEmpty(users)) {
+            usersMap.putAll(users.stream().collect(Collectors.toMap(Users::getId, Function.identity())));
+        }
+
+        return orderDetails.stream().map(e -> rejectedOrderBeanMapping(e, usersMap)).toList();
+    }
+
 
     @GetMapping("/fetch/orders-for-reattempt")
     public List<OrdersForOperationsBean> fetchOrdersForReattempt() {
