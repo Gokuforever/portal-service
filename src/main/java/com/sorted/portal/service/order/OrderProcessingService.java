@@ -8,6 +8,7 @@ import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Order_Item_Service;
 import com.sorted.commons.entity.service.ProductService;
+import com.sorted.commons.enums.MailTemplate;
 import com.sorted.commons.enums.OrderStatus;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
@@ -19,6 +20,7 @@ import com.sorted.commons.porter.res.beans.CreateOrderResBean;
 import com.sorted.commons.porter.res.beans.FetchOrderRes.FareDetails;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.InternalMailService;
+import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.request.beans.CreateDeliveryBean;
 import com.sorted.portal.request.beans.OrderAcceptRejectRequest;
@@ -47,6 +49,7 @@ public class OrderProcessingService {
     private final PhonePeUtility phonePeUtility;
     private final InternalMailService internalMailService;
     private final ProductService productService;
+    private final PorterUtility porterUtility;
 
     /**
      * Process ready for pickup operation
@@ -201,6 +204,8 @@ public class OrderProcessingService {
         if (orderStatus == OrderStatus.REFUND_FAILED) {
             internalMailService.sendMailOnError("Refund failed for order ID: " + orderDetails.getId(), "Refund failed for order ID: " + orderDetails.getId(), null);
         }
+
+        porterUtility.sendMailWithOrderDetails(orderDetails, MailTemplate.ORDER_REJECTED, null);
 
         return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
     }
