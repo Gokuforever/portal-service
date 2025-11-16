@@ -186,7 +186,7 @@ public class OrderStatusCheckService {
             boolean isPaid = status.equals(OrderStatus.TRANSACTION_PROCESSED);
             if (isPaid) {
                 if (StringUtils.hasText(order_Details.getCoupon_code())) {
-                    couponUtility.addCouponUsage(order_Details, order_Details.getUser_id());
+                    couponUtility.addCouponUsage(order_Details);
                 }
 
                 boolean storeOperational = storeActivityService.isStoreOperational(order_Details.getSeller_id());
