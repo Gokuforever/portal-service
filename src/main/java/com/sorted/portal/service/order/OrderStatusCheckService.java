@@ -16,6 +16,7 @@ import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.notifications.SMSService;
 import com.sorted.commons.notifications.helper.SmsTraceHelper;
 import com.sorted.commons.utils.ComboUtility;
+import com.sorted.commons.utils.CouponUtility;
 import com.sorted.commons.utils.OrderService;
 import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.response.beans.OrderItemResponse;
@@ -49,6 +50,7 @@ public class OrderStatusCheckService {
     private final OrderService orderService;
     private final SmsTraceHelper smsTraceHelper;
     private final SMSService smsService;
+    private final CouponUtility couponUtility;
     private final ComboUtility comboUtility;
     @Value("${se.enable.sms:false}")
     private boolean enableSms;
@@ -183,6 +185,10 @@ public class OrderStatusCheckService {
             }
             boolean isPaid = status.equals(OrderStatus.TRANSACTION_PROCESSED);
             if (isPaid) {
+                if (StringUtils.hasText(order_Details.getCoupon_code())) {
+                    couponUtility.addCouponUsage(order_Details, order_Details.getUser_id());
+                }
+
                 boolean storeOperational = storeActivityService.isStoreOperational(order_Details.getSeller_id());
                 if (!storeOperational) {
                     status = OrderStatus.STORE_NOT_OPERATIONAL;
