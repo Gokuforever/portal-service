@@ -1,6 +1,9 @@
 package com.sorted.portal.bl_services;
 
-import com.sorted.commons.entity.mongo.*;
+import com.sorted.commons.entity.mongo.BaseMongoEntity;
+import com.sorted.commons.entity.mongo.Order_Details;
+import com.sorted.commons.entity.mongo.Order_Item;
+import com.sorted.commons.entity.mongo.Users;
 import com.sorted.commons.entity.service.CouponService;
 import com.sorted.commons.entity.service.Order_Details_Service;
 import com.sorted.commons.entity.service.Order_Item_Service;
@@ -29,7 +32,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -266,7 +268,7 @@ public class ManageOrderOperations_BLService {
                 .rejectedReason(order.getRejection_remarks())
                 .customerName(usersMap.containsKey(order.getUser_id()) ? usersMap.get(order.getUser_id()).getFirst_name() + " " + usersMap.get(order.getUser_id()).getLast_name() : "")
                 .customerEmail(usersMap.containsKey(order.getUser_id()) ? usersMap.get(order.getUser_id()).getEmail_id() : "")
-                .userPhoneNo(usersMap.containsKey(order.getUser_id()) ? usersMap.get(order.getUser_id()).getMobile_no() : "")
+                .userPhoneNo(usersMap.containsKey(order.getUser_id()) ? "91" + usersMap.get(order.getUser_id()).getMobile_no() : "")
                 .nameForDelivery(order.getDelivery_address().getFirst_name() + " " + order.getDelivery_address().getLast_name())
                 .phoneForDelivery(order.getDelivery_address().getPhone_no())
                 .customerAddress(order.getDelivery_address().getFullAddress())
