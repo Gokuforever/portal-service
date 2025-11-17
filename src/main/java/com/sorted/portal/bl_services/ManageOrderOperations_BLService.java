@@ -8,6 +8,7 @@ import com.sorted.commons.entity.service.Users_Service;
 import com.sorted.commons.enums.OrderStatus;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
@@ -187,6 +188,8 @@ public class ManageOrderOperations_BLService {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.nin(Order_Details.Fields.status_id, List.of(OrderStatus.TRANSACTION_FAILED.getId())));
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        AggregationFilter.OrderBy orderBy = new AggregationFilter.OrderBy(BaseMongoEntity.Fields.modification_date, AggregationFilter.SortOrder.DESC);
+        filter.setOrderBy(orderBy);
 
         List<Order_Details> orderDetails = orderDetailsService.repoFind(filter);
         if (CollectionUtils.isEmpty(orderDetails)) {
