@@ -93,6 +93,10 @@ public class ManageOrderOperations_BLService {
 
                 // TODO: send email for refund completion
             }
+            case DELIVERY_FAILED -> {
+                order.setStatus(OrderStatus.DELIVERY_FAILED, request.userName());
+                orderDetailsService.update(order.getId(), order, request.userName());
+            }
             case ORDER_CANCELLED -> {
                 porterUtility.cancelOrder(order, request.userName());
             }
