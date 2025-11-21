@@ -143,7 +143,7 @@ public class ManageOrderOperations_BLService {
     @GetMapping("/fetch/orders-in-transit")
     public List<OrdersForOperationsBean> fetchOrdersInTransit() {
         SEFilter filter = new SEFilter(SEFilterType.AND);
-        filter.addClause(WhereClause.in(Order_Details.Fields.status_id, List.of(OrderStatus.OUT_FOR_DELIVERY.getId(), OrderStatus.READY_FOR_PICK_UP.getId(), OrderStatus.RIDER_ASSIGNED.getId(), OrderStatus.DELIVERY_FAILED.getId())));
+        filter.addClause(WhereClause.in(Order_Details.Fields.status_id, List.of(OrderStatus.OUT_FOR_DELIVERY.getId(), OrderStatus.READY_FOR_PICK_UP.getId(), OrderStatus.RIDER_ASSIGNED.getId(), OrderStatus.DELIVERY_FAILED.getId(), OrderStatus.DELIVERED.getId())));
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         List<Order_Details> orderDetails = orderDetailsService.repoFind(filter);
