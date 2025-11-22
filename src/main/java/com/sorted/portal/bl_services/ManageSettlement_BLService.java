@@ -96,7 +96,7 @@ public class ManageSettlement_BLService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal unpaid = unpaidOrders.stream()
-                .map(order -> CommonUtils.calculateFees(order.getTotal_amount(), 10).cost())
+                .map(order -> CommonUtils.calculateFees(order.getTotal_items_cost(), 10).cost())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         SettlementAnalyticsResponse response = new SettlementAnalyticsResponse(paid, unpaid);
