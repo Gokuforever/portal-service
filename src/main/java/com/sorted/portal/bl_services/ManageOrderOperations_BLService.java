@@ -99,6 +99,8 @@ public class ManageOrderOperations_BLService {
             }
             case ORDER_CANCELLED -> {
                 porterUtility.cancelOrder(order, request.userName());
+                order.setStatus(OrderStatus.DELIVERY_FAILED, request.userName());
+                orderDetailsService.update(order.getId(), order, request.userName());
             }
             default -> throw new CustomIllegalArgumentsException(ResponseCode.INVALID_ORDER_STATUS);
         }
