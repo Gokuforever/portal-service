@@ -42,12 +42,18 @@ public class StoreProductService {
     public List<ProductDetailsBeanList> getProductDetailsBeanLists(FindProductBean req, UsersBean usersBean) {
         List<ProductDetailsBeanList> comboProducts = new ArrayList<>();
         SEFilter filterSE = new SEFilter(SEFilterType.AND);
-        SEFilter filterCombo = new SEFilter(SEFilterType.AND);
         filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, defaultSeller));
         String name = req.getName();
         if (StringUtils.hasText(name)) {
             String productName = name.trim().replaceAll("\\s+", " ");
-            filterSE.addClause(WhereClause.like(Products.Fields.name, productName));
+            SEFilterNode nameNode = new SEFilterNode(SEFilterType.OR);
+            nameNode.addClause(WhereClause.like(Products.Fields.name, productName));
+            SEFilterNode nameNode1 = new SEFilterNode(SEFilterType.OR);
+            nameNode1.addClause(WhereClause.like(Products.Fields.description, productName));
+            filterSE.addNodes(nameNode);
+            filterSE.addNodes(nameNode1);
+
+            SEFilter filterCombo = new SEFilter(SEFilterType.AND);
             filterCombo.addClause(WhereClause.like(Combo.Fields.name, productName));
             filterCombo.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
