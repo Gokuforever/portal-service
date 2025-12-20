@@ -25,7 +25,6 @@ import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
 import com.sorted.portal.enums.ReportType;
-import com.sorted.portal.request.beans.BlankReqBean;
 import com.sorted.portal.request.beans.BulkEditProductReqBean;
 import com.sorted.portal.request.beans.FindProductBean;
 import com.sorted.portal.request.beans.RandomProductReqBean;
@@ -87,18 +86,13 @@ public class ManageProduct_BLService {
 
 
     @GetMapping("/curated")
-    public SEResponse getCuratedProduct(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
-        BlankReqBean req = request.getGenericRequestDataObject(BlankReqBean.class);
-        CommonUtils.extractHeaders(httpServletRequest, req);
-        UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(),
-                Activity.PRODUCTS);
+    public SEResponse getCuratedProduct(HttpServletRequest httpServletRequest) {
+        String reqUserId = httpServletRequest.getHeader("req_user_id");
+        UsersBean usersBean = users_Service.validateUserForActivity(reqUserId, Activity.PRODUCTS);
         Role role = usersBean.getRole();
         UserType user_type = role.getUser_type();
-        switch (user_type) {
-            case GUEST, CUSTOMER:
-                break;
-            default:
-                throw new AccessDeniedException();
+        if (Objects.requireNonNull(user_type) != UserType.CUSTOMER) {
+            throw new AccessDeniedException();
         }
         SEFilter filter = new SEFilter(SEFilterType.AND);
 //        String nearestSeller = usersBean.getNearestSeller();
