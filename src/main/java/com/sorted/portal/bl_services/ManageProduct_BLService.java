@@ -87,7 +87,7 @@ public class ManageProduct_BLService {
 
 
     @GetMapping("/curated")
-    public SEResponse getCuratedProduct(@RequestBody SERequest request, HttpServletRequest httpServletRequest) throws JsonProcessingException {
+    public SEResponse getCuratedProduct(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         BlankReqBean req = request.getGenericRequestDataObject(BlankReqBean.class);
         CommonUtils.extractHeaders(httpServletRequest, req);
         UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(),
@@ -101,7 +101,7 @@ public class ManageProduct_BLService {
                 throw new AccessDeniedException();
         }
         SEFilter filter = new SEFilter(SEFilterType.AND);
-        String nearestSeller = usersBean.getNearestSeller();
+//        String nearestSeller = usersBean.getNearestSeller();
 //        if (StringUtils.hasText(nearestSeller)) {
 //            boolean storeOperational = storeActivityService.isStoreOperational(nearestSeller);
 //            if (!storeOperational) {
