@@ -30,7 +30,7 @@
         <dependency>
             <groupId>com.sorted</groupId>
             <artifactId>se-commons</artifactId>
-            <version>25.12.03-SNAPSHOT</version>
+            <version>25.12.06-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -44,19 +44,28 @@
             <optional>true</optional>
         </dependency>
         <!-- Apache POI for Excel -->
-        <dependency>
-            <groupId>org.apache.poi</groupId>
-            <artifactId>poi</artifactId>
-            <version>5.2.5</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.poi</groupId>-->
+<!--            <artifactId>poi</artifactId>-->
+<!--            <version>5.2.5</version>-->
+<!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>org.apache.poi</groupId>-->
+<!--            <artifactId>poi-ooxml</artifactId>-->
+<!--            <version>5.2.5</version>-->
+<!--        </dependency>-->
 
         <!-- Apache POI for .xlsx (XSSF) format -->
+<!--        <dependency>-->
+<!--            <groupId>org.apache.poi</groupId>-->
+<!--            <artifactId>poi-ooxml</artifactId>-->
+<!--            <version>5.4.0</version>-->
+<!--        </dependency>-->
         <dependency>
-            <groupId>org.apache.poi</groupId>
-            <artifactId>poi-ooxml</artifactId>
-            <version>5.4.0</version>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>2.20.0</version>
         </dependency>
-
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
