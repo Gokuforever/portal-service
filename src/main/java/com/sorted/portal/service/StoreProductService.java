@@ -15,6 +15,7 @@ import com.sorted.commons.helper.SearchHistoryAsyncHelper;
 import com.sorted.commons.utils.ComboUtility;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
+import com.sorted.portal.assisting.beans.ProductReview;
 import com.sorted.portal.request.beans.FindProductBean;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -196,7 +197,22 @@ public class StoreProductService {
                 .groupId(p.getGroup_id())
                 .secure(false)
                 .search_sub_title(p.getSelected_sub_catagories().get(0).getSelected_attributes().get(0))
+                .reviews(reviews(p))
                 .build();
+    }
+
+    public List<ProductReview> reviews(Products product) {
+        if (CollectionUtils.isEmpty(product.getReviews())) {
+            return null;
+        }
+        return product.getReviews().stream().map(e -> {
+            return ProductReview.builder()
+                    .userName(e.getUserName())
+                    .review(e.getReview())
+                    .rating(e.getRating())
+                    .title(e.getTitle())
+                    .build();
+        }).toList();
     }
 
     private void makeValuesUnique(Map<String, List<String>> map) {
