@@ -31,8 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
@@ -64,7 +63,7 @@ public class ManageCrons_BLService {
     private final PhonePeUtility phonePeUtility;
     private final AwsS3Service awsS3Service;
 
-    //    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
+    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
@@ -91,7 +90,7 @@ public class ManageCrons_BLService {
 
     }
 
-    //    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
+    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheckForCancelledOrders() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
@@ -127,7 +126,7 @@ public class ManageCrons_BLService {
         porterUtility.updateOrderStatus(details, fetchOrderRes);
     }
 
-    //    @Scheduled(fixedRate = 60000) // Executes every 60000ms (1 minute)
+    @Scheduled(fixedRate = 60000) // Executes every 60000ms (1 minute)
     public void phonePeStatusCheckForPendingTransactions() {
         log.info("PhonePe Status Check For Pending Transactions");
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
@@ -230,7 +229,7 @@ public class ManageCrons_BLService {
         }
     }
 
-    //    @Scheduled(cron = "0 0 10 * * ?")
+    @Scheduled(cron = "0 0 10 * * ?")
     public void sendReminderToSellers() {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -283,7 +282,7 @@ public class ManageCrons_BLService {
     }
 
 
-    //    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 60000)
     public void checkPhonePeRefundStatus() {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -313,7 +312,6 @@ public class ManageCrons_BLService {
         }
     }
 
-    @EventListener(ApplicationReadyEvent.class)
     public void generateOrderReport() {
         LocalDate now = LocalDate.now();
         SEFilter filter = new SEFilter(SEFilterType.AND);
