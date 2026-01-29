@@ -31,6 +31,7 @@ public class ProductDetailsBean {
     private String modification_date;
     private Integer group_id;
     private boolean is_combo;
+    private List<ProductReview> reviews;
 
     @Builder
     @Data

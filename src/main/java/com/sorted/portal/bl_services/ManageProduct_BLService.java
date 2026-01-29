@@ -22,6 +22,7 @@ import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDetailsBuilder;
 import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
+import com.sorted.portal.assisting.beans.ProductReview;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
 import com.sorted.portal.enums.ReportType;
@@ -30,10 +31,7 @@ import com.sorted.portal.request.beans.FindProductBean;
 import com.sorted.portal.request.beans.RandomProductReqBean;
 import com.sorted.portal.response.beans.OrderItemReportsDTO;
 import com.sorted.portal.response.beans.OrderReportDTO;
-import com.sorted.portal.service.ExcelGenerationUtility;
-import com.sorted.portal.service.FileGeneratorUtil;
-import com.sorted.portal.service.NearestSellerService;
-import com.sorted.portal.service.StoreProductService;
+import com.sorted.portal.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +59,7 @@ import java.util.stream.Collectors;
 public class ManageProduct_BLService {
 
     private final ProductService productService;
+    private final Product_Master_Service productMasterService;
     private final Cart_Service cart_Service;
     private final Varient_Mapping_Service varient_Mapping_Service;
     private final Category_MasterService category_MasterService;
@@ -80,7 +79,7 @@ public class ManageProduct_BLService {
     private final StoreProductService storeProductService;
     private final EducationCategoriesService educationCategoriesService;
     private final ComboUtility comboUtility;
-
+    private final RestockNotificationService restockNotificationService;
     @Value("${se.store.allowed.categories:660194cde437f74a756be5f7,6858628aa520924ecbaa7ad5,687b6f241e9e6eb839f72cd5,687c94224323c53b054eafea}")
     private String allowedCategories;
 
@@ -256,6 +255,7 @@ public class ManageProduct_BLService {
                         product.setDescription(
                                 StringUtils.hasText(productReqBean.getDescription()) ? productReqBean.getDescription() : null);
                         product.setIs_secure(productReqBean.getIs_secure() != null && productReqBean.getIs_secure());
+                        product.setProduct_master_id(productReqBean.getProduct_master_id());
                         if (!CollectionUtils.isEmpty(productReqBean.getMedia())) {
                             product.setMedia(getMediaList(productReqBean.getMedia()));
                         }
@@ -451,7 +451,10 @@ public class ManageProduct_BLService {
                     Map<String, List<String>> mapSC = this.getSubCategoriesMap(category_Master, products1.getGroup_id());
                     List<SelectedSubCategories> listSC = this.buildSelectedSubCategories(product, mapSC);
                     this.validateMandatorySubCategories(category_Master, listSC, product.getGroup_id());
-
+                    long quantity = Long.parseLong(product.getQuantity());
+                    if (products1.getQuantity() == 0 && quantity > 0) {
+                        restockNotificationService.sendNotification(products1);
+                    }
                     BigDecimal mrp = new BigDecimal(product.getMrp());
                     BigDecimal sp = new BigDecimal(product.getSelling_price());
                     products1.setName(product.getName());
@@ -459,7 +462,7 @@ public class ManageProduct_BLService {
                     products1.setSelling_price(CommonUtils.rupeeToPaise(sp));
                     products1.setSelected_sub_catagories(listSC);
                     products1.setCategory_id(category_Master.getId());
-                    products1.setQuantity(Long.valueOf(product.getQuantity()));
+                    products1.setQuantity(quantity);
                     products1.setDescription(StringUtils.hasText(product.getDescription()) ? product.getDescription() : null);
                     products1.setMedia(product.getMedia());
                     products1.setIs_secure(product.getIs_secure() != null && product.getIs_secure());
@@ -795,6 +798,20 @@ public class ManageProduct_BLService {
 
 
     /* <<<<<<<<<<<<<<  ✨ Windsurf Command 🌟 >>>>>>>>>>>>>>>> */
+    public List<ProductReview> reviews(Products product) {
+        if (CollectionUtils.isEmpty(product.getReviews())) {
+            return null;
+        }
+        return product.getReviews().stream().map(e -> {
+            return ProductReview.builder()
+                    .userName(e.getUserName())
+                    .review(e.getReview())
+                    .rating(e.getRating())
+                    .title(e.getTitle())
+                    .build();
+        }).toList();
+    }
+
     private SEFilter createFilterForProductList(FindProductBean req, UsersBean usersBean)
             throws JsonProcessingException {
 
@@ -979,6 +996,7 @@ public class ManageProduct_BLService {
         bean.setSecure(false);
         bean.setMedia(product.getMedia());
         bean.setGroup_id(product.getGroup_id());
+        bean.setReviews(reviews(product));
         return bean;
     }
 
@@ -1023,6 +1041,15 @@ public class ManageProduct_BLService {
     }
 
     private void validateRequest(ProductReqBean req, boolean isEdit) {
+        if (isEdit && !StringUtils.hasText(req.getProduct_master_id())) {
+            throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_PRODUCT_MASTER_ID);
+        }
+        if (isEdit) {
+            Optional<Product_Master> optionalProductMaster = productMasterService.findById(req.getProduct_master_id());
+            if (optionalProductMaster.isEmpty()) {
+                throw new CustomIllegalArgumentsException(ResponseCode.PRODUCT_MASTER_NOT_FOUND);
+            }
+        }
         if (!StringUtils.hasText(req.getCategory_id())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_CATEGORY);
         }

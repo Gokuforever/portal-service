@@ -9,6 +9,7 @@ import com.sorted.commons.entity.mongo.Products;
 import com.sorted.commons.entity.service.Category_MasterService;
 import com.sorted.commons.entity.service.ComboService;
 import com.sorted.commons.entity.service.ProductService;
+import com.sorted.commons.entity.service.RecommendationsService;
 import com.sorted.commons.helper.AggregationFilter.*;
 import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
@@ -39,6 +40,7 @@ public class StoreProductService {
     private final ComboUtility comboUtility;
     @Value("${se.store.allowed.categories:660194cde437f74a756be5f7,6858628aa520924ecbaa7ad5,687b6f241e9e6eb839f72cd5,687c94224323c53b054eafea}")
     private String allowedCategories;
+    private final RecommendationsService recommendationsService;
 
     public List<ProductDetailsBeanList> getProductDetailsBeanLists(FindProductBean req, UsersBean usersBean) {
         List<ProductDetailsBeanList> comboProducts = new ArrayList<>();
@@ -195,24 +197,9 @@ public class StoreProductService {
                 .image(CollectionUtils.isEmpty(p.getMedia()) ? "" : p.getMedia().stream().filter(e -> e.getOrder() == 0).findFirst().get().getCdn_url())
                 .categoryId(p.getCategory_id())
                 .groupId(p.getGroup_id())
-                .secure(false)
+                .secure(p.getIs_secure())
                 .search_sub_title(p.getSelected_sub_catagories().get(0).getSelected_attributes().get(0))
-                .reviews(reviews(p))
                 .build();
-    }
-
-    public List<ProductReview> reviews(Products product) {
-        if (CollectionUtils.isEmpty(product.getReviews())) {
-            return null;
-        }
-        return product.getReviews().stream().map(e -> {
-            return ProductReview.builder()
-                    .userName(e.getUserName())
-                    .review(e.getReview())
-                    .rating(e.getRating())
-                    .title(e.getTitle())
-                    .build();
-        }).toList();
     }
 
     private void makeValuesUnique(Map<String, List<String>> map) {
