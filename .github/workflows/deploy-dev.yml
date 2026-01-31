@@ -71,7 +71,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: dev-gcp
+    runs-on: [self-hosted, dev, gcp]
     environment: development
     permissions:
       contents: read
