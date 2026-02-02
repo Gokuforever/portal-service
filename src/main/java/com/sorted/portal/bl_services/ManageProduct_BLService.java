@@ -1041,14 +1041,12 @@ public class ManageProduct_BLService {
     }
 
     private void validateRequest(ProductReqBean req, boolean isEdit) {
-        if (isEdit && !StringUtils.hasText(req.getProduct_master_id())) {
+        if (!StringUtils.hasText(req.getProduct_master_id())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_PRODUCT_MASTER_ID);
         }
-        if (isEdit) {
-            Optional<Product_Master> optionalProductMaster = productMasterService.findById(req.getProduct_master_id());
-            if (optionalProductMaster.isEmpty()) {
-                throw new CustomIllegalArgumentsException(ResponseCode.PRODUCT_MASTER_NOT_FOUND);
-            }
+        Optional<Product_Master> optionalProductMaster = productMasterService.findById(req.getProduct_master_id());
+        if (optionalProductMaster.isEmpty()) {
+            throw new CustomIllegalArgumentsException(ResponseCode.PRODUCT_MASTER_NOT_FOUND);
         }
         if (!StringUtils.hasText(req.getCategory_id())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_CATEGORY);
