@@ -9,6 +9,7 @@ import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.AssetType;
 import com.sorted.commons.enums.ResponseCode;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.exceptions.LocationNotFoundException;
 import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
@@ -16,6 +17,7 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.repository.mongo.ProductRepository;
+import com.sorted.commons.service.PreferencesHandlerService;
 import com.sorted.commons.utils.ComboUtility;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.assisting.beans.config.*;
@@ -29,10 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -42,6 +41,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ManageMetaData_BLService {
 
+
+    private final PreferencesHandlerService preferencesHandlerService;
     private final Category_MasterService categoryMasterService;
     private final Users_Service usersService;
     private final Product_Master_Service productMasterService;
@@ -69,6 +70,14 @@ public class ManageMetaData_BLService {
         metaDataCache = null;
         metaDataCacheTime = 0;
         log.info("All caches cleared successfully");
+    }
+
+    @GetMapping("/preferences/v2/{lat}/{lng}")
+    public com.sorted.commons.beans.Config getPreferencesV2(@PathVariable String lat, @PathVariable String lng) {
+        if (!StringUtils.hasText(lat) || !StringUtils.hasText(lng)) {
+            throw new LocationNotFoundException();
+        }
+        return preferencesHandlerService.fetchPreference(Double.parseDouble(lat), Double.parseDouble(lng));
     }
 
     @GetMapping("/preferences")
