@@ -14,9 +14,9 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
 import com.sorted.commons.repository.mongo.ProductRepository;
-import com.sorted.commons.utils.AwsS3Service;
 import com.sorted.commons.utils.ComboUtility;
 import com.sorted.commons.utils.CommonUtils;
+import com.sorted.commons.utils.GcpStorageService;
 import com.sorted.commons.utils.SERegExpUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
@@ -67,7 +67,7 @@ public class ManageProduct_BLService {
     private final Seller_Service seller_Service;
     private final SearchHistoryAsyncHelper searchHistoryAsyncHelper;
     private final NearestSellerService nearestSellerService;
-    private final AwsS3Service awsS3Service;
+    private final GcpStorageService gcpStorageService;
     @Value("${se.default.page}")
     private int defaultPage;
     @Value("${se.default.size}")
@@ -785,7 +785,7 @@ public class ManageProduct_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
             }
             UsersBean usersBean = users_Service.validateUserForActivity(req_user_id, Activity.INVENTORY_MANAGEMENT);
-            File_Upload_Details file_Upload_Details = awsS3Service.uploadPhoto(file, usersBean,
+            File_Upload_Details file_Upload_Details = gcpStorageService.uploadPhoto(file, usersBean,
                     DocumentType.PRODUCT_IMAGE);
             Media media = new Media();
             media.setCdn_url(file_Upload_Details.getFile_url());

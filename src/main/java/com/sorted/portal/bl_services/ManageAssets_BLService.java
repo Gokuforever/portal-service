@@ -10,7 +10,7 @@ import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
-import com.sorted.commons.utils.AwsS3Service;
+import com.sorted.commons.utils.GcpStorageService;
 import com.sorted.portal.request.beans.UploadAssetBean;
 import com.sorted.portal.response.beans.AssetDetails;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ import java.util.List;
 @RequestMapping("/assets")
 public class ManageAssets_BLService {
 
-    private final AwsS3Service awsS3Service;
+    private final GcpStorageService gcpStorageService;
     private final AssetsService assetsService;
 
     @PostMapping("/promo-banner/create")
@@ -36,7 +36,7 @@ public class ManageAssets_BLService {
 
         log.info("Request: {}", request);
 
-        String cdnUrl = awsS3Service.uploadPhoto(request.getBytes(), request.getContentType(), request.getFileName());
+        String cdnUrl = gcpStorageService.uploadPhoto(request.getBytes(), request.getContentType(), request.getFileName());
 
         int existingOrder = 0;
 

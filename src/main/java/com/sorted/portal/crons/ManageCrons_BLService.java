@@ -15,8 +15,8 @@ import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.MailBuilder;
 import com.sorted.commons.notifications.EmailSenderImpl;
 import com.sorted.commons.porter.res.beans.FetchOrderRes;
-import com.sorted.commons.utils.AwsS3Service;
 import com.sorted.commons.utils.CommonUtils;
+import com.sorted.commons.utils.GcpStorageService;
 import com.sorted.commons.utils.InternalMailService;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.portal.PhonePe.PhonePeUtility;
@@ -61,7 +61,7 @@ public class ManageCrons_BLService {
     private final EmailSenderImpl emailSenderImpl;
     private final InternalMailService internalMailService;
     private final PhonePeUtility phonePeUtility;
-    private final AwsS3Service awsS3Service;
+    private final GcpStorageService gcpStorageService;
 
     @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheck() {
@@ -366,7 +366,7 @@ public class ManageCrons_BLService {
 
             // Upload to S3
             String fileName = "Order_Report_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
-            String s3Url = awsS3Service.uploadExcelReport(excelBytes, fileName);
+            String s3Url = gcpStorageService.uploadExcelReport(excelBytes, fileName);
 
             log.info("Order report generated and uploaded successfully: {}", s3Url);
 
