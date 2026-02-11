@@ -8,6 +8,7 @@ import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.AssetType;
 import com.sorted.commons.enums.ResponseCode;
+import com.sorted.commons.exceptions.AccessDeniedException;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
 import com.sorted.commons.exceptions.LocationNotFoundException;
 import com.sorted.commons.helper.AggregationFilter;
@@ -73,11 +74,18 @@ public class ManageMetaData_BLService {
     }
 
     @GetMapping("/preferences/v2/{lat}/{lng}")
-    public com.sorted.commons.beans.Config getPreferencesV2(@PathVariable String lat, @PathVariable String lng) {
+    public com.sorted.commons.beans.Config getPreferencesV2(@PathVariable String lat, @PathVariable String lng, HttpServletRequest httpServletRequest) {
         if (!StringUtils.hasText(lat) || !StringUtils.hasText(lng)) {
             throw new LocationNotFoundException();
         }
-        return preferencesHandlerService.fetchPreference(Double.parseDouble(lat), Double.parseDouble(lng));
+        String req_user_id;
+        try {
+            req_user_id = httpServletRequest.getHeader("req_user_id");
+        } catch (Exception e) {
+            throw new AccessDeniedException();
+        }
+        Users users = usersService.findById(req_user_id).orElseThrow(AccessDeniedException::new);
+        return preferencesHandlerService.fetchPreference(Double.parseDouble(lat), Double.parseDouble(lng), users);
     }
 
     @GetMapping("/preferences")
