@@ -1049,7 +1049,7 @@ public class ManageProduct_BLService {
             throw new CustomIllegalArgumentsException(ResponseCode.PRODUCT_MASTER_NOT_FOUND);
         }
         if (!StringUtils.hasText(req.getCategory_id())) {
-            throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_CATEGORY);
+            throw new CustomIllegalArgumentsException(ResponseCode.CATEGORY_NOT_SELECTED);
         }
         if (!StringUtils.hasText(req.getName())) {
             throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_NAME);
@@ -1085,6 +1085,15 @@ public class ManageProduct_BLService {
         BigDecimal sp = new BigDecimal(req.getSelling_price());
         if (sp.compareTo(mrp) > 0) {
             throw new CustomIllegalArgumentsException(ResponseCode.SP_MAX_MRP);
+        }
+        SEFilter filterDup = new SEFilter(SEFilterType.AND);
+        filterDup.addClause(WhereClause.eq(Products.Fields.product_master_id, req.getProduct_master_id()));
+        filterDup.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        long count = productService.countByFilter(filterDup);
+        if (count > 0) {
+            String name = req.getName();
+            throw new CustomIllegalArgumentsException(name + " : Product already exist in your store");
         }
 //        if (StringUtils.hasText(req.getDescription()) && !SERegExpUtils.standardTextValidation(req.getDescription())) {
 //            throw new CustomIllegalArgumentsException(ResponseCode.INVALID_PRODUCT_DESCRIPTION);
