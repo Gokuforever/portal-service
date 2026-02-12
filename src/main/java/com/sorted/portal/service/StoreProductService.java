@@ -2,21 +2,15 @@ package com.sorted.portal.service;
 
 import com.sorted.commons.beans.SelectedSubCategories;
 import com.sorted.commons.beans.UsersBean;
-import com.sorted.commons.entity.mongo.BaseMongoEntity;
-import com.sorted.commons.entity.mongo.Category_Master;
-import com.sorted.commons.entity.mongo.Combo;
-import com.sorted.commons.entity.mongo.Products;
-import com.sorted.commons.entity.service.Category_MasterService;
-import com.sorted.commons.entity.service.ComboService;
-import com.sorted.commons.entity.service.ProductService;
-import com.sorted.commons.entity.service.RecommendationsService;
+import com.sorted.commons.entity.mongo.*;
+import com.sorted.commons.entity.service.*;
 import com.sorted.commons.helper.AggregationFilter.*;
 import com.sorted.commons.helper.Pagination;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
+import com.sorted.commons.service.ZoneHandlerService;
 import com.sorted.commons.utils.ComboUtility;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
-import com.sorted.portal.assisting.beans.ProductReview;
 import com.sorted.portal.request.beans.FindProductBean;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,66 +32,73 @@ public class StoreProductService {
     private final SearchHistoryAsyncHelper searchHistoryAsyncHelper;
     private final Category_MasterService category_MasterService;
     private final ComboUtility comboUtility;
-    @Value("${se.store.allowed.categories:660194cde437f74a756be5f7,6858628aa520924ecbaa7ad5,687b6f241e9e6eb839f72cd5,687c94224323c53b054eafea}")
+    @Value("${se.store.allowed.categories:660194cde437f74a756be5f7,693701e9c6f45220cc784671,69370ac8c6f45220cc784675,69370e15c6f45220cc784678,69370f58c6f45220cc78467a,69371231c6f45220cc78467c,68df9761ffe872a16b247617,68dd47b6f88953e8a00deea5,693edb76e48e2b76f1cb918c}")
     private String allowedCategories;
     private final RecommendationsService recommendationsService;
+    private final ZoneHandlerService zoneHandlerService;
+    private final Product_Master_Service productMasterService;
 
     public List<ProductDetailsBeanList> getProductDetailsBeanLists(FindProductBean req, UsersBean usersBean) {
-        List<ProductDetailsBeanList> comboProducts = new ArrayList<>();
+
+        String zoneId = usersBean.getNearestZoneId();
+        Seller seller = zoneHandlerService.getSellerByZone(zoneId, usersBean.getCurrentLat().doubleValue(), usersBean.getCurrentLng().doubleValue());
+
         SEFilter filterSE = new SEFilter(SEFilterType.AND);
         filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, defaultSeller));
         String name = req.getName();
+
+        SEFilter filterPM = new SEFilter(SEFilterType.AND);
+        filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
         if (StringUtils.hasText(name)) {
             String productName = name.trim().replaceAll("\\s+", " ");
-            SEFilterNode nameNode = new SEFilterNode(SEFilterType.OR);
-            nameNode.addClause(WhereClause.like(Products.Fields.name, productName));
-            SEFilterNode nameNode1 = new SEFilterNode(SEFilterType.OR);
-            nameNode1.addClause(WhereClause.like(Products.Fields.description, productName));
-            filterSE.addNodes(nameNode);
-            filterSE.addNodes(nameNode1);
 
-            SEFilter filterCombo = new SEFilter(SEFilterType.AND);
-            filterCombo.addClause(WhereClause.like(Combo.Fields.name, productName));
-            filterCombo.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            SEFilterNode nameNodePM = new SEFilterNode(SEFilterType.OR);
+            nameNodePM.addClause(WhereClause.like(Product_Master.Fields.name, productName));
+            nameNodePM.addClause(WhereClause.like(Product_Master.Fields.desc, productName));
 
-            List<Combo> combos = comboService.repoFind(filterCombo);
-            if (!CollectionUtils.isEmpty(combos)) {
-                Map<String, Long> resultMap = combos.stream()
-                        .collect(Collectors.toMap(
-                                Combo::getId,
-                                combo -> {
-                                    List<Products> products = comboUtility.getProductsByCombo(combo);
-                                    return products.stream().map(Products::getQuantity).toList().stream().sorted().toList().get(0);
-                                }
-                        ));
-                comboProducts.addAll(combos.stream().map(combo -> this.getResponseBean(combo, resultMap.get(combo.getId()))).toList());
-            }
+            SEFilterNode nameNodeP = new SEFilterNode(SEFilterType.OR);
+            nameNodeP.addClause(WhereClause.like(Products.Fields.name, productName));
+            nameNodeP.addClause(WhereClause.like(Products.Fields.description, productName));
+
+            filterPM.addNodes(nameNodePM);
+            filterSE.addNodes(nameNodeP);
         }
+
         List<String> allowedCategoryList = List.of(this.allowedCategories.split(","));
+
         if (StringUtils.hasText(req.getCategory_id()) && allowedCategoryList.contains(req.getCategory_id())) {
+            filterPM.addClause(WhereClause.eq(Product_Master.Fields.catagory_id, req.getCategory_id()));
             filterSE.addClause(WhereClause.eq(Products.Fields.category_id, req.getCategory_id()));
         } else {
+            filterPM.addClause(WhereClause.in(Product_Master.Fields.catagory_id, allowedCategoryList));
             filterSE.addClause(WhereClause.in(Products.Fields.category_id, allowedCategoryList));
         }
 
         if (req.getGroup_id() != null && req.getGroup_id() > 0) {
+            filterPM.addClause(WhereClause.eq(Product_Master.Fields.group_id, req.getGroup_id()));
             filterSE.addClause(WhereClause.eq(Products.Fields.group_id, req.getGroup_id()));
         }
+
         if (!CollectionUtils.isEmpty(req.getFilters())) {
-            List<SEFilterNode> filterNodes = new ArrayList<>();
+            SEFilterNode node = new SEFilterNode(SEFilterType.AND);
+            SEFilterNode nodePM = new SEFilterNode(SEFilterType.AND);
             for (Map.Entry<String, List<String>> entry : req.getFilters().entrySet()) {
                 entry.getValue().removeIf(e -> !StringUtils.hasText(e));
                 if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
-                    SEFilterNode node = new SEFilterNode(SEFilterType.OR);
                     Map<String, Object> map = new HashMap<>();
                     map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
                     map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
                     node.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
-                    filterNodes.add(node);
+                    nodePM.addClause(WhereClause.in("sub_categories." + entry.getKey(), entry.getValue()));
                 }
             }
-            filterSE.addNodes(filterNodes);
+            if (node.getClause() != null) {
+                filterSE.addNodes(node);
+                filterPM.addNodes(nodePM);
+            }
         }
+
         filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         if (StringUtils.hasText(req.getSort_by())) {
             OrderBy sort = switch (req.getSort_by()) {
@@ -107,19 +108,59 @@ public class StoreProductService {
                 case "oldest" -> new OrderBy(BaseMongoEntity.Fields.creation_date, SortOrder.ASC);
                 default -> new OrderBy(BaseMongoEntity.Fields.modification_date, SortOrder.DESC);
             };
+
+            OrderBy sortPM = switch (req.getSort_by()) {
+                case "price_low_to_high" -> new OrderBy(Products.Fields.mrp, SortOrder.ASC);
+                case "price_high_to_low" -> new OrderBy(Products.Fields.mrp, SortOrder.DESC);
+                case "oldest" -> new OrderBy(BaseMongoEntity.Fields.id, SortOrder.ASC);
+                default -> new OrderBy(BaseMongoEntity.Fields.id, SortOrder.DESC);
+            };
             filterSE.setOrderBy(sort);
+            filterPM.setOrderBy(sortPM);
         }
+
+        List<Product_Master> productMasters = productMasterService.repoFind(filterPM);
+
         searchHistoryAsyncHelper.createSearchHistory(usersBean.getId(), usersBean.getRole().getUser_type_id(),
                 filterSE);
+        filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, seller.getId()));
         List<Products> listP = productService.repoFind(filterSE);
-        if (CollectionUtils.isEmpty(listP)) {
-            return comboProducts;
-        }
+
         List<ProductDetailsBeanList> list = new ArrayList<>();
-        for (Products p : listP) {
-            list.add(getResponseBean(p));
+        if (!CollectionUtils.isEmpty(listP)) {
+            List<String> filteredMasterIds = listP.stream().map(Products::getProduct_master_id).toList();
+
+            SEFilter filterAllProducts = new SEFilter(SEFilterType.AND);
+            filterAllProducts.addClause(WhereClause.in(Products.Fields.product_master_id, filteredMasterIds));
+            filterAllProducts.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            List<Products> allFilteredProducts = productService.repoFind(filterAllProducts);
+
+            Map<String, List<Products>> listMap = allFilteredProducts.stream().collect(Collectors.groupingBy(Products::getProduct_master_id));
+            Map<String, Long> highestPrize = new HashMap<>();
+
+            for (Map.Entry<String, List<Products>> entry : listMap.entrySet()) {
+                long max = 0L;
+                for (Products product : entry.getValue()) {
+                    Long sellingPrice = product.getSelling_price();
+                    max = Math.max(max, sellingPrice);
+                }
+                highestPrize.put(entry.getKey(), max);
+            }
+
+            for (Products p : listP) {
+                list.add(getResponseBean(p, highestPrize));
+            }
         }
-        list.addAll(comboProducts);
+
+        if (!CollectionUtils.isEmpty(productMasters)) {
+            List<String> productMasterIds = list.isEmpty() ? new ArrayList<>() : list.stream().map(ProductDetailsBeanList::productMasterId).toList();
+            for (Product_Master productMaster : productMasters) {
+                if (productMasterIds.contains(productMaster.getId())) {
+                    continue;
+                }
+                list.add(getResponseBean(productMaster));
+            }
+        }
         return list;
     }
 
@@ -174,19 +215,6 @@ public class StoreProductService {
 
     }
 
-    public ProductDetailsBeanList getResponseBean(Combo c, long quantity) {
-        return ProductDetailsBeanList.builder()
-                .name(c.getName())
-                .id(c.getId())
-                .mrp(CommonUtils.paiseToRupee(c.getMrp()))
-                .sellingPrice(CommonUtils.paiseToRupee(c.getSelling_price()))
-                .quantity(quantity)
-                .image(CollectionUtils.isEmpty(c.getMedia()) ? "" : c.getMedia().get(0).getCdn_url())
-                .secure(false)
-                .is_combo(true)
-                .build();
-    }
-
     public ProductDetailsBeanList getResponseBean(Products p) {
         return ProductDetailsBeanList.builder()
                 .name(p.getName())
@@ -199,6 +227,35 @@ public class StoreProductService {
                 .groupId(p.getGroup_id())
                 .secure(p.getIs_secure())
                 .search_sub_title(p.getSelected_sub_catagories().get(0).getSelected_attributes().get(0))
+                .build();
+    }
+
+    public ProductDetailsBeanList getResponseBean(Product_Master p) {
+        return ProductDetailsBeanList.builder()
+                .name(p.getName())
+                .productMasterId(p.getId())
+                .mrp(CommonUtils.paiseToRupee(p.getMrp()))
+                .quantity(0L)
+                .image(p.getCdn_url())
+                .categoryId(p.getCatagory_id())
+                .groupId(p.getGroup_id())
+                .secure(false)
+                .build();
+    }
+
+    public ProductDetailsBeanList getResponseBean(Products p, Map<String, Long> highestPrize) {
+        return ProductDetailsBeanList.builder()
+                .name(p.getName())
+                .id(p.getId())
+                .mrp(CommonUtils.paiseToRupee(p.getMrp()))
+                .sellingPrice(CommonUtils.paiseToRupee(highestPrize.getOrDefault(p.getId(), 0L)))
+                .quantity(p.getQuantity())
+                .image(CollectionUtils.isEmpty(p.getMedia()) ? "" : p.getMedia().stream().filter(e -> e.getOrder() == 0).findFirst().get().getCdn_url())
+                .categoryId(p.getCategory_id())
+                .groupId(p.getGroup_id())
+                .secure(p.getIs_secure())
+                .search_sub_title(p.getSelected_sub_catagories().get(0).getSelected_attributes().get(0))
+                .productMasterId(p.getProduct_master_id())
                 .build();
     }
 
