@@ -17,7 +17,6 @@ import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
 import com.sorted.commons.helper.SERequest;
-import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.utils.*;
 import com.sorted.portal.assisting.beans.CartItemsBean;
 import com.sorted.portal.enums.CartAction;
@@ -132,72 +131,72 @@ public class ManageCart_BLService {
                 .build();
     }
 
-    @GetMapping("/cart/v2/fetch")
-    public FetchCartV2 fetchV2(HttpServletRequest httpServletRequest) throws JsonProcessingException {
-        String req_user_id = httpServletRequest.getHeader("req_user_id");
-        if (!StringUtils.hasText(req_user_id)) {
-            throw new AccessDeniedException();
-        }
-
-        // Use more efficient query with projection to get only needed fields
-        SEFilter cartFilter = new SEFilter(SEFilterType.AND);
-        cartFilter.addClause(WhereClause.eq(Cart.Fields.user_id, req_user_id));
-        cartFilter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-        Cart cart = cart_Service.repoFindOne(cartFilter);
-        if (cart == null) {
-            cart = new Cart();
-            cart.setUser_id(req_user_id);
-            cart_Service.create(cart, req_user_id);
-
-            // Return early for empty cart to avoid unnecessary processing
-            return FetchCartV2.builder()
-                    .totalCount(0L)
-                    .totalAmount(BigDecimal.ZERO)
-                    .freeDeliveryDiff(CommonUtils.paiseToRupee(minCartValueInPaise))
-                    .deliveryFree(false)
-                    .savings(BigDecimal.ZERO)
-                    .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
-                    .build();
-        }
-
-        List<Item> cartItems = cart.getCart_items();
-        if (CollectionUtils.isEmpty(cartItems)) {
-            // Return early for empty cart
-            return FetchCartV2.builder()
-                    .totalCount(0L)
-                    .totalAmount(BigDecimal.ZERO)
-                    .freeDeliveryDiff(CommonUtils.paiseToRupee(minCartValueInPaise))
-                    .deliveryFree(false)
-                    .savings(BigDecimal.ZERO)
-                    .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
-                    .build();
-        }
-
-        CartBean cartBean = cartUtility.getCartBean(cart);
-
-        BigDecimal freeDeliveryDiff = BigDecimal.ZERO;
-        boolean freeDelivery = cartBean.is_free_delivery();
-        if (!freeDelivery) {
-            freeDeliveryDiff = CommonUtils.paiseToRupee(minCartValueInPaise).subtract(cartBean.getTotal_amount());
-        }
-        BigDecimal discountAmount = cartBean.getDiscountAmount();
-        if (freeDelivery) {
-            cartBean.setDiscountAmount(discountAmount.add(CommonUtils.paiseToRupee(fixedDeliveryFee)));
-        }
-
-        BigDecimal difference = cartBean.getItem_total_mrp().subtract(cartBean.getTotal_amount());
-
-
-        return FetchCartV2.builder()
-                .totalCount(cartBean.getTotal_count()) // Use actual count of valid items
-                .totalAmount(cartBean.getTotal_amount())
-                .freeDeliveryDiff(freeDeliveryDiff)
-                .deliveryFree(freeDelivery)
-                .savings(discountAmount.add(difference))
-                .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
-                .build();
-    }
+//    @GetMapping("/cart/v2/fetch")
+//    public FetchCartV2 fetchV2(HttpServletRequest httpServletRequest) throws JsonProcessingException {
+//        String req_user_id = httpServletRequest.getHeader("req_user_id");
+//        if (!StringUtils.hasText(req_user_id)) {
+//            throw new AccessDeniedException();
+//        }
+//
+//        // Use more efficient query with projection to get only needed fields
+//        SEFilter cartFilter = new SEFilter(SEFilterType.AND);
+//        cartFilter.addClause(WhereClause.eq(Cart.Fields.user_id, req_user_id));
+//        cartFilter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//
+//        Cart cart = cart_Service.repoFindOne(cartFilter);
+//        if (cart == null) {
+//            cart = new Cart();
+//            cart.setUser_id(req_user_id);
+//            cart_Service.create(cart, req_user_id);
+//
+//            // Return early for empty cart to avoid unnecessary processing
+//            return FetchCartV2.builder()
+//                    .totalCount(0L)
+//                    .totalAmount(BigDecimal.ZERO)
+//                    .freeDeliveryDiff(CommonUtils.paiseToRupee(minCartValueInPaise))
+//                    .deliveryFree(false)
+//                    .savings(BigDecimal.ZERO)
+//                    .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
+//                    .build();
+//        }
+//
+//        List<Item> cartItems = cart.getCart_items();
+//        if (CollectionUtils.isEmpty(cartItems)) {
+//            // Return early for empty cart
+//            return FetchCartV2.builder()
+//                    .totalCount(0L)
+//                    .totalAmount(BigDecimal.ZERO)
+//                    .freeDeliveryDiff(CommonUtils.paiseToRupee(minCartValueInPaise))
+//                    .deliveryFree(false)
+//                    .savings(BigDecimal.ZERO)
+//                    .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
+//                    .build();
+//        }
+//
+//        CartBean cartBean = cartUtility.getCartBean(cart);
+//
+//        BigDecimal freeDeliveryDiff = BigDecimal.ZERO;
+//        boolean freeDelivery = cartBean.is_free_delivery();
+//        if (!freeDelivery) {
+//            freeDeliveryDiff = CommonUtils.paiseToRupee(minCartValueInPaise).subtract(cartBean.getTotal_amount());
+//        }
+//        BigDecimal discountAmount = cartBean.getDiscountAmount();
+//        if (freeDelivery) {
+//            cartBean.setDiscountAmount(discountAmount.add(CommonUtils.paiseToRupee(fixedDeliveryFee)));
+//        }
+//
+//        BigDecimal difference = cartBean.getItem_total_mrp().subtract(cartBean.getTotal_amount());
+//
+//
+//        return FetchCartV2.builder()
+//                .totalCount(cartBean.getTotal_count()) // Use actual count of valid items
+//                .totalAmount(cartBean.getTotal_amount())
+//                .freeDeliveryDiff(freeDeliveryDiff)
+//                .deliveryFree(freeDelivery)
+//                .savings(discountAmount.add(difference))
+//                .minimumCartValue(CommonUtils.paiseToRupee(minCartValueInPaise))
+//                .build();
+//    }
 
     @PostMapping("/cart/clear")
     public CartBeanV2 clear(HttpServletRequest httpServletRequest) {
@@ -234,40 +233,40 @@ public class ManageCart_BLService {
         }
     }
 
-    @PostMapping("/cart/fetch")
-    public SEResponse fetch(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
-        try {
-            CartFetchReqBean fetchReqBean = request.getGenericRequestDataObject(CartFetchReqBean.class);
-            CommonUtils.extractHeaders(httpServletRequest, fetchReqBean);
-            String address_id = StringUtils.hasText(fetchReqBean.getAddress_id()) ? fetchReqBean.getAddress_id() : null;
-            UsersBean usersBean = users_Service.validateUserForActivity(fetchReqBean.getReq_user_id(), Permission.VIEW,
-                    Activity.CART_MANAGEMENT);
-            switch (usersBean.getRole().getUser_type()) {
-                case CUSTOMER, GUEST:
-                    break;
-                default:
-                    throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
-            }
-            SEFilter filterC = new SEFilter(SEFilterType.AND);
-            filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
-            filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-            Cart cart = cart_Service.repoFindOne(filterC);
-            if (cart == null) {
-                cart = new Cart();
-                cart.setUser_id(usersBean.getId());
-                cart = cart_Service.create(cart, usersBean.getId());
-            }
-            CartBean cartBean = cartUtility.getCartBean(cart, address_id, usersBean.getFirst_name() + " " + usersBean.getLast_name());
-            return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
-        } catch (CustomIllegalArgumentsException ex) {
-            throw ex;
-        } catch (Exception e) {
-            log.error("/fetch:: exception occurred");
-            log.error("/fetch:: {}", e.getMessage());
-            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-        }
-    }
+//    @PostMapping("/cart/fetch")
+//    public SEResponse fetch(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+//        try {
+//            CartFetchReqBean fetchReqBean = request.getGenericRequestDataObject(CartFetchReqBean.class);
+//            CommonUtils.extractHeaders(httpServletRequest, fetchReqBean);
+//            String address_id = StringUtils.hasText(fetchReqBean.getAddress_id()) ? fetchReqBean.getAddress_id() : null;
+//            UsersBean usersBean = users_Service.validateUserForActivity(fetchReqBean.getReq_user_id(), Permission.VIEW,
+//                    Activity.CART_MANAGEMENT);
+//            switch (usersBean.getRole().getUser_type()) {
+//                case CUSTOMER, GUEST:
+//                    break;
+//                default:
+//                    throw new CustomIllegalArgumentsException(ResponseCode.ACCESS_DENIED);
+//            }
+//            SEFilter filterC = new SEFilter(SEFilterType.AND);
+//            filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
+//            filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//
+//            Cart cart = cart_Service.repoFindOne(filterC);
+//            if (cart == null) {
+//                cart = new Cart();
+//                cart.setUser_id(usersBean.getId());
+//                cart = cart_Service.create(cart, usersBean.getId());
+//            }
+//            CartBean cartBean = cartUtility.getCartBean(cart, address_id, usersBean.getFirst_name() + " " + usersBean.getLast_name());
+//            return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
+//        } catch (CustomIllegalArgumentsException ex) {
+//            throw ex;
+//        } catch (Exception e) {
+//            log.error("/fetch:: exception occurred");
+//            log.error("/fetch:: {}", e.getMessage());
+//            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+//        }
+//    }
 
     @PostMapping("/cart/fetch/all")
     public CartBeanV2 fetchAll(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
@@ -383,95 +382,95 @@ public class ManageCart_BLService {
         return cartItems.stream().filter(e -> !e.getProduct_id().equals(productId)).toList();
     }
 
-    @PostMapping("/cart/add")
-    public SEResponse update(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
-        try {
-            CartCRUDBean req = request.getGenericRequestDataObject(CartCRUDBean.class);
-            CommonUtils.extractHeaders(httpServletRequest, req);
-            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.CART_MANAGEMENT);
-            if (req.getItem() == null) {
-                throw new CustomIllegalArgumentsException(ResponseCode.NO_ITEMS);
-            }
-
-            CartItemsBean itemBean = req.getItem();
-            if (!StringUtils.hasText(itemBean.getProduct_id())) {
-                throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_ID);
-            }
-            if (itemBean.getQuantity() == null || itemBean.getQuantity() < 0) {
-                throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_QUANTITY);
-            }
-
-            SEFilter filterC = new SEFilter(SEFilterType.AND);
-            filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
-            filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-            Cart cart = cart_Service.repoFindOne(filterC);
-            if (cart == null) {
-                throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
-            }
-            if (CollectionUtils.isEmpty(cart.getCart_items())) {
-                cart.setCart_items(new ArrayList<>());
-            }
-
-            List<Item> listItems = new ArrayList<>();
-            if (itemBean.getQuantity() == 0) {
-                for (Item cartItem : cart.getCart_items()) {
-                    if (!cartItem.getProduct_id().equals(itemBean.getProduct_id()) || (cartItem.getProduct_id().equals(itemBean.getProduct_id()) && cartItem.is_secure() != itemBean.isSecure_item())) {
-                        listItems.add(cartItem);
-                    }
-                }
-            } else {
-
-                SEFilter filterP = new SEFilter(SEFilterType.AND);
-                filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, itemBean.getProduct_id()));
-                filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-                Products product = productService.repoFindOne(filterP);
-                if (product == null) {
-                    throw new CustomIllegalArgumentsException(ResponseCode.ITEM_NOT_FOUND);
-                }
-                long total_item = itemBean.getQuantity();
-
-                Predicate<Item> p1 = x -> x.getProduct_id().equals(itemBean.getProduct_id());
-                Predicate<Item> p2 = x -> x.is_secure() != itemBean.isSecure_item();
-                Optional<Item> optional = cart.getCart_items().stream().filter(p1.and(p2)).findFirst();
-                if (optional.isPresent()) {
-                    total_item += optional.get().getQuantity();
-                }
-                boolean is_secure_item = isIsSecureItem(product, total_item, itemBean);
-
-                Item item = new Item();
-                item.setProduct_id(product.getId());
-                item.setQuantity(itemBean.getQuantity());
-                item.setProduct_code(product.getProduct_code());
-                item.set_secure(is_secure_item);
-
-                listItems.add(item);
-                if (CollectionUtils.isEmpty(cart.getCart_items())) {
-                    cart.setCart_items(new ArrayList<>());
-                } else {
-                    Predicate<Item> p3 = x -> !x.getProduct_id().equals(item.getProduct_id());
-                    Predicate<Item> p4 = x -> x.is_secure() != is_secure_item;
-                    List<Item> list = cart.getCart_items().stream().filter(p3.or(p4)).toList();
-                    if (!CollectionUtils.isEmpty(list)) {
-                        listItems.addAll(list);
-                    }
-                }
-            }
-
-            cart.setCart_items(listItems);
-            cart_Service.update(cart.getId(), cart, usersBean.getId());
-
-            CartBean cartBean = cartUtility.getCartBean(cart);
-            return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
-        } catch (CustomIllegalArgumentsException ex) {
-            throw ex;
-        } catch (Exception e) {
-            log.error("/add:: exception occurred");
-            log.error("/add:: {}", e.getMessage());
-            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-        }
-    }
+//    @PostMapping("/cart/add")
+//    public SEResponse update(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+//        try {
+//            CartCRUDBean req = request.getGenericRequestDataObject(CartCRUDBean.class);
+//            CommonUtils.extractHeaders(httpServletRequest, req);
+//            UsersBean usersBean = users_Service.validateUserForActivity(req.getReq_user_id(), Activity.CART_MANAGEMENT);
+//            if (req.getItem() == null) {
+//                throw new CustomIllegalArgumentsException(ResponseCode.NO_ITEMS);
+//            }
+//
+//            CartItemsBean itemBean = req.getItem();
+//            if (!StringUtils.hasText(itemBean.getProduct_id())) {
+//                throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_ID);
+//            }
+//            if (itemBean.getQuantity() == null || itemBean.getQuantity() < 0) {
+//                throw new CustomIllegalArgumentsException(ResponseCode.MISSING_PRODUCT_QUANTITY);
+//            }
+//
+//            SEFilter filterC = new SEFilter(SEFilterType.AND);
+//            filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
+//            filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//
+//            Cart cart = cart_Service.repoFindOne(filterC);
+//            if (cart == null) {
+//                throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+//            }
+//            if (CollectionUtils.isEmpty(cart.getCart_items())) {
+//                cart.setCart_items(new ArrayList<>());
+//            }
+//
+//            List<Item> listItems = new ArrayList<>();
+//            if (itemBean.getQuantity() == 0) {
+//                for (Item cartItem : cart.getCart_items()) {
+//                    if (!cartItem.getProduct_id().equals(itemBean.getProduct_id()) || (cartItem.getProduct_id().equals(itemBean.getProduct_id()) && cartItem.is_secure() != itemBean.isSecure_item())) {
+//                        listItems.add(cartItem);
+//                    }
+//                }
+//            } else {
+//
+//                SEFilter filterP = new SEFilter(SEFilterType.AND);
+//                filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, itemBean.getProduct_id()));
+//                filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//
+//                Products product = productService.repoFindOne(filterP);
+//                if (product == null) {
+//                    throw new CustomIllegalArgumentsException(ResponseCode.ITEM_NOT_FOUND);
+//                }
+//                long total_item = itemBean.getQuantity();
+//
+//                Predicate<Item> p1 = x -> x.getProduct_id().equals(itemBean.getProduct_id());
+//                Predicate<Item> p2 = x -> x.is_secure() != itemBean.isSecure_item();
+//                Optional<Item> optional = cart.getCart_items().stream().filter(p1.and(p2)).findFirst();
+//                if (optional.isPresent()) {
+//                    total_item += optional.get().getQuantity();
+//                }
+//                boolean is_secure_item = isIsSecureItem(product, total_item, itemBean);
+//
+//                Item item = new Item();
+//                item.setProduct_id(product.getId());
+//                item.setQuantity(itemBean.getQuantity());
+//                item.setProduct_code(product.getProduct_code());
+//                item.set_secure(is_secure_item);
+//
+//                listItems.add(item);
+//                if (CollectionUtils.isEmpty(cart.getCart_items())) {
+//                    cart.setCart_items(new ArrayList<>());
+//                } else {
+//                    Predicate<Item> p3 = x -> !x.getProduct_id().equals(item.getProduct_id());
+//                    Predicate<Item> p4 = x -> x.is_secure() != is_secure_item;
+//                    List<Item> list = cart.getCart_items().stream().filter(p3.or(p4)).toList();
+//                    if (!CollectionUtils.isEmpty(list)) {
+//                        listItems.addAll(list);
+//                    }
+//                }
+//            }
+//
+//            cart.setCart_items(listItems);
+//            cart_Service.update(cart.getId(), cart, usersBean.getId());
+//
+//            CartBean cartBean = cartUtility.getCartBean(cart);
+//            return SEResponse.getBasicSuccessResponseObject(cartBean, ResponseCode.SUCCESSFUL);
+//        } catch (CustomIllegalArgumentsException ex) {
+//            throw ex;
+//        } catch (Exception e) {
+//            log.error("/add:: exception occurred");
+//            log.error("/add:: {}", e.getMessage());
+//            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+//        }
+//    }
 
     @PostMapping("/cart/applyCoupon")
     public CartBeanV2 applyCoupon(@RequestBody ApplyCouponBean request, HttpServletRequest httpServletRequest) throws JsonProcessingException {

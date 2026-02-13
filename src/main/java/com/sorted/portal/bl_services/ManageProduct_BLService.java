@@ -14,10 +14,7 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.helper.SearchHistoryAsyncHelper;
 import com.sorted.commons.repository.mongo.ProductRepository;
-import com.sorted.commons.utils.ComboUtility;
-import com.sorted.commons.utils.CommonUtils;
-import com.sorted.commons.utils.GcpStorageService;
-import com.sorted.commons.utils.SERegExpUtils;
+import com.sorted.commons.utils.*;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDetailsBuilder;
@@ -79,6 +76,7 @@ public class ManageProduct_BLService {
     private final StoreProductService storeProductService;
     private final EducationCategoriesService educationCategoriesService;
     private final ComboUtility comboUtility;
+    private final ProductUtility productUtility;
     private final RestockNotificationService restockNotificationService;
     @Value("${se.store.allowed.categories:660194cde437f74a756be5f7,6858628aa520924ecbaa7ad5,687b6f241e9e6eb839f72cd5,687c94224323c53b054eafea}")
     private String allowedCategories;
@@ -678,53 +676,55 @@ public class ManageProduct_BLService {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_ENTITY);
             }
 
-            boolean isCombo = comboUtility.isCombo(req.getId());
-            if (isCombo) {
-                Combo combo = comboUtility.validateAndGetCombo(req.getId());
-                List<Products> products = comboUtility.getProductsByCombo(combo);
-                long averageQuantity = products.stream().map(Products::getQuantity).toList().stream().sorted().toList().get(0);
-                List<Media> media = products.stream().filter(e -> !CollectionUtils.isEmpty(e.getMedia()) && !e.getMedia().isEmpty()).flatMap(m -> m.getMedia().stream()).toList();
-
-                ProductDetailsBean bean = new ProductDetailsBean();
-                bean.setName(combo.getName());
-                bean.setId(combo.getId());
-                bean.setProduct_code(combo.getCode());
-                bean.setSelling_price(CommonUtils.paiseToRupee(combo.getSelling_price()));
-                bean.setMrp(CommonUtils.paiseToRupee(combo.getMrp()));
-                bean.setSelected_sub_catagories(new ArrayList<>());
-                bean.setQuantity(averageQuantity);
-                bean.setDescription(combo.getDescription());
-                bean.setSecure(false);
-                bean.setMedia(media);
-                bean.set_combo(true);
-
-                List<ProductDetailsBeanList> relatedProducts = products.stream().map(storeProductService::getResponseBean).toList();
-                bean.setRelated_products(relatedProducts);
-                if (usersBean.getRole().getUser_type() == UserType.CUSTOMER
-                        || usersBean.getRole().getUser_type() == UserType.GUEST) {
-                    SEFilter filterC = new SEFilter(SEFilterType.AND);
-                    filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
-                    filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-                    Cart cart = cart_Service.repoFindOne(filterC);
-                    if (cart == null) {
-                        cart = new Cart();
-                        cart.setUser_id(usersBean.getId());
-                        cart = cart_Service.create(cart, usersBean.getId());
-                    }
-                    List<Item> cart_items = cart.getCart_items();
-                    CartDetailsBuilder cartDetailsBuilder = CartDetails.builder();
-                    if (!CollectionUtils.isEmpty(cart_items)) {
-                        Optional<Item> itemOptional = cart_items.stream().filter(item -> item.getProduct_id().equals(bean.getId())).findFirst();
-                        if (itemOptional.isPresent()) {
-                            Item item = itemOptional.get();
-                            cartDetailsBuilder.normal_items(item.is_secure() ? item.getQuantity() : 0);
-                        }
-                    }
-                    bean.setCart_info(cartDetailsBuilder.build());
-                }
-                return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
-            }
+//            boolean isCombo = comboUtility.isCombo(req.getId());
+//            if (isCombo) {
+//                Combo combo = comboUtility.validateAndGetCombo(req.getId());
+//                List<Products> products = comboUtility.getProductsByCombo(combo);
+//                long averageQuantity = products.stream().map(Products::getQuantity).toList().stream().sorted().toList().get(0);
+//                List<Media> media = products.stream().filter(e -> !CollectionUtils.isEmpty(e.getMedia()) && !e.getMedia().isEmpty()).flatMap(m -> m.getMedia().stream()).toList();
+//
+//                ProductDetailsBean bean = new ProductDetailsBean();
+//                bean.setName(combo.getName());
+//                bean.setId(combo.getId());
+//                bean.setProduct_code(combo.getCode());
+//                bean.setSelling_price(CommonUtils.paiseToRupee(combo.getSelling_price()));
+//                bean.setMrp(CommonUtils.paiseToRupee(combo.getMrp()));
+//                bean.setSelected_sub_catagories(new ArrayList<>());
+//                bean.setQuantity(averageQuantity);
+//                bean.setDescription(combo.getDescription());
+//                bean.setSecure(false);
+//                bean.setMedia(media);
+//                bean.set_combo(true);
+//
+//                Map<String, Long> productHighestSellingPrice = productUtility.getProductHighestSellingPrice(products.stream().map(Products::getProduct_master_id).toArray(String[]::new));
+//
+//                List<ProductDetailsBeanList> relatedProducts = products.stream().map(p-> storeProductService.getResponseBean(p, productHighestSellingPrice)).toList();
+//                bean.setRelated_products(relatedProducts);
+//                if (usersBean.getRole().getUser_type() == UserType.CUSTOMER
+//                        || usersBean.getRole().getUser_type() == UserType.GUEST) {
+//                    SEFilter filterC = new SEFilter(SEFilterType.AND);
+//                    filterC.addClause(WhereClause.eq(Cart.Fields.user_id, usersBean.getId()));
+//                    filterC.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//
+//                    Cart cart = cart_Service.repoFindOne(filterC);
+//                    if (cart == null) {
+//                        cart = new Cart();
+//                        cart.setUser_id(usersBean.getId());
+//                        cart = cart_Service.create(cart, usersBean.getId());
+//                    }
+//                    List<Item> cart_items = cart.getCart_items();
+//                    CartDetailsBuilder cartDetailsBuilder = CartDetails.builder();
+//                    if (!CollectionUtils.isEmpty(cart_items)) {
+//                        Optional<Item> itemOptional = cart_items.stream().filter(item -> item.getProduct_id().equals(bean.getId())).findFirst();
+//                        if (itemOptional.isPresent()) {
+//                            Item item = itemOptional.get();
+//                            cartDetailsBuilder.normal_items(item.is_secure() ? item.getQuantity() : 0);
+//                        }
+//                    }
+//                    bean.setCart_info(cartDetailsBuilder.build());
+//                }
+//                return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
+//            }
             SEFilter filterSE = new SEFilter(SEFilterType.AND);
             filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getId()));
             filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));

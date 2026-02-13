@@ -10,6 +10,7 @@ import com.sorted.commons.helper.SearchHistoryAsyncHelper;
 import com.sorted.commons.service.ZoneHandlerService;
 import com.sorted.commons.utils.ComboUtility;
 import com.sorted.commons.utils.CommonUtils;
+import com.sorted.commons.utils.ProductUtility;
 import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
 import com.sorted.portal.request.beans.FindProductBean;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class StoreProductService {
     private final RecommendationsService recommendationsService;
     private final ZoneHandlerService zoneHandlerService;
     private final Product_Master_Service productMasterService;
+    private final ProductUtility productUtility;
 
     public List<ProductDetailsBeanList> getProductDetailsBeanLists(FindProductBean req, UsersBean usersBean) {
 
@@ -136,16 +138,7 @@ public class StoreProductService {
             List<Products> allFilteredProducts = productService.repoFind(filterAllProducts);
 
             Map<String, List<Products>> listMap = allFilteredProducts.stream().collect(Collectors.groupingBy(Products::getProduct_master_id));
-            Map<String, Long> highestPrize = new HashMap<>();
-
-            for (Map.Entry<String, List<Products>> entry : listMap.entrySet()) {
-                long max = 0L;
-                for (Products product : entry.getValue()) {
-                    Long sellingPrice = product.getSelling_price();
-                    max = Math.max(max, sellingPrice);
-                }
-                highestPrize.put(entry.getKey(), max);
-            }
+            Map<String, Long> highestPrize = productUtility.getProductHighestSellingPrice(listMap.entrySet().toArray(String[]::new));
 
             for (Products p : listP) {
                 list.add(getResponseBean(p, highestPrize));
@@ -207,27 +200,14 @@ public class StoreProductService {
             return null;
         }
 
+        Map<String, Long> highestSellingPrice = productUtility.getProductHighestSellingPrice(listRI.stream().map(Products::getProduct_master_id).toArray(String[]::new));
+
         List<ProductDetailsBeanList> list = new ArrayList<>();
         for (Products p : listRI) {
-            list.add(getResponseBean(p));
+            list.add(getResponseBean(p, highestSellingPrice));
         }
         return list;
 
-    }
-
-    public ProductDetailsBeanList getResponseBean(Products p) {
-        return ProductDetailsBeanList.builder()
-                .name(p.getName())
-                .id(p.getId())
-                .mrp(CommonUtils.paiseToRupee(p.getMrp()))
-                .sellingPrice(CommonUtils.paiseToRupee(p.getSelling_price()))
-                .quantity(p.getQuantity())
-                .image(CollectionUtils.isEmpty(p.getMedia()) ? "" : p.getMedia().stream().filter(e -> e.getOrder() == 0).findFirst().get().getCdn_url())
-                .categoryId(p.getCategory_id())
-                .groupId(p.getGroup_id())
-                .secure(p.getIs_secure())
-                .search_sub_title(p.getSelected_sub_catagories().get(0).getSelected_attributes().get(0))
-                .build();
     }
 
     public ProductDetailsBeanList getResponseBean(Product_Master p) {

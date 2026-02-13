@@ -64,6 +64,10 @@ public class AuthService {
             if (guestUser != null) {
                 signUpService.migrateCart(guest_user_id, users.getId());
                 signUpService.migrateAddressForCustomer(guest_user_id, users.getId());
+                users.setNearestZoneId(guestUser.getNearestZoneId());
+                users.setCurrentLat(guestUser.getCurrentLat());
+                users.setCurrentLng(guestUser.getCurrentLng());
+                users_Service.update(users.getId(), users, Defaults.AUTH);
             }
         }
         return users;

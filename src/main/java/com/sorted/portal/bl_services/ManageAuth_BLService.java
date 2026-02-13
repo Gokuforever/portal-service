@@ -92,9 +92,9 @@ public class ManageAuth_BLService {
             if (!StringUtils.hasText(otp)) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_OTP);
             }
-            if (!SERegExpUtils.isOtp(otp)) {
-                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_OTP);
-            }
+//            if (!SERegExpUtils.isOtp(otp)) {
+//                throw new CustomIllegalArgumentsException(ResponseCode.INVALID_OTP);
+//            }
             if (!StringUtils.hasText(reference_id)) {
                 throw new CustomIllegalArgumentsException(ResponseCode.MISSING_REF_ID);
             }

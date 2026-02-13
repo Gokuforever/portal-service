@@ -15,6 +15,7 @@ import com.sorted.commons.helper.SERequest;
 import com.sorted.commons.helper.SEResponse;
 import com.sorted.commons.porter.req.beans.GetQuoteRequest;
 import com.sorted.commons.porter.res.beans.GetQuoteResponse;
+import com.sorted.commons.service.ZoneHandlerService;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.ValidationUtil;
@@ -47,6 +48,7 @@ public class ManageAddress_BLService {
     private final DemandingPincodeService demandingPincodeService;
     private final PorterUtility porterUtility;
     private final Seller_Service seller_Service;
+    private final ZoneHandlerService zoneHandlerService;
 
     @PostMapping("/add")
     public SEResponse add(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
@@ -138,15 +140,24 @@ public class ManageAddress_BLService {
 
         ValidationUtil.validateAddress(addressDTO, address);
 
-        SEFilter filterP = new SEFilter(SEFilterType.AND);
-        filterP.addClause(WhereClause.eq(Pincode_Master.Fields.pincode, address.getPincode()));
-        filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-
-        Pincode_Master pincode_Master = pincode_Master_Service.repoFindOne(filterP);
-        if (pincode_Master == null) {
-            demandingPincodeService.storeDemandingPincode(address.getPincode(), user_id);
-            throw new CustomIllegalArgumentsException(ResponseCode.NOT_DELIVERIBLE);
+        ZoneEntity zoneEntity = zoneHandlerService.identifyZone(addressDTO.getLat().doubleValue(), addressDTO.getLng().doubleValue());
+        if (!zoneEntity.getZoneId().equals(usersBean.getNearestZoneId())){
+            Users users = users_Service.findById(usersBean.getId()).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.USER_NOT_FOUND));
+            users.setCurrentLat(addressDTO.getLat());
+            users.setCurrentLng(addressDTO.getLng());
+            users.setNearestZoneId(zoneEntity.getZoneId());
+            users_Service.update(users.getId(), users, req.getReq_user_id());
         }
+
+//        SEFilter filterP = new SEFilter(SEFilterType.AND);
+//        filterP.addClause(WhereClause.eq(Pincode_Master.Fields.pincode, address.getPincode()));
+//        filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+//
+//        Pincode_Master pincode_Master = pincode_Master_Service.repoFindOne(filterP);
+//        if (pincode_Master == null) {
+//            demandingPincodeService.storeDemandingPincode(address.getPincode(), user_id);
+//            throw new DeliveryNotAvailableException();
+//        }
 
         SEFilter filterA = new SEFilter(SEFilterType.AND);
         filterA.addClause(WhereClause.eq(Address.Fields.entity_id, user_id));
@@ -167,7 +178,7 @@ public class ManageAddress_BLService {
             }
         }
 
-        Seller seller = seller_Service.findById("68711a63a2dcdf55ed170972").orElseThrow();
+        Seller seller = zoneHandlerService.getSellerByZone(zoneEntity.getZoneId(), addressDTO.getLat().doubleValue(), addressDTO.getLng().doubleValue());
 
         Address pickUpAddress = address_Service.findById(seller.getAddress_id()).orElseThrow();
 
