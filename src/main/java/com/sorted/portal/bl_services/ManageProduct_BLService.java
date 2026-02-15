@@ -1020,6 +1020,15 @@ public class ManageProduct_BLService {
         bean.setSecure(false);
         bean.setMedia(List.of(Media.builder().order(0).cdn_url(product.getCdn_url()).build()));
         bean.setGroup_id(product.getGroup_id());
+        List<SelectedSubCategories> subCategoriesList = new ArrayList<>();
+        product.getSub_categories().forEach((key, value) -> {
+            SelectedSubCategories subCategories = new SelectedSubCategories();
+            subCategories.setSub_category(key);
+            subCategories.setSelected_attributes(value);
+            subCategoriesList.add(subCategories);
+        });
+
+        bean.setSelected_sub_catagories(subCategoriesList);
         return bean;
     }
 
