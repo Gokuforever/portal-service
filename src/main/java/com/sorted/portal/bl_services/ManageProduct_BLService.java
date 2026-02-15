@@ -728,8 +728,8 @@ public class ManageProduct_BLService {
             Optional<Product_Master> optionalProductMaster = productMasterService.findById(req.getId());
             if (optionalProductMaster.isPresent()) {
                 Category_Master category_master = category_MasterService.findById(optionalProductMaster.get().getCatagory_id()).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.CATEGORY_NOT_FOUND));
-                this.convertProductToBean(optionalProductMaster.get(), category_master);
-                return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+                ProductDetailsBean productDetailsBean = this.convertProductToBean(optionalProductMaster.get(), category_master);
+                return SEResponse.getBasicSuccessResponseObject(productDetailsBean, ResponseCode.SUCCESSFUL);
             }
             SEFilter filterSE = new SEFilter(SEFilterType.AND);
             filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getId()));
