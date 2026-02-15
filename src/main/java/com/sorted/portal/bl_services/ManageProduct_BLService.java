@@ -18,7 +18,6 @@ import com.sorted.commons.utils.*;
 import com.sorted.portal.assisting.beans.ProductDetailsBean;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails;
 import com.sorted.portal.assisting.beans.ProductDetailsBean.CartDetails.CartDetailsBuilder;
-import com.sorted.portal.assisting.beans.ProductDetailsBeanList;
 import com.sorted.portal.assisting.beans.ProductReview;
 import com.sorted.portal.enums.OrderItemsProperties;
 import com.sorted.portal.enums.OrderProperties;
@@ -725,6 +724,13 @@ public class ManageProduct_BLService {
 //                }
 //                return SEResponse.getBasicSuccessResponseObject(bean, ResponseCode.SUCCESSFUL);
 //            }
+
+            Optional<Product_Master> optionalProductMaster = productMasterService.findById(req.getId());
+            if (optionalProductMaster.isPresent()) {
+                Category_Master category_master = category_MasterService.findById(optionalProductMaster.get().getCatagory_id()).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.CATEGORY_NOT_FOUND));
+                this.convertProductToBean(optionalProductMaster.get(), category_master);
+                return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
+            }
             SEFilter filterSE = new SEFilter(SEFilterType.AND);
             filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, req.getId()));
             filterSE.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -996,6 +1002,24 @@ public class ManageProduct_BLService {
         bean.setMedia(product.getMedia());
         bean.setGroup_id(product.getGroup_id());
         bean.setReviews(reviews(product));
+        return bean;
+    }
+
+    private ProductDetailsBean convertProductToBean(Product_Master product,
+                                                    Category_Master category_Master) {
+        ProductDetailsBean bean = new ProductDetailsBean();
+        bean.setName(product.getName());
+        bean.setId(product.getId());
+        bean.setSelling_price(CommonUtils.paiseToRupee(product.getMrp()));
+        bean.setMrp(CommonUtils.paiseToRupee(product.getMrp()));
+        bean.setQuantity(0L);
+        bean.setDescription(product.getDesc());
+        bean.setCategory_id(category_Master.getId());
+        bean.setCategory_name(category_Master.getName());
+//        bean.setSecure(Boolean.TRUE.equals(product.getIs_secure()));
+        bean.setSecure(false);
+        bean.setMedia(List.of(Media.builder().order(0).cdn_url(product.getCdn_url()).build()));
+        bean.setGroup_id(product.getGroup_id());
         return bean;
     }
 
