@@ -8,6 +8,7 @@ import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.BaseException;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.exceptions.DeliveryNotAvailableException;
 import com.sorted.commons.helper.AggregationFilter.SEFilter;
 import com.sorted.commons.helper.AggregationFilter.SEFilterType;
 import com.sorted.commons.helper.AggregationFilter.WhereClause;
@@ -203,7 +204,7 @@ public class ManageAddress_BLService {
         // @formatter:on
         GetQuoteResponse getQuoteResponse = porterUtility.getDeliveryQuote(quoteRequest);
         if (getQuoteResponse == null) {
-            throw new CustomIllegalArgumentsException(ResponseCode.NO_RECORD);
+            throw new DeliveryNotAvailableException();
         }
 
         address.setUser_type(user_type);

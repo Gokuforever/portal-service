@@ -33,6 +33,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -72,7 +73,7 @@ public class ManageCrons_BLService {
 //                WhereClause.lte(BaseMongoEntity.Fields.modification_date, LocalDateTime.now().minusMinutes(5)));
         filterOD.addClause(
                 WhereClause.in(Order_Details.Fields.status_id, Arrays.asList(OrderStatus.READY_FOR_PICK_UP.getId(),
-                        OrderStatus.RIDER_ASSIGNED.getId(), OrderStatus.OUT_FOR_DELIVERY.getId())));
+                        OrderStatus.RIDER_ASSIGNED.getId(), OrderStatus.OUT_FOR_DELIVERY.getId(), OrderStatus.SECURE_RETURN_INITIATED.getId())));
 
         List<Order_Details> listOD = order_Details_Service.repoFind(filterOD);
         if (CollectionUtils.isEmpty(listOD)) {
@@ -118,10 +119,19 @@ public class ManageCrons_BLService {
     }
 
     private void updateOrderStatus(Order_Details details) {
-        FetchOrderRes fetchOrderRes = porterUtility.getOrderStatus(details.getDp_order_id());
-        if (!details.getDp_order_id().equals(fetchOrderRes.getOrder_id())) {
-            internalMailService.sendMailOnError("Order id mismatch from porter.", details.getDp_order_id(), new InvalidParameterException("Order id mismatch from porter."));
-            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+        FetchOrderRes fetchOrderRes;
+        if (StringUtils.hasText(details.getSecure_dp_order_id())) {
+            fetchOrderRes = porterUtility.getOrderStatus(details.getSecure_dp_order_id());
+            if (!details.getSecure_dp_order_id().equals(fetchOrderRes.getOrder_id())) {
+                internalMailService.sendMailOnError("Order id mismatch from porter.", details.getDp_order_id(), new InvalidParameterException("Order id mismatch from porter."));
+                throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+            }
+        } else {
+            fetchOrderRes = porterUtility.getOrderStatus(details.getDp_order_id());
+            if (!details.getDp_order_id().equals(fetchOrderRes.getOrder_id())) {
+                internalMailService.sendMailOnError("Order id mismatch from porter.", details.getDp_order_id(), new InvalidParameterException("Order id mismatch from porter."));
+                throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
+            }
         }
         porterUtility.updateOrderStatus(details, fetchOrderRes);
     }
@@ -210,7 +220,7 @@ public class ManageCrons_BLService {
     }
 
 
-    //    @Scheduled(cron = "0 0 9,12,15,18 * * *")
+    @Scheduled(cron = "0 0 9-18 * * *")
     public void initiatePickUpForSecureReturn() throws JsonProcessingException {
         TimeSlot timeSlot = TimeSlot.getCurrentTimeSlot();
         if (timeSlot == null) return;

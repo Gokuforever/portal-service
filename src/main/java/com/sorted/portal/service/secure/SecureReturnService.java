@@ -10,9 +10,12 @@ import com.sorted.commons.entity.mongo.*;
 import com.sorted.commons.entity.service.*;
 import com.sorted.commons.enums.*;
 import com.sorted.commons.exceptions.CustomIllegalArgumentsException;
+import com.sorted.commons.exceptions.DeliveryNotAvailableException;
 import com.sorted.commons.helper.AggregationFilter;
 import com.sorted.commons.porter.req.beans.CreateOrderBean;
+import com.sorted.commons.porter.req.beans.GetQuoteRequest;
 import com.sorted.commons.porter.res.beans.CreateOrderResBean;
+import com.sorted.commons.porter.res.beans.GetQuoteResponse;
 import com.sorted.commons.utils.CommonUtils;
 import com.sorted.commons.utils.PorterUtility;
 import com.sorted.commons.utils.Preconditions;
@@ -31,6 +34,7 @@ import java.time.LocalDate;
 import java.time.Year;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import static com.sorted.commons.enums.UserType.CUSTOMER;
@@ -47,8 +51,9 @@ public class SecureReturnService {
     private final Seller_Service sellerService;
     private final Address_Service addressService;
     private final PorterUtility porterUtility;
+    private final StoreActivityService storeActivityService;
 
-    @Value("${se.secure.max-return-days:150}")
+    @Value("${se.secure.max-return-days:180}")
     private Integer maxReturnDays;
 
     /**
@@ -67,6 +72,9 @@ public class SecureReturnService {
         Seller seller = validateSellerBusinessHours(order, returnDate);
         Address pickUpAddress = validateAndGetCustomerAddressForSecureReturn(secureBean.getAddressId(), user.getId());
         Address deliveryAddress = validateAndGetSellerAddressForSecureReturn(seller.getAddress_id(), order.getSeller_id());
+        GetQuoteRequest getQuoteRequest = porterUtility.buildGetQuoteRequest(pickUpAddress, deliveryAddress, user.getMobile_no(), user.getFirst_name());
+        GetQuoteResponse deliveryQuote = porterUtility.getDeliveryQuote(getQuoteRequest);
+        Preconditions.check(Objects.nonNull(deliveryQuote), new DeliveryNotAvailableException());
         updateOrderAndItems(order, secureBean, returnDate, user.getId(), pickUpAddress, deliveryAddress);
 
         log.info("Successfully scheduled secure return for order ID: {}", order.getId());
@@ -249,6 +257,12 @@ public class SecureReturnService {
             String reason = String.format("OrderItems: %s, Seller: %s, Users: %s",
                     CollectionUtils.isEmpty(items), seller == null, user == null);
             markFailure(order, items, reason);
+            return;
+        }
+
+        boolean storeOperational = storeActivityService.isStoreOperational(seller.getId());
+        if (!storeOperational) {
+            log.error("Store is not operational. Seller ID: {}", seller.getId());
             return;
         }
 
