@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  portal-service:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/portal-service:latest
+    container_name: portal-service
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SE_ENV=/etc/config
+      # Add other environment variables as needed
+    volumes:
+      - /home/ubuntu/studeaze/config:/etc/config
+    networks:
+      - portal-network
+
+networks:
+  portal-network:
+    driver: bridge 
