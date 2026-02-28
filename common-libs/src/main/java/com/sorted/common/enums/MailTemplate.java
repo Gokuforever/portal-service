@@ -17,6 +17,7 @@ public enum MailTemplate {
 	SELLER_WELCOME_MAIL("welcome_mail.html", "Welcome Aboard! Let’s Grow Together with Studeaze!"),
 	LAUNCHING_MAIL("launch.html", "Your Student Life, Officially Simplified. Studeaze is Here"),
 	AMBASSADOR_WELCOME_MAIL("ambassador_welcome_mail.html", "Welcome to the Studeaze Campus Ambassador Family!"),
+	SECURE_PICKUP_REMINDER("secure_pickup_reminder.html", "Reminder: Your SecuRe Pickup is Scheduled for Tomorrow!"),
 	ERROR("error.html", "Error occurred on website.");
 
 	private final String file_name;

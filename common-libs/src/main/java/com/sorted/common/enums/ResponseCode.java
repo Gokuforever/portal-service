@@ -291,6 +291,8 @@ public enum ResponseCode {
 	PRODUCT_MASTER_NOT_FOUND("SE_0275", "Product master not found.", "Product master not found."),
 	PRODUCT_IN_STOCK("SE_0276", "Product is in stock, please place your order.", "Product is in stock, please place your order."),
 	LOCATION_NOT_FOUND("SE_0277", "Location not found.", "Location not found."),
+	MISSING_RATING_OR_AMOUNT("SE_0278", "Either rating or amount must be provided.", "Please provide either a rating (1-5) or a refund amount."),
+	INVALID_RATING_RANGE("SE_0279", "Rating must be between 1 and 5.", "Rating must be between 1 and 5."),
 	;
 	// @formatter:on
 

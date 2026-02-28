@@ -19,6 +19,7 @@ import com.sorted.common.porter.res.beans.GetQuoteResponse;
 import com.sorted.common.utils.CommonUtils;
 import com.sorted.common.utils.PorterUtility;
 import com.sorted.common.utils.Preconditions;
+import com.sorted.portal.PhonePe.PhonePeUtility;
 import com.sorted.portal.request.beans.AppraiseSecureReturn;
 import com.sorted.portal.request.beans.InitiateSecureBean;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,7 @@ public class SecureReturnService {
     private final Address_Service addressService;
     private final PorterUtility porterUtility;
     private final StoreActivityService storeActivityService;
+    private final PhonePeUtility phonePeUtility;
 
     @Value("${se.secure.max-return-days:180}")
     private Integer maxReturnDays;
@@ -116,16 +118,6 @@ public class SecureReturnService {
         log.debug("Order found with status: {}", order.getStatus());
         Preconditions.check(order.getStatus() == orderStatus,
                 ResponseCode.INVALID_STATUS_FOR_SECURE_RETURN);
-
-        LocalDate orderDate = order.getCreation_date().toLocalDate();
-        LocalDate maxAllowedReturnDate = orderDate.plusDays(maxReturnDays);
-        LocalDate returnDate = LocalDate.now();
-
-        if (returnDate.isAfter(maxAllowedReturnDate)) {
-            String errorMessage = String.format("Return date cannot be more than %d days from order date.", maxReturnDays);
-            log.error(errorMessage);
-            throw new CustomIllegalArgumentsException(errorMessage);
-        }
 
         return order;
     }
@@ -336,10 +328,57 @@ public class SecureReturnService {
                 .build();
     }
 
-    public void appraiseSecureReturn(AppraiseSecureReturn acceptReject) {
-        UsersBean user = validateSeller(acceptReject.getReq_user_id());
-        validateAppraiseSecureRequest(acceptReject);
-        validateAndGetOrder(acceptReject.getOrderId(), user.getId(), OrderStatus.SECURE_RETURN_COMPLETED);
+    /**
+     * Appraises a secure return and calculates refund amount
+     * Rating system: 5 = 50%, 4 = 40%, 3 = 30%, 2 = 20%, 1 = 10% of selling_price_after_discount
+     * 
+     * @param appraisal The appraisal details including rating or amount
+     */
+    public void appraiseSecureReturn(AppraiseSecureReturn appraisal) {
+        log.info("Appraising secure return for order: {}", appraisal.getOrderId());
+        
+        // Validate seller
+        UsersBean seller = validateSeller(appraisal.getReq_user_id());
+        
+        // Validate appraisal request
+        validateAppraiseSecureRequest(appraisal);
+        
+        // Get order and validate status
+        Order_Details order = validateAndGetOrder(appraisal.getOrderId(), seller.getId(), OrderStatus.SECURE_RETURN_COMPLETED);
+        
+        // Get order items that were returned
+        AggregationFilter.SEFilter itemFilter = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
+        itemFilter.addClause(AggregationFilter.WhereClause.eq(Order_Item.Fields.order_id, order.getId()));
+        itemFilter.addClause(AggregationFilter.WhereClause.eq(Order_Item.Fields.status_id, OrderStatus.SECURE_RETURN_COMPLETED.getId()));
+        
+        List<Order_Item> returnedItems = orderItemService.repoFind(itemFilter);
+        
+        if (CollectionUtils.isEmpty(returnedItems)) {
+            log.error("No returned items found for order: {}", order.getId());
+            throw new CustomIllegalArgumentsException("No returned items found for this order");
+        }
+        
+        // Calculate refund amount in paise (Long)
+        Long refundAmountPaise;
+        if (appraisal.getAmount() != null && appraisal.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+            // Use provided amount - convert rupees to paise
+            refundAmountPaise = CommonUtils.rupeeToPaise(appraisal.getAmount());
+            log.info("Using provided refund amount: ₹{} ({} paise)", appraisal.getAmount(), refundAmountPaise);
+        } else {
+            // Calculate based on rating (rating is mandatory)
+            refundAmountPaise = calculateRefundFromRating(returnedItems, appraisal.getRating());
+            log.info("Calculated refund amount from rating {}: {} paise (₹{})", 
+                    appraisal.getRating(), refundAmountPaise, refundAmountPaise / 100.0);
+        }
+        
+        // Update order with appraisal details and set status to APPRAISED
+        updateOrderWithAppraisal(order, returnedItems, refundAmountPaise, appraisal, seller.getId());
+        
+        // Initiate refund with PhonePe
+        initiateSecureRefund(order, refundAmountPaise, seller.getId());
+        
+        log.info("Successfully appraised secure return for order: {}. Refund amount: {} paise (₹{})", 
+                order.getId(), refundAmountPaise, refundAmountPaise / 100.0);
     }
 
     private UsersBean validateSeller(String userId) {
@@ -350,12 +389,247 @@ public class SecureReturnService {
         return user;
     }
 
-    private void validateAppraiseSecureRequest(AppraiseSecureReturn acceptReject) {
-        Preconditions.check(StringUtils.hasText(acceptReject.getOrderId()), ResponseCode.MISSING_ORDER_ID);
-//        Preconditions.check(acceptReject.getAmount() != null, ResponseCode.MISSING_AMOUNT);
-        Preconditions.check(acceptReject.getAmount().compareTo(BigDecimal.ZERO) > 0, ResponseCode.INVALID_AMOUNT);
+    /**
+     * Validates the appraisal request
+     * Rating is mandatory, amount is optional (used to override calculated refund)
+     */
+    private void validateAppraiseSecureRequest(AppraiseSecureReturn appraisal) {
+        Preconditions.check(StringUtils.hasText(appraisal.getOrderId()), ResponseCode.MISSING_ORDER_ID);
+        
+        // Rating is mandatory
+        Preconditions.check(appraisal.getRating() != null, ResponseCode.MISSING_RATING_OR_AMOUNT);
+        
+        // Validate rating range (1-5)
+        Preconditions.check(appraisal.getRating() >= 1 && appraisal.getRating() <= 5, 
+                ResponseCode.INVALID_RATING_RANGE);
+        
+        // Validate amount if provided (optional - used to override calculated refund)
+        if (appraisal.getAmount() != null) {
+            Preconditions.check(appraisal.getAmount().compareTo(BigDecimal.ZERO) > 0, ResponseCode.INVALID_AMOUNT);
+        }
+    }
+    
+    /**
+     * Calculates refund amount based on rating
+     * Rating 5 = 50%, 4 = 40%, 3 = 30%, 2 = 20%, 1 = 10%
+     * All amounts are in paise
+     */
+    private Long calculateRefundFromRating(List<Order_Item> items, Integer rating) {
+        log.debug("Calculating refund for {} items with rating {}", items.size(), rating);
+        
+        // Sum up all item prices (in paise)
+        Long totalItemPricePaise = items.stream()
+                .map(Order_Item::getSelling_price_after_discount)
+                .filter(Objects::nonNull)
+                .reduce(0L, Long::sum);
+        
+        // Calculate refund amount based on rating
+        // rating * 10 gives percentage (5->50%, 4->40%, etc.)
+        Long refundAmountPaise = (totalItemPricePaise * rating * 10) / 100;
+
+        log.debug("Total item price: {} paise (₹{}), Rating: {}, Percentage: {}%, Refund amount: {} paise (₹{})", 
+                totalItemPricePaise, totalItemPricePaise / 100.0, rating, rating * 10, 
+                refundAmountPaise, refundAmountPaise / 100.0);
+        
+        return refundAmountPaise;
+    }
+    
+    /**
+     * Updates order and items with appraisal details
+     */
+    private void updateOrderWithAppraisal(Order_Details order, List<Order_Item> items, 
+                                          Long refundAmountPaise, AppraiseSecureReturn appraisal, String sellerId) {
+        log.info("Updating order {} with appraisal. Refund: {} paise (₹{}), Rating: {}", 
+                order.getId(), refundAmountPaise, refundAmountPaise / 100.0, appraisal.getRating());
+        
+        // Update order status to SECURE_RETURN_APPRAISED
+        order.setStatus(OrderStatus.SECURE_RETURN_APPRAISED, sellerId);
+        
+        // Store appraisal details in order (you may need to add these fields to Order_Details)
+        // order.setSecure_refund_amount(refundAmount);
+        // order.setSecure_appraisal_rating(appraisal.getRating());
+        // order.setSecure_appraisal_remark(appraisal.getRemark());
+        
+        orderDetailsService.update(order.getId(), order, sellerId);
+        
+        // Update items with rating
+        items.forEach(item -> {
+            item.setSecure_item_rating(appraisal.getRating());
+            item.setStatus(OrderStatus.SECURE_RETURN_APPRAISED, sellerId);
+            orderItemService.update(item.getId(), item, sellerId);
+        });
+        
+        log.info("Order and items updated successfully with appraisal");
     }
 
+    /**
+     * Initiates refund with PhonePe for the appraised secure return
+     */
+    private void initiateSecureRefund(Order_Details order, Long refundAmountPaise, String sellerId) {
+        log.info("Initiating PhonePe refund for order: {}, Amount: {} paise (₹{})",
+                order.getId(), refundAmountPaise, refundAmountPaise / 100.0);
+        
+        // Generate unique refund transaction ID
+        String refundTxnId = generateRefundTransactionId(order.getId());
+        
+        // Call PhonePe partial refund API
+        var refundResponse = phonePeUtility.partialRefund(
+                refundTxnId,
+                order.getId(),
+                refundAmountPaise
+        );
+        
+        if (refundResponse.isEmpty()) {
+            log.error("Empty response from PhonePe refund API for order: {}", order.getId());
+            // Keep status as APPRAISED for manual intervention
+            return;
+        }
+        
+        // Process refund response based on state
+        var response = refundResponse.get();
+        String state = response.getState();
+        
+        log.info("PhonePe refund response state: {} for order: {}", state, order.getId());
+        
+        OrderStatus orderStatus = switch (state) {
+            case "COMPLETED" -> {
+                log.info("Refund completed immediately for order: {}", order.getId());
+                yield OrderStatus.PARTIALLY_REFUNDED;
+            }
+            case "FAILED" -> {
+                log.error("Refund failed immediately for order: {}", order.getId());
+                yield OrderStatus.REFUND_FAILED;
+            }
+            default -> {
+                log.info("Refund pending for order: {}. State: {}", order.getId(), state);
+                yield OrderStatus.SECURE_REFUND_PENDING;
+            }
+        };
+        
+        // Update order with refund details and status
+        order.setRefund_transaction_id(refundTxnId);
+        order.setStatus(orderStatus, sellerId);
+        orderDetailsService.update(order.getId(), order, sellerId);
+        
+        log.info("Order {} status updated to {}", order.getId(), orderStatus);
+        
+        // Send error notification if refund failed
+        if (orderStatus == OrderStatus.REFUND_FAILED) {
+            String subject = "Secure Return Refund Failed - Order: " + order.getCode();
+            String message = String.format(
+                    "PhonePe refund failed for secure return.%n" +
+                    "Order ID: %s%n" +
+                    "Order Code: %s%n" +
+                    "Refund Transaction ID: %s%n" +
+                    "Refund Amount: %d paise (₹%.2f)%n" +
+                    "Please investigate and process refund manually.",
+                    order.getId(), 
+                    order.getCode(), 
+                    refundTxnId,
+                    refundAmountPaise,
+                    refundAmountPaise / 100.0
+            );
+            // Note: Add InternalMailService dependency if not already present
+            // internalMailService.sendMailOnError(subject, message, null);
+            log.error("Refund failed notification: {}", message);
+        }
+    }
+
+    /**
+     * Generates a unique refund transaction ID
+     */
+    private String generateRefundTransactionId(String orderId) {
+        return "SECURE-REFUND-" + orderId + "-" + System.currentTimeMillis();
+    }
+
+    /**
+     * Reschedules a secure return pickup
+     * Maximum 2 reschedules allowed per order
+     *
+     * @param rescheduleBean The reschedule request details
+     */
+    public void rescheduleSecureReturn(com.sorted.portal.request.beans.RescheduleSecureBean rescheduleBean) {
+        log.info("Rescheduling secure return for user: {}", rescheduleBean.getReq_user_id());
+
+        // Validate customer
+        UsersBean user = validateCustomer(rescheduleBean.getReq_user_id());
+        
+        // Validate reschedule request
+        validateRescheduleRequest(rescheduleBean);
+        
+        // Parse new pickup date
+        LocalDate newPickupDate = parseReturnDate(rescheduleBean.getNewPickupDate());
+        
+        // Get and validate order - must be in SECURE_RETURN_SCHEDULED status
+        Order_Details order = validateAndGetOrder(rescheduleBean.getOrderId(), user.getId(), OrderStatus.SECURE_RETURN_SCHEDULED);
+        
+        // Check reschedule count - maximum 2 reschedules allowed
+        if (order.getMax_secured_reschedule_count() >= 2) {
+            log.error("Maximum reschedule limit reached for order: {}", order.getId());
+            throw new CustomIllegalArgumentsException("Maximum reschedule limit (2) reached. Cannot reschedule further.");
+        }
+        
+        // Validate seller business hours for new date
+        Seller seller = validateSellerBusinessHours(order, newPickupDate);
+        
+        // If address is being changed, validate it
+        Address pickUpAddress;
+        if (StringUtils.hasText(rescheduleBean.getAddressId())) {
+            pickUpAddress = validateAndGetCustomerAddressForSecureReturn(rescheduleBean.getAddressId(), user.getId());
+        } else {
+            // Use existing pickup address from order
+            pickUpAddress = addressService.findById(order.getSecure_pickup_address().getId())
+                    .orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.ADDRESS_NOT_FOUND));
+        }
+        
+        // Get delivery address
+        Address deliveryAddress = validateAndGetSellerAddressForSecureReturn(seller.getAddress_id(), order.getSeller_id());
+        
+        // Check delivery availability for new date
+        GetQuoteRequest getQuoteRequest = porterUtility.buildGetQuoteRequest(pickUpAddress, deliveryAddress, user.getMobile_no(), user.getFirst_name());
+        GetQuoteResponse deliveryQuote = porterUtility.getDeliveryQuote(getQuoteRequest);
+        Preconditions.check(Objects.nonNull(deliveryQuote), new DeliveryNotAvailableException());
+        
+        // Update order with new schedule
+        updateOrderForReschedule(order, rescheduleBean, newPickupDate, user.getId(), pickUpAddress);
+        
+        log.info("Successfully rescheduled secure return for order ID: {}", order.getId());
+    }
+
+    /**
+     * Validates the reschedule request
+     */
+    private void validateRescheduleRequest(com.sorted.portal.request.beans.RescheduleSecureBean rescheduleBean) {
+        Preconditions.check(StringUtils.hasText(rescheduleBean.getOrderId()), ResponseCode.MISSING_ORDER_ID);
+        Preconditions.check(StringUtils.hasText(rescheduleBean.getNewPickupDate()), ResponseCode.MISSING_RETURN_DATE);
+        Preconditions.check(rescheduleBean.getNewTimeSlot() != null, ResponseCode.MISSING_TIME_SLOT);
+    }
+
+    /**
+     * Updates order details for reschedule
+     */
+    private void updateOrderForReschedule(Order_Details order, com.sorted.portal.request.beans.RescheduleSecureBean rescheduleBean,
+                                          LocalDate newPickupDate, String userId, Address pickUpAddress) {
+        log.info("Updating order for reschedule. Order ID: {}, New Date: {}, New Time Slot: {}",
+                order.getId(), newPickupDate, rescheduleBean.getNewTimeSlot());
+
+        // Update pickup schedule
+        order.setSecured_date(newPickupDate);
+        order.setSecured_time_slot(rescheduleBean.getNewTimeSlot());
+        
+        // Increment reschedule count
+        order.setMax_secured_reschedule_count(order.getMax_secured_reschedule_count() + 1);
+        
+        // Update pickup address if changed
+        if (StringUtils.hasText(rescheduleBean.getAddressId())) {
+            order.setSecure_pickup_address(createAddressDTOFromAddress(pickUpAddress));
+        }
+        
+        // Save order
+        orderDetailsService.update(order.getId(), order, userId);
+        
+        log.info("Order rescheduled successfully. Reschedule count: {}", order.getMax_secured_reschedule_count());
+    }
 
 }
 

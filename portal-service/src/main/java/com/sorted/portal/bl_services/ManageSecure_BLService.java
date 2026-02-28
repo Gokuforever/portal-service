@@ -4,6 +4,7 @@ import com.sorted.common.helper.SERequest;
 import com.sorted.common.utils.CommonUtils;
 import com.sorted.portal.request.beans.AppraiseSecureReturn;
 import com.sorted.portal.request.beans.InitiateSecureBean;
+import com.sorted.portal.request.beans.RescheduleSecureBean;
 import com.sorted.portal.service.secure.SecureReturnService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +64,27 @@ public class ManageSecure_BLService {
         log.info("Completed secure return accept/reject for order ID: {}", appraiseSecureReturn.getOrderId());
     }
 
-
+    /**
+     * Reschedules a secure return pickup
+     * Maximum 2 reschedules allowed per order
+     * 
+     * @param request The HTTP request containing reschedule details
+     * @param httpServletRequest The servlet request for extracting headers
+     */
+    @PostMapping("/secure/reschedule")
+    public void reschedulePickup(@RequestBody RescheduleSecureBean request, HttpServletRequest httpServletRequest) {
+        log.info("Received secure return reschedule request");
+        
+        log.debug("Extracted reschedule request data: orderId={}, newPickupDate={}, newTimeSlot={}",
+                request.getOrderId(), request.getNewPickupDate(), request.getNewTimeSlot());
+        
+        // Extract headers and set them in the reschedule bean
+        CommonUtils.extractHeaders(httpServletRequest, request);
+        
+        // Delegate to service layer for processing
+        secureReturnService.rescheduleSecureReturn(request);
+        
+        log.info("Completed secure return reschedule for order ID: {}", request.getOrderId());
+    }
 
 }

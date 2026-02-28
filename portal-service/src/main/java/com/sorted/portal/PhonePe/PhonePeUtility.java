@@ -156,4 +156,40 @@ public class PhonePeUtility {
             throw new RuntimeException(e);
         }
     }
+
+    /**
+     * Initiate a partial refund for secure returns
+     * 
+     * @param merchantRefundId Unique refund transaction ID
+     * @param originalMerchantOrderId Original order ID
+     * @param refundAmount Amount to refund (in paise)
+     * @return Optional RefundResponse
+     */
+    public Optional<RefundResponse> partialRefund(String merchantRefundId, String originalMerchantOrderId, Long refundAmount) {
+        logger.info("Initiating partial refund - RefundId: {}, OrderId: {}, Amount: {} paise (₹{})",
+                merchantRefundId, originalMerchantOrderId, refundAmount, refundAmount / 100.0);
+        
+        RefundRequest refundRequest = RefundRequest.builder()
+                .merchantRefundId(merchantRefundId)
+                .originalMerchantOrderId(originalMerchantOrderId)
+                .amount(refundAmount)
+                .build();
+
+        try {
+            RefundResponse refundResponse = traceHelper.runWithTrace(
+                    ThirdPartyAPIType.PHONEPE_INITIATE_REFUND, 
+                    refundRequest, 
+                    () -> client.refund(refundRequest)
+            );
+            
+            logger.info("Partial refund initiated successfully - RefundId: {}, OrderId: {}",
+                    merchantRefundId, originalMerchantOrderId);
+            
+            return Optional.ofNullable(refundResponse);
+        } catch (Exception e) {
+            logger.error("Partial refund failed - RefundId: {}, OrderId: {}, Error: {}",
+                    merchantRefundId, originalMerchantOrderId, e.getMessage(), e);
+            return Optional.empty();
+        }
+    }
 }
