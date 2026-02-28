@@ -61,7 +61,15 @@ public class PreferencesHandlerService {
         filter2.addClause(WhereClause.eq(Products.Fields.seller_id, seller.getId()));
         List<Products> products = productService.repoFind(filter2);
 
-        Map<String, Products> productsMapBySeller = products.stream().collect(Collectors.toMap(Products::getProduct_master_id, p -> p));
+        // Check for duplicate product_master_id and create map (keeping first occurrence if duplicates exist)
+        Map<String, Products> productsMapBySeller = products.stream()
+                .collect(Collectors.toMap(
+                        Products::getProduct_master_id,
+                        p -> p,
+                        (existing, replacement) -> {
+                            return existing; // Keep the first occurrence
+                        }
+                ));
         Set<String> productIdsBySeller = productsMapBySeller.keySet();
 
         HomeProductsBean.HomeProductsBeanBuilder homeProductsBeanBuilder = HomeProductsBean.builder();
