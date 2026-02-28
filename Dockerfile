@@ -2,7 +2,7 @@ FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
-COPY target/*.jar app.jar
+COPY portal-service/target/*.jar app.jar
 
 # Add wait-for-it script to handle database dependencies if needed
 # RUN apk add --no-cache bash
