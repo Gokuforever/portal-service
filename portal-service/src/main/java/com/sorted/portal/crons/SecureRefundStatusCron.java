@@ -15,6 +15,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -124,23 +125,35 @@ public class SecureRefundStatusCron {
 
     /**
      * Handle successful refund
+     * Uses SECURE_BUY_REFUNDED status for secure buy orders with partial refunds
      */
     private void handleRefundSuccess(Order_Details order) {
         log.info("Refund completed successfully for order: {}", order.getId());
         
-        order.setStatus(OrderStatus.PARTIALLY_REFUNDED, Defaults.PHONEPE_REFUND_CRON);
+        // Use SECURE_BUY_REFUNDED for secure buy orders to differentiate from regular partial refunds
+        order.setStatus(OrderStatus.SECURE_BUY_REFUNDED, Defaults.PHONEPE_REFUND_CRON);
+        
         orderDetailsService.update(order.getId(), order, Defaults.PHONEPE_REFUND_CRON);
         
-        log.info("Order {} status updated to PARTIALLY_REFUNDED", order.getId());
+        log.info("Order {} status updated to SECURE_BUY_REFUNDED", order.getId());
     }
 
     /**
      * Handle failed refund
+     * Uses SECURE_REFUND_FAILED status for retry mechanism
      */
     private void handleRefundFailure(Order_Details order) {
         log.error("Refund failed for order: {}", order.getId());
         
-        order.setStatus(OrderStatus.REFUND_FAILED, Defaults.PHONEPE_REFUND_CRON);
+        // Update status to SECURE_REFUND_FAILED for retry
+        order.setStatus(OrderStatus.SECURE_REFUND_FAILED, Defaults.PHONEPE_REFUND_CRON);
+        
+        // Track retry count and failure
+        Integer retryCount = order.getRefund_retry_count() != null ? order.getRefund_retry_count() : 0;
+        order.setRefund_retry_count(retryCount);
+        order.setLast_refund_retry_date(LocalDateTime.now());
+        order.setRefund_failure_reason("PhonePe refund failed");
+        
         orderDetailsService.update(order.getId(), order, Defaults.PHONEPE_REFUND_CRON);
         
         // Send error notification email
@@ -150,10 +163,13 @@ public class SecureRefundStatusCron {
                 "Order ID: %s%n" +
                 "Order Code: %s%n" +
                 "Refund Transaction ID: %s%n" +
-                "Please investigate and process refund manually.",
+                "Retry Count: %d%n" +
+                "Status: SECURE_REFUND_FAILED (will be retried by cron)%n" +
+                "Next retry will be attempted automatically.",
                 order.getId(), 
                 order.getCode(), 
-                order.getRefund_transaction_id()
+                order.getRefund_transaction_id(),
+                retryCount
         );
         
         internalMailService.sendMailOnError(subject, message, null);

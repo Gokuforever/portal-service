@@ -363,7 +363,7 @@ public class ManageCrons_BLService {
             OrderReportBean orderReportBean = OrderReportBean.builder()
                     .orderId(orderDetail.getCode())
                     .orderDate(orderDetail.getCreation_date())
-                    .orderAmount(orderDetail.getTotal_items_cost() == null ? BigDecimal.ZERO : CommonUtils.paiseToRupee(orderDetail.getTotal_items_cost() * 90 / 100))
+                    .orderAmount(CommonUtils.paiseToRupee(orderDetail.getTotal_items_cost() * 90 / 100))
                     .orderQuantity(orderItemList.stream().map(Order_Item::getQuantity).reduce(0L, Long::sum).intValue())
                     .orderItems(orderItemReportBeans)
                     .build();

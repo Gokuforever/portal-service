@@ -35,7 +35,19 @@ public class OrderFilterBuilder {
             OrderStatus.READY_FOR_PICK_UP,
             OrderStatus.RIDER_ASSIGNED,
             OrderStatus.OUT_FOR_DELIVERY,
-            OrderStatus.DELIVERED);
+            OrderStatus.DELIVERED,
+            // Secure return and buy statuses
+            OrderStatus.SECURE_RETURN_SCHEDULED,
+            OrderStatus.SECURE_RETURN_INITIATED,
+            OrderStatus.ORDER_CANCELLED_FOR_SECURE_RETURN,
+            OrderStatus.RIDER_ASSIGNED_FOR_SECURE_RETURN,
+            OrderStatus.ITEMS_PICKED_UP_FOR_SECURE_RETURN,
+            OrderStatus.SECURE_RETURN_COMPLETED,
+            OrderStatus.SECURE_RETURN_APPRAISED,
+            OrderStatus.SECURE_REFUND_PENDING,
+            OrderStatus.SECURE_BUY_REFUNDED,
+            OrderStatus.SECURE_REFUND_FAILED,
+            OrderStatus.ITEM_SECURED);
 
     private final int defaultPage;
     private final int defaultSize;
@@ -273,15 +285,31 @@ public class OrderFilterBuilder {
             case "PROCESSING" -> List.of(
                     OrderStatus.READY_FOR_PICK_UP,
                     OrderStatus.RIDER_ASSIGNED,
-                    OrderStatus.OUT_FOR_DELIVERY
+                    OrderStatus.OUT_FOR_DELIVERY,
+                    // Secure return pickup in progress
+                    OrderStatus.SECURE_RETURN_SCHEDULED,
+                    OrderStatus.SECURE_RETURN_INITIATED,
+                    OrderStatus.ORDER_CANCELLED_FOR_SECURE_RETURN,
+                    OrderStatus.RIDER_ASSIGNED_FOR_SECURE_RETURN,
+                    OrderStatus.ITEMS_PICKED_UP_FOR_SECURE_RETURN
             );
-            case "DELIVERED" -> List.of(OrderStatus.DELIVERED);
+            case "DELIVERED" -> List.of(
+                    OrderStatus.DELIVERED,
+                    OrderStatus.ITEM_SECURED  // SecuRe buy items secured
+            );
             case "CANCELLED" -> List.of(
                     OrderStatus.ORDER_REJECTED,
                     OrderStatus.PENDING_REFUND,
                     OrderStatus.REFUND_REQUESTED,
                     OrderStatus.REFUND_FAILED,
-                    OrderStatus.FULLY_REFUNDED
+                    OrderStatus.FULLY_REFUNDED,
+                    // Secure refund statuses
+                    OrderStatus.SECURE_RETURN_COMPLETED,
+                    OrderStatus.SECURE_RETURN_APPRAISED,
+                    OrderStatus.SECURE_REFUND_PENDING,
+                    OrderStatus.SECURE_BUY_REFUNDED,
+                    OrderStatus.SECURE_REFUND_FAILED,
+                    OrderStatus.SECURE_RETURN_FAILED
             );
             default -> {
                 log.warn("Unknown customer status: {}", customerStatus);

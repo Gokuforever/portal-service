@@ -78,6 +78,9 @@ public class Order_Details extends BaseMongoEntity<String> {
     private String secure_return_failure_reason;
     private boolean secure_return_initiated;
     private String coupon_code;
+    private Integer refund_retry_count;
+    private LocalDateTime last_refund_retry_date;
+    private String refund_failure_reason;
 
 
 

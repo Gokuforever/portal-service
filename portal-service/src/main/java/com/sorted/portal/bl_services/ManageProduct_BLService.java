@@ -998,7 +998,7 @@ public class ManageProduct_BLService {
         bean.setCategory_id(category_Master.getId());
         bean.setCategory_name(category_Master.getName());
 //        bean.setSecure(Boolean.TRUE.equals(product.getIs_secure()));
-        bean.setSecure(false);
+        bean.setSecure(product.getIs_secure());
         bean.setMedia(product.getMedia());
         bean.setGroup_id(product.getGroup_id());
         bean.setReviews(reviews(product));
