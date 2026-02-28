@@ -1002,6 +1002,7 @@ public class ManageProduct_BLService {
         bean.setMedia(product.getMedia());
         bean.setGroup_id(product.getGroup_id());
         bean.setReviews(reviews(product));
+        bean.setProduct_master_id(product.getProduct_master_id());
         return bean;
     }
 
