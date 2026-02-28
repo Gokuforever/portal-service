@@ -256,7 +256,7 @@ public class OrderFilterBuilder {
         log.debug("Setting pagination - page: {}, size: {}", page, size);
 
         Pagination pagination = new Pagination(page, size);
-        filterOD.setPagination(pagination);
+//        filterOD.setPagination(pagination);
     }
 
     /**

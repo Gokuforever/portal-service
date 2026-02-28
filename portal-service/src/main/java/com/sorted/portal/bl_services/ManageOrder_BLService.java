@@ -2,6 +2,7 @@ package com.sorted.portal.bl_services;
 
 // Java standard imports
 
+import com.sorted.common.enums.PurchaseType;
 import com.sorted.common.helper.SERequest;
 import com.sorted.common.helper.SEResponse;
 import com.sorted.common.utils.CommonUtils;
@@ -112,6 +113,23 @@ public class ManageOrder_BLService {
     public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("find:: API started for customer order search");
         FindOrderReqBean req = request.getGenericRequestDataObject(FindOrderReqBean.class);
+        req.setPurchase_type(PurchaseType.BUY);
+        return orderSearchService.findOrdersForCustomer(req, httpServletRequest);
+    }
+
+    /**
+     * Searches and retrieves SECURE orders for customers.
+     * Filters orders to only return those with PurchaseType.SECURE items.
+     *
+     * @param request            The search request containing filter criteria
+     * @param httpServletRequest The HTTP servlet request
+     * @return A response containing a list of matching SECURE orders
+     */
+    @PostMapping("/order/store/find/secure")
+    public SEResponse findSecure(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
+        log.info("findSecure:: API started for customer SECURE order search");
+        FindOrderReqBean req = request.getGenericRequestDataObject(FindOrderReqBean.class);
+        req.setPurchase_type(PurchaseType.SECURE);
         return orderSearchService.findOrdersForCustomer(req, httpServletRequest);
     }
 

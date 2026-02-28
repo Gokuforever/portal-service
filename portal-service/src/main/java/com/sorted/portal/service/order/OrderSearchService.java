@@ -76,7 +76,7 @@ public class OrderSearchService {
             log.debug("Found {} orders matching criteria", ordersList.size());
 
             // Fetch related data
-            Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList);
+            Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList, req.getPurchase_type());
 
             // Map to response beans
             List<FindOrderResBean> resList = ordersList.stream()
@@ -126,7 +126,7 @@ public class OrderSearchService {
             log.debug("Found {} orders for customer", ordersList.size());
 
             // Fetch related data
-            Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList);
+            Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList, req.getPurchase_type());
 
             List<String> sellerIds = ordersList.stream().map(Order_Details::getSeller_id).toList();
             AggregationFilter.SEFilter filter = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
@@ -223,10 +223,11 @@ public class OrderSearchService {
     /**
      * Fetch related data for orders
      *
-     * @param ordersList List of orders
+     * @param ordersList   List of orders
+     * @param purchaseType The purchase type
      * @return Map containing related data
      */
-    private Map<String, List<Order_Item>> fetchRelatedData(List<Order_Details> ordersList) {
+    private Map<String, List<Order_Item>> fetchRelatedData(List<Order_Details> ordersList, PurchaseType purchaseType) {
         // Get order IDs
         List<String> orderIds = ordersList.stream()
                 .map(BaseMongoEntity::getId)
@@ -234,6 +235,7 @@ public class OrderSearchService {
 
         // Fetch order items
         SEFilter orderItemsFilter = filterBuilder.buildOrderItemsFilter(orderIds);
+        orderItemsFilter.addClause(AggregationFilter.WhereClause.eq(Order_Item.Fields.type, purchaseType.name()));
         List<Order_Item> orderItems = orderItemService.repoFind(orderItemsFilter);
 
         return responseMapper.groupOrderItemsByOrderId(orderItems);
@@ -310,4 +312,4 @@ public class OrderSearchService {
                 .deliveryCharge(orderDetails.getEstimated_delivery_charges() == null ? BigDecimal.ZERO : CommonUtils.paiseToRupee(orderDetails.getEstimated_delivery_charges()))
                 .build();
     }
-} 
+}
