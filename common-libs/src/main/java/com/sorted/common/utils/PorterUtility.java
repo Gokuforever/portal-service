@@ -106,6 +106,9 @@ public class PorterUtility {
     @Value("${se.enable.sms:false}")
     private boolean enableSms;
 
+    @Value("${porter.mock.enabled:false}")
+    private boolean porterResponseMockEnabled;
+
     public GetQuoteResponse getDeliveryQuote(GetQuoteRequest request) {
         return traceHelper.runWithTrace(ThirdPartyAPIType.PORTER_GET_QUOTE, request, () -> this.getQuote(request));
     }
@@ -153,25 +156,25 @@ public class PorterUtility {
 
 
         ResponseEntity<String> response = null;
-//        if (porterResponseMockEnabled) {
-//            String mockResponse = "{\"request_id\": \"" + order.getRequest_id() + "\", " +
-//                    "\"order_id\": \"CRN" + order.getRequest_id() + "\", " +
-//                    "\"estimated_pickup_time\": 1642473111, " +
-//                    "\"estimated_fare_details\": { " +
-//                    "  \"currency\": \"" + mockCurrency + "\", " +
-//                    "  \"minor_amount\": 35000 }, " +
-//                    "\"tracking_url\": \"https://porter.in/track_live_order?booking_id=CRN" + order.getRequest_id() + "&customer_uuid=0337fe22-0745-4d5c-8514-3003912be89a\"}";
-//            response = new ResponseEntity<>(mockResponse, HttpStatus.OK);
-//        } else {
-        // Make the POST request
-        try {
-            response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
-        } catch (HttpServerErrorException.InternalServerError ex) {
-            log.error("Exception occurred with message: {}", ex.getMessage(), ex);
-            String responseBody = ex.getResponseBodyAsString();
-            extractError(order_Details, delivery_request_attempts, responseBody, HttpStatus.INTERNAL_SERVER_ERROR);
+        if (porterResponseMockEnabled) {
+            String mockResponse = "{\"request_id\": \"" + order.getRequest_id() + "\", " +
+                    "\"order_id\": \"CRN" + order.getRequest_id() + "\", " +
+                    "\"estimated_pickup_time\": 1642473111, " +
+                    "\"estimated_fare_details\": { " +
+                    "  \"currency\": \"" + "INR" + "\", " +
+                    "  \"minor_amount\": 35000 }, " +
+                    "\"tracking_url\": \"https://porter.in/track_live_order?booking_id=CRN" + order.getRequest_id() + "&customer_uuid=0337fe22-0745-4d5c-8514-3003912be89a\"}";
+            response = new ResponseEntity<>(mockResponse, HttpStatus.OK);
+        } else {
+            // Make the POST request
+            try {
+                response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+            } catch (HttpServerErrorException.InternalServerError ex) {
+                log.error("Exception occurred with message: {}", ex.getMessage(), ex);
+                String responseBody = ex.getResponseBodyAsString();
+                extractError(order_Details, delivery_request_attempts, responseBody, HttpStatus.INTERNAL_SERVER_ERROR);
+            }
         }
-//        }
 
         if (response == null) {
             extractError(order_Details, delivery_request_attempts, "No Response", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -243,49 +246,49 @@ public class PorterUtility {
         // Create an HttpEntity with the headers (no body needed)
         HttpEntity<String> requestEntity = new HttpEntity<>(headers);
         ResponseEntity<String> response;
-//        if (porterResponseMockEnabled) {
-//            String mockResponse = "{\n" +
-//                    "    \"order_id\": \"" + porter_order_id + "\",\n" +
-//                    "    \"status\": \"ended\",\n" +
-//                    "    \"partner_info\":\n" +
-//                    "    {\n" +
-//                    "        \"name\": \"Anupam Patel\",\n" +
-//                    "        \"vehicle_number\": \"AK-02-HH-2020\",\n" +
-//                    "        \"vehicle_type\": \"TWO_WHEELER\",\n" +
-//                    "        \"mobile\":\n" +
-//                    "        {\n" +
-//                    "            \"country_code\": \"" + countryCode + "\",\n" +
-//                    "            \"mobile_number\": \"9535321734\"\n" +
-//                    "        },\n" +
-//                    "        \"partner_secondary_mobile\":\n" +
-//                    "        {\n" +
-//                    "            \"country_code\": \"" + countryCode + "\",\n" +
-//                    "            \"mobile_number\": \"9535321734\"\n" +
-//                    "        },\n" +
-//                    "        \"location\": null\n" +
-//                    "    },\n" +
-//                    "    \"order_timings\":\n" +
-//                    "    {\n" +
-//                    "        \"pickup_time\": 1669879581,\n" +
-//                    "        \"order_accepted_time\": 1669877932,\n" +
-//                    "        \"order_started_time\": 1669877997,\n" +
-//                    "        \"order_ended_time\": 1669878042\n" +
-//                    "    },\n" +
-//                    "    \"fare_details\":\n" +
-//                    "    {\n" +
-//                    "        \"estimated_fare_details\": null,\n" +
-//                    "        \"actual_fare_details\":\n" +
-//                    "        {\n" +
-//                    "            \"currency\": \"" + mockCurrency + "\",\n" +
-//                    "            \"minor_amount\": 5500\n" +
-//                    "        }\n" +
-//                    "    }\n" +
-//                    "}";
-//            response = new ResponseEntity<>(mockResponse, HttpStatus.OK);
-//        } else {
-        // Make the GET request
-        response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, String.class);
-//        }
+        if (porterResponseMockEnabled) {
+            String mockResponse = "{\n" +
+                    "    \"order_id\": \"" + porterOrderId + "\",\n" +
+                    "    \"status\": \"ended\",\n" +
+                    "    \"partner_info\":\n" +
+                    "    {\n" +
+                    "        \"name\": \"Anupam Patel\",\n" +
+                    "        \"vehicle_number\": \"AK-02-HH-2020\",\n" +
+                    "        \"vehicle_type\": \"TWO_WHEELER\",\n" +
+                    "        \"mobile\":\n" +
+                    "        {\n" +
+                    "            \"country_code\": \"" + countryCode + "\",\n" +
+                    "            \"mobile_number\": \"9535321734\"\n" +
+                    "        },\n" +
+                    "        \"partner_secondary_mobile\":\n" +
+                    "        {\n" +
+                    "            \"country_code\": \"" + countryCode + "\",\n" +
+                    "            \"mobile_number\": \"9535321734\"\n" +
+                    "        },\n" +
+                    "        \"location\": null\n" +
+                    "    },\n" +
+                    "    \"order_timings\":\n" +
+                    "    {\n" +
+                    "        \"pickup_time\": 1669879581,\n" +
+                    "        \"order_accepted_time\": 1669877932,\n" +
+                    "        \"order_started_time\": 1669877997,\n" +
+                    "        \"order_ended_time\": 1669878042\n" +
+                    "    },\n" +
+                    "    \"fare_details\":\n" +
+                    "    {\n" +
+                    "        \"estimated_fare_details\": null,\n" +
+                    "        \"actual_fare_details\":\n" +
+                    "        {\n" +
+                    "            \"currency\": \"" + "INR" + "\",\n" +
+                    "            \"minor_amount\": 5500\n" +
+                    "        }\n" +
+                    "    }\n" +
+                    "}";
+            response = new ResponseEntity<>(mockResponse, HttpStatus.OK);
+        } else {
+            // Make the GET request
+            response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, String.class);
+        }
         // Print the response
         log.info("Response:: " + response.getBody());
         String body = response.getBody();
@@ -352,19 +355,19 @@ public class PorterUtility {
         ResponseEntity<String> response = null;
         HttpStatus httpStatus;
         String responseBody = null;
-//        if (porterResponseMockEnabled) {
-//            httpStatus = HttpStatus.OK;
-//            responseBody = "{\"vehicles\":[{\"type\":\"Tata 407\",\"eta\":null,\"fare\":{\"currency\":\"INR\",\"minor_amount\":84621},\"capacity\":{\"value\":2500.0,\"unit\":\"kg\"},\"size\":{\"length\":{\"value\":9.0,\"unit\":\"ft\"},\"breadth\":{\"value\":5.5,\"unit\":\"ft\"},\"height\":{\"value\":6.0,\"unit\":\"ft\"}}},{\"type\":\"Ace (Helper + 1 Labour)\",\"eta\":null,\"fare\":{\"currency\":\"INR\",\"minor_amount\":54275},\"capacity\":{\"value\":750.0,\"unit\":\"kg\"},\"size\":{\"length\":{\"value\":7.0,\"unit\":\"ft\"},\"breadth\":{\"value\":4.5,\"unit\":\"ft\"},\"height\":{\"value\":5.5,\"unit\":\"ft\"}}},{\"type\":\"3 Wheeler\",\"eta\":null,\"fare\":{\"currency\":\"INR\",\"minor_amount\":36697},\"capacity\":{\"value\":500.0,\"unit\":\"kg\"},\"size\":{\"length\":{\"value\":6.0,\"unit\":\"ft\"},\"breadth\":{\"value\":5.0,\"unit\":\"ft\"},\"height\":{\"value\":5.0,\"unit\":\"ft\"}}},{\"type\":\"2 Wheeler\",\"eta\":null,\"fare\":{\"currency\":\"INR\",\"minor_amount\":8556},\"capacity\":{\"value\":20.0,\"unit\":\"kg\"},\"size\":{\"length\":{\"value\":9.0,\"unit\":\"ft\"},\"breadth\":{\"value\":5.5,\"unit\":\"ft\"},\"height\":{\"value\":6.0,\"unit\":\"ft\"}}}]}";
-//        } else {
-        try {
-            response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
-            responseBody = response.getBody();
-            httpStatus = HttpStatus.resolve(response.getStatusCode().value());
-        } catch (HttpClientErrorException e) {
-            HttpStatusCode statusCode = e.getStatusCode();
-            httpStatus = HttpStatus.resolve(statusCode.value());
+        if (porterResponseMockEnabled) {
+            httpStatus = HttpStatus.OK;
+            responseBody = "{\"vehicles\":[{\"type\":\"Tata 407\",\"eta\":null,\"fare\":{\"currency\":\"INR\",\"minor_amount\":84621},\"capacity\":{\"value\":2500.0,\"unit\":\"kg\"},\"size\":{\"length\":{\"value\":9.0,\"unit\":\"ft\"},\"breadth\":{\"value\":5.5,\"unit\":\"ft\"},\"height\":{\"value\":6.0,\"unit\":\"ft\"}}},{\"type\":\"Ace (Helper + 1 Labour)\",\"eta\":null,\"fare\":{\"currency\":\"INR\",\"minor_amount\":54275},\"capacity\":{\"value\":750.0,\"unit\":\"kg\"},\"size\":{\"length\":{\"value\":7.0,\"unit\":\"ft\"},\"breadth\":{\"value\":4.5,\"unit\":\"ft\"},\"height\":{\"value\":5.5,\"unit\":\"ft\"}}},{\"type\":\"3 Wheeler\",\"eta\":null,\"fare\":{\"currency\":\"INR\",\"minor_amount\":36697},\"capacity\":{\"value\":500.0,\"unit\":\"kg\"},\"size\":{\"length\":{\"value\":6.0,\"unit\":\"ft\"},\"breadth\":{\"value\":5.0,\"unit\":\"ft\"},\"height\":{\"value\":5.0,\"unit\":\"ft\"}}},{\"type\":\"2 Wheeler\",\"eta\":null,\"fare\":{\"currency\":\"INR\",\"minor_amount\":8556},\"capacity\":{\"value\":20.0,\"unit\":\"kg\"},\"size\":{\"length\":{\"value\":9.0,\"unit\":\"ft\"},\"breadth\":{\"value\":5.5,\"unit\":\"ft\"},\"height\":{\"value\":6.0,\"unit\":\"ft\"}}}]}";
+        } else {
+            try {
+                response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+                responseBody = response.getBody();
+                httpStatus = HttpStatus.resolve(response.getStatusCode().value());
+            } catch (HttpClientErrorException e) {
+                HttpStatusCode statusCode = e.getStatusCode();
+                httpStatus = HttpStatus.resolve(statusCode.value());
+            }
         }
-//        }
 
         if (httpStatus == null) {
             throw new CustomIllegalArgumentsException(porterErrorMessage);
