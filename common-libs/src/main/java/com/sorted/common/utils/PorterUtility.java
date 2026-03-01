@@ -570,42 +570,20 @@ public class PorterUtility {
     // @formatter:on
 
     public void updateOrderStatus(Order_Details details, FetchOrderRes fetchOrderRes) {
-        List<OrderStatus> secureStatuses = List.of(OrderStatus.SECURE_RETURN_INITIATED, OrderStatus.SECURE_RETURN_SCHEDULED, OrderStatus.ITEMS_PICKED_UP_FOR_SECURE_RETURN, OrderStatus.RIDER_ASSIGNED_FOR_SECURE_RETURN);
-        boolean secureReturn = secureStatuses.contains(details.getStatus());
+
         MailTemplate mailTemplate = null;
         OrderStatus currentOrderStatus;
 
-        if (secureReturn) {
-            currentOrderStatus = switch (fetchOrderRes.getStatus()) {
-                case open -> OrderStatus.SECURE_RETURN_INITIATED;
-                case accepted -> OrderStatus.RIDER_ASSIGNED_FOR_SECURE_RETURN;
-                case cancelled -> {
-                    internalMailService.sendMailOnError("Secure pickup cancelled - order id: " + details.getId() + "/" + details.getCode() + ", user id: " + details.getUser_id(), "Secure Pickup Cancelled");
-                    yield OrderStatus.ORDER_CANCELLED_FOR_SECURE_RETURN;
-                }
-                case ended, completed -> OrderStatus.SECURE_RETURN_COMPLETED;
-                case live -> OrderStatus.ITEMS_PICKED_UP_FOR_SECURE_RETURN;
-            };
-        } else {
-            currentOrderStatus = switch (fetchOrderRes.getStatus()) {
-                case open -> OrderStatus.READY_FOR_PICK_UP;
-                case accepted -> OrderStatus.RIDER_ASSIGNED;
-                case cancelled -> {
-                    internalMailService.sendMailOnError("Order Cancelled - order id: " + details.getId() + "/" + details.getCode() + ", user id: " + details.getUser_id(), "Order Cancelled");
-                    yield OrderStatus.ORDER_CANCELLED;
-                }
-                case ended, completed -> OrderStatus.DELIVERED;
-                case live -> OrderStatus.OUT_FOR_DELIVERY;
-            };
-        }
-
-        if (!secureReturn) {
-            mailTemplate = switch (fetchOrderRes.getStatus()) {
-                case accepted -> MailTemplate.ORDER_DISPATCHED;
-                case ended, completed -> MailTemplate.ORDER_ARRIVED;
-                default -> null;
-            };
-        }
+        currentOrderStatus = switch (fetchOrderRes.getStatus()) {
+            case open -> OrderStatus.READY_FOR_PICK_UP;
+            case accepted -> OrderStatus.RIDER_ASSIGNED;
+            case cancelled -> {
+                internalMailService.sendMailOnError("Order Cancelled - order id: " + details.getId() + "/" + details.getCode() + ", user id: " + details.getUser_id(), "Order Cancelled");
+                yield OrderStatus.ORDER_CANCELLED;
+            }
+            case ended, completed -> OrderStatus.DELIVERED;
+            case live -> OrderStatus.OUT_FOR_DELIVERY;
+        };
 
 
         String invoiceUrl = null;
@@ -646,12 +624,8 @@ public class PorterUtility {
             details.setFare_details(fetchOrderRes.getFare_details());
             details.setStatus(currentOrderStatus, Defaults.PORTER_STCHK_CRON);
 
-            if (secureReturn) {
-                List<Order_Item> listOI = getSecureOrderItems(details);
-                order_Details_Service.updateForSecureItems(details.getId(), details, Defaults.PORTER_STCHK_CRON, listOI.stream().map(Order_Item::getId).toList());
-            } else {
-                order_Details_Service.update(details.getId(), details, Defaults.PORTER_STCHK_CRON);
-            }
+
+            order_Details_Service.update(details.getId(), details, Defaults.PORTER_STCHK_CRON);
             if (currentOrderStatus == OrderStatus.DELIVERED) {
                 try {
                     invoiceUrl = generateInvoiceService.generateInvoice(details);

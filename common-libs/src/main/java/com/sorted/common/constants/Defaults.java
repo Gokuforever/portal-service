@@ -18,6 +18,7 @@ public class Defaults {
 	public static final String PORTER_ORDER_UPDATE_WEBHOOK = "Porter Order Update Webhook";
 	public static final String PHONEPE_ORDER_UPDATE_WEBHOOK = "PhonePe Order Update Webhook";
 	public static final String INITIATE_SECURE_RETURN_CRON = "Initiate Secure Return Cron";
+	public static final String TRACK_ORDER_CRON = "Track Order Cron";
 	public static final String REACT_APP = "React App";
 	public static final String AUTH = "Auth";
 	public static final String PHONEPE_REFUND_CRON = "PhonePe Refund Cron";

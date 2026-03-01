@@ -1,6 +1,5 @@
 package com.sorted.portal.crons;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.phonepe.sdk.pg.common.models.response.RefundStatusResponse;
 import com.sorted.common.beans.BusinessHours;
 import com.sorted.common.beans.Spoc_Details;
@@ -24,8 +23,6 @@ import com.sorted.portal.response.beans.OrderItemReportBean;
 import com.sorted.portal.response.beans.OrderReportBean;
 import com.sorted.portal.service.order.OrderStatusCheckService;
 import com.sorted.portal.service.order.OrderTemplateService;
-import com.sorted.portal.service.secure.SecureReturnDataService;
-import com.sorted.portal.service.secure.SecureReturnService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -33,11 +30,9 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.security.InvalidParameterException;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -56,8 +51,6 @@ public class ManageCrons_BLService {
     private final OrderStatusCheckService orderStatusCheckService;
     private final Seller_Service seller_Service;
     private final StoreActivityService storeActivityService;
-    private final SecureReturnDataService secureReturnDataService;
-    private final SecureReturnService secureReturnService;
     private final Users_Service usersService;
     private final EmailSenderImpl emailSenderImpl;
     private final InternalMailService internalMailService;
@@ -73,7 +66,7 @@ public class ManageCrons_BLService {
 //                WhereClause.lte(BaseMongoEntity.Fields.modification_date, LocalDateTime.now().minusMinutes(5)));
         filterOD.addClause(
                 WhereClause.in(Order_Details.Fields.status_id, Arrays.asList(OrderStatus.READY_FOR_PICK_UP.getId(),
-                        OrderStatus.RIDER_ASSIGNED.getId(), OrderStatus.OUT_FOR_DELIVERY.getId(), OrderStatus.SECURE_RETURN_INITIATED.getId())));
+                        OrderStatus.RIDER_ASSIGNED.getId(), OrderStatus.OUT_FOR_DELIVERY.getId())));
 
         List<Order_Details> listOD = order_Details_Service.repoFind(filterOD);
         if (CollectionUtils.isEmpty(listOD)) {
@@ -120,18 +113,11 @@ public class ManageCrons_BLService {
 
     private void updateOrderStatus(Order_Details details) {
         FetchOrderRes fetchOrderRes;
-        if (StringUtils.hasText(details.getSecure_dp_order_id())) {
-            fetchOrderRes = porterUtility.getOrderStatus(details.getSecure_dp_order_id());
-            if (!details.getSecure_dp_order_id().equals(fetchOrderRes.getOrder_id())) {
-                internalMailService.sendMailOnError("Order id mismatch from porter.", details.getDp_order_id(), new InvalidParameterException("Order id mismatch from porter."));
-                throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-            }
-        } else {
-            fetchOrderRes = porterUtility.getOrderStatus(details.getDp_order_id());
-            if (!details.getDp_order_id().equals(fetchOrderRes.getOrder_id())) {
-                internalMailService.sendMailOnError("Order id mismatch from porter.", details.getDp_order_id(), new InvalidParameterException("Order id mismatch from porter."));
-                throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
-            }
+
+        fetchOrderRes = porterUtility.getOrderStatus(details.getDp_order_id());
+        if (!details.getDp_order_id().equals(fetchOrderRes.getOrder_id())) {
+            internalMailService.sendMailOnError("Order id mismatch from porter.", details.getDp_order_id(), new InvalidParameterException("Order id mismatch from porter."));
+            throw new CustomIllegalArgumentsException(ResponseCode.ERR_0001);
         }
         porterUtility.updateOrderStatus(details, fetchOrderRes);
     }
@@ -217,26 +203,6 @@ public class ManageCrons_BLService {
     private WeekDay getCurrentDayInIST() {
         DayOfWeek day = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).getDayOfWeek();
         return WeekDay.values()[day.getValue()];
-    }
-
-
-    @Scheduled(cron = "0 0 9-18 * * *")
-    public void initiatePickUpForSecureReturn() throws JsonProcessingException {
-        TimeSlot timeSlot = TimeSlot.getCurrentTimeSlot();
-        if (timeSlot == null) return;
-
-        List<Order_Details> orderDetailsList = secureReturnDataService.fetchEligibleOrders(timeSlot);
-        if (CollectionUtils.isEmpty(orderDetailsList)) return;
-
-        Map<String, List<Order_Item>> itemsMap = secureReturnDataService.fetchOrderItemsMap(orderDetailsList);
-        Map<String, Seller> sellerMap = secureReturnDataService.fetchSellerMap(orderDetailsList);
-        Map<String, Users> userMap = secureReturnDataService.fetchUserMap(orderDetailsList);
-
-        for (Order_Details order : orderDetailsList) {
-            secureReturnService.process(order, itemsMap.getOrDefault(order.getId(), null),
-                    sellerMap.getOrDefault(order.getSeller_id(), null),
-                    userMap.getOrDefault(order.getUser_id(), null));
-        }
     }
 
     @Scheduled(cron = "0 0 10 * * ?")

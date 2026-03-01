@@ -12,10 +12,10 @@ import java.util.List;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class InitiateSecureBean extends ReqBaseBean {
+    @JsonProperty("secure_return_id")
+    private String secureReturnId;
     @JsonProperty("order_id")
     private String orderId;
-    @JsonProperty("order_item_ids")
-    private List<String> orderItemIds;
     @JsonProperty("return_date")
     private String returnDate;
     @JsonProperty("time_slot")

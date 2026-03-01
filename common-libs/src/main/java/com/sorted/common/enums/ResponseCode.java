@@ -293,6 +293,17 @@ public enum ResponseCode {
 	LOCATION_NOT_FOUND("SE_0277", "Location not found.", "Location not found."),
 	MISSING_RATING_OR_AMOUNT("SE_0278", "Either rating or amount must be provided.", "Please provide either a rating (1-5) or a refund amount."),
 	INVALID_RATING_RANGE("SE_0279", "Rating must be between 1 and 5.", "Rating must be between 1 and 5."),
+	SECURE_RETURN_ALREADY_SCHEDULED("SE_0280", "A secure return is already scheduled.", "A secure return is already scheduled."),
+	MISSING_SECURE_RETURN_ID("SE_0281", "Secure return id is missing.", "Secure return id is missing."),
+	MISSING_SECURE_ITEMS("SE_0282", "Secure items are missing.", "Secure items are missing."),
+	MISSING_ORDER_ITEM_ID("SE_0283", "Order item id is missing.", "Order item id is missing."),
+	MISSING_GRADE("SE_0284", "Grade is missing.", "Grade is missing."),
+	MISSING_GRADE_REMARKS("SE_0285", "Grade remarks is missing.", "Grade remarks is missing."),
+	MISSING_SECURE_ITEM_IMAGES("SE_0286", "Secure item images are missing.", "Secure item images are missing."),
+	INVALID_SECURE_RETURN_ID("SE_0287", "Invalid secure return id.", "Invalid secure return id."),
+	INVALID_SECURE_RETURN_STATUS("SE_0288", "Invalid secure return status.", "Invalid secure return status."),
+	SECURE_RETURN_RESCHEDULE_LIMIT_EXCEEDED("SE_0289", "Secure return reschedule limit exceeded.", "Secure return reschedule limit exceeded."),
+	RETURN_DATE_RANGE_EXCEEDED("SE_0290", "Return date range exceeded.", "Return date range exceeded."),
 	;
 	// @formatter:on
 

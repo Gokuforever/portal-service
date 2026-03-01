@@ -13,9 +13,6 @@ import java.util.Map;
 public enum OrderStatus {
 
     //@formatter:off
-	
-
-	
 	ORDER_PLACED(0, "Order Placed", "Order Placed"),
 	TRANSACTION_PROCESSED(1, "Payment Success", "Payment Success"),
 	ORDER_ACCEPTED(2, "Order Confirmed", "Seller Accepted"),
@@ -33,19 +30,7 @@ public enum OrderStatus {
 	REFUND_REQUESTED(14, "Refund Requested", "Refund Requested"),
 	REFUND_FAILED(15, "Refund Failed", "Refund Failed"),
 	STORE_NOT_OPERATIONAL(16, "Payment Success", "Store not operational"),
-	SECURE_RETURN_SCHEDULED(17, "Return Pickup Scheduled", "SecuRe Return Scheduled"),
-	SECURE_RETURN_INITIATED(18, "Return Pickup Initiated", "SecuRe Return Initiated"),
-    ORDER_CANCELLED_FOR_SECURE_RETURN(19, "Return Pickup Scheduled", "SecuRe Return Scheduled"),
-    RIDER_ASSIGNED_FOR_SECURE_RETURN(20, "Pickup Partner Assigned", "Delivery Partner Assigned"),
-    ITEMS_PICKED_UP_FOR_SECURE_RETURN(21, "Items Picked Up", "Items Picked Up For SecuRe Return"),
-    SECURE_RETURN_COMPLETED(22, "Return Completed", "SecuRe Return Completed"),
-    SECURE_RETURN_FAILED(23, "Return Pickup Failed", "SecuRe Return Failed"),
-    ITEM_SECURED(24, "Items Secured", "Item SecuRe"),
-    DELIVERY_FAILED(25, "Delivery Failed", "Delivery Failed - Reattempt Requested"),
-    SECURE_RETURN_APPRAISED(26, "Return Under Review", "SecuRe Return Appraised"),
-    SECURE_REFUND_PENDING(27, "Refund Processing", "SecuRe Refund Pending"),
-    SECURE_BUY_REFUNDED(28, "Refund Completed", "SecuRe Buy Refunded"),
-    SECURE_REFUND_FAILED(29, "Refund Failed", "SecuRe Refund Failed"),
+    DELIVERY_FAILED(25, "Delivery Failed", "Delivery Failed - Reattempt Requested")
     ;
 	// @formatter:on
 
