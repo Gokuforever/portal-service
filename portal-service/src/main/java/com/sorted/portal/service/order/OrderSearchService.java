@@ -309,7 +309,7 @@ public class OrderSearchService {
                 .invoiceUrl(invoice != null ? invoice.getGeneratedUrl() : null)
                 .orderPlacedAt(orderDetails.getCreation_date_str())
                 .deliveredAt(deliveredAt)
-                .addressId(orderDetails.getDelivery_address().getId())
+                .addressId(orderDetails.getDelivery_address().getAddress_id())
                 .deliveryCharge(orderDetails.getEstimated_delivery_charges() == null ? BigDecimal.ZERO : CommonUtils.paiseToRupee(orderDetails.getEstimated_delivery_charges()))
                 .build();
     }
