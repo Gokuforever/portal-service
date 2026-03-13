@@ -31,6 +31,8 @@ public record FindOneOrderResBean(
         @JsonProperty("order_placed_at")
         String orderPlacedAt,
         @JsonProperty("delivered_at")
-        String deliveredAt
+        String deliveredAt,
+        @JsonProperty("address_id")
+        String addressId
 ) {
 }
