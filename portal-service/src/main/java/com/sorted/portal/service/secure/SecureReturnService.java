@@ -35,9 +35,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.time.Year;
+import java.time.*;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -80,7 +78,19 @@ public class SecureReturnService {
         } else {
             filter.addClause(WhereClause.eq(Secure_Return.Fields.seller_id, usersBean.getId()));
         }
-
+        if (req.getOrder_status() != null) {
+            filter.addClause(WhereClause.eq(Secure_Return.Fields.status, req.getOrder_status()));
+        }
+        if (req.getCode() != null) {
+            filter.addClause(WhereClause.eq(Secure_Return.Fields.order_code, req.getCode()));
+        }
+        if (StringUtils.hasText(req.getFrom_date()) && StringUtils.hasText(req.getTo_date())) {
+            LocalDateTime from = LocalDate.parse(req.getFrom_date()).atTime(LocalTime.MIN);
+            LocalDateTime to = LocalDate.parse(req.getTo_date()).atTime(LocalTime.MAX);
+            log.debug("Applying date range filter from {} to {}", from, to);
+            filter.addClause(WhereClause.gte(BaseMongoEntity.Fields.creation_date, from));
+            filter.addClause(WhereClause.lte(BaseMongoEntity.Fields.creation_date, to));
+        }
         List<Secure_Return> secureReturns = secureReturnService.repoFind(filter);
         if (CollectionUtils.isEmpty(secureReturns)) {
             return Collections.emptyList();
