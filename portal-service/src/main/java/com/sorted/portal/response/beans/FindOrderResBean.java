@@ -25,7 +25,9 @@ public record FindOrderResBean(
         List<OrderItemDTO> orderItems,
         int max_return_days,
         String creation_date_str,
-        String dp_order_id
+        String dp_order_id,
+        @JsonProperty("address_id")
+        String addressId
 ) {
 
 }

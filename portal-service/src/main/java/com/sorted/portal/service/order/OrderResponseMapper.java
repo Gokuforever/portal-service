@@ -100,6 +100,7 @@ public class OrderResponseMapper {
                 .max_return_days(maxReturnDays)
                 .creation_date_str(orderDetails.getCreation_date_str())
                 .dp_order_id(orderDetails.getDp_order_id())
+                .addressId(orderDetails.getDelivery_address().getId())
                 .build();
     }
 
