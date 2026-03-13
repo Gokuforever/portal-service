@@ -264,14 +264,12 @@ public class SecureReturnService {
         List<Order_Item> orderItems = findOrderItems(order.getId());
         log.debug("Found {} order items for return processing", orderItems.size());
 
-        boolean directPurchasedItem = orderItems.stream()
-                .anyMatch(item -> item.getType() == PurchaseType.BUY);
-        Preconditions.check(!directPurchasedItem, ResponseCode.NOT_SECURED_ITEM);
+        List<Order_Item> secureItems = orderItems.stream().filter(item -> item.getType().equals(PurchaseType.SECURE)).toList();
 
-        boolean invalidItemStatus = orderItems.stream()
+        boolean invalidItemStatus = secureItems.stream()
                 .anyMatch(item -> item.getStatus() != OrderStatus.DELIVERED);
         Preconditions.check(!invalidItemStatus, ResponseCode.INVALID_ITEM_STATUS_FOR_SECURE_RETURN);
-        return orderItems;
+        return secureItems;
     }
 
 
