@@ -66,7 +66,7 @@ public class SecureReturnService {
     public List<SecureOrderDetailsBean> findSecureOrders(FindOrderReqBean req, HttpServletRequest httpServletRequest) {
         CommonUtils.extractHeaders(httpServletRequest, req);
         // Validate user permissions
-        UsersBean usersBean = usersService.validateUserForActivity(req.getReq_user_id());
+        UsersBean usersBean = usersService.validateUserForActivity(req.getReq_user_id(), Activity.SECURE_RETURN);
         switch (usersBean.getRole().getUser_type()) {
             case CUSTOMER, SELLER:
                 break;
