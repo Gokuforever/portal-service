@@ -33,6 +33,9 @@ public record FindOneOrderResBean(
         @JsonProperty("delivered_at")
         String deliveredAt,
         @JsonProperty("address_id")
-        String addressId
+        String addressId,
+        @JsonProperty("is_secure_initiated")
+        boolean isSecureInitiated
+
 ) {
 }

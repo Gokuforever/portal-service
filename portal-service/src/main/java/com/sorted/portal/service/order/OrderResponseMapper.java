@@ -1,10 +1,7 @@
 package com.sorted.portal.service.order;
 
 import com.sorted.common.beans.BusinessHours;
-import com.sorted.common.entity.mongo.Order_Details;
-import com.sorted.common.entity.mongo.Order_Item;
-import com.sorted.common.entity.mongo.Products;
-import com.sorted.common.entity.mongo.Seller;
+import com.sorted.common.entity.mongo.*;
 import com.sorted.common.enums.WeekDay;
 import com.sorted.common.utils.ComboUtility;
 import com.sorted.common.utils.CommonUtils;
@@ -75,7 +72,7 @@ public class OrderResponseMapper {
      */
     public FindOrderResBean mapToCustomerResponse(
             Order_Details orderDetails,
-            Map<String, List<Order_Item>> orderItemsMap, Map<String, Seller> mapS) {
+            Map<String, List<Order_Item>> orderItemsMap, Map<String, Seller> mapS, Map<String, List<Secure_Return>> mapSR) {
 
         log.debug("Mapping order details to customer response for order ID: {}", orderDetails.getId());
 
@@ -101,6 +98,7 @@ public class OrderResponseMapper {
                 .creation_date_str(orderDetails.getCreation_date_str())
                 .dp_order_id(orderDetails.getDp_order_id())
                 .addressId(orderDetails.getDelivery_address().getId())
+                .isSecureInitiated(mapSR.containsKey(orderDetails.getId()))
                 .build();
     }
 

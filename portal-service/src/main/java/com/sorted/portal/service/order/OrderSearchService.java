@@ -6,8 +6,9 @@ import com.sorted.common.entity.mongo.*;
 import com.sorted.common.entity.service.*;
 import com.sorted.common.enums.*;
 import com.sorted.common.exceptions.CustomIllegalArgumentsException;
-import com.sorted.common.helper.AggregationFilter;
 import com.sorted.common.helper.AggregationFilter.SEFilter;
+import com.sorted.common.helper.AggregationFilter.SEFilterType;
+import com.sorted.common.helper.AggregationFilter.WhereClause;
 import com.sorted.common.helper.SEResponse;
 import com.sorted.common.utils.CommonUtils;
 import com.sorted.portal.request.beans.FindOrderReqBean;
@@ -23,10 +24,7 @@ import org.springframework.util.CollectionUtils;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +42,7 @@ public class OrderSearchService {
     private final OrderResponseMapper responseMapper;
     private final Seller_Service sellerService;
     private final InvoiceService invoiceService;
+    private final Secure_Return_Service secureReturnService;
 
     /**
      * Search for orders for internal users
@@ -129,16 +128,24 @@ public class OrderSearchService {
             Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList, req.getPurchase_type());
 
             List<String> sellerIds = ordersList.stream().map(Order_Details::getSeller_id).toList();
-            AggregationFilter.SEFilter filter = new AggregationFilter.SEFilter(AggregationFilter.SEFilterType.AND);
-            filter.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-            filter.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.id, sellerIds));
+            SEFilter filter = new SEFilter(SEFilterType.AND);
+            filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.id, sellerIds));
             List<Seller> sellers = sellerService.repoFind(filter);
 
             Map<String, Seller> mapS = sellers.stream().collect(Collectors.toMap(Seller::getId, seller -> seller));
 
+            SEFilter filterSR = new SEFilter(SEFilterType.AND);
+            filterSR.addClause(WhereClause.in(Secure_Return.Fields.order_id, ordersList.stream().map(Order_Details::getId).toList()));
+            List<Secure_Return> secureReturns = secureReturnService.repoFind(filterSR);
+            Map<String, List<Secure_Return>> mapSR = new HashMap<>();
+            if (!CollectionUtils.isEmpty(secureReturns)) {
+                mapSR.putAll(secureReturns.stream().collect(Collectors.groupingBy(Secure_Return::getOrder_id)));
+            }
+
             // Map to response beans
             List<FindOrderResBean> resList = ordersList.stream()
-                    .map(order -> responseMapper.mapToCustomerResponse(order, mapOI, mapS))
+                    .map(order -> responseMapper.mapToCustomerResponse(order, mapOI, mapS, mapSR))
                     .toList();
 
             log.info("Returning {} orders to customer", resList.size());
@@ -235,7 +242,7 @@ public class OrderSearchService {
 
         // Fetch order items
         SEFilter orderItemsFilter = filterBuilder.buildOrderItemsFilter(orderIds);
-        orderItemsFilter.addClause(AggregationFilter.WhereClause.eq(Order_Item.Fields.type, purchaseType.name()));
+        orderItemsFilter.addClause(WhereClause.eq(Order_Item.Fields.type, purchaseType.name()));
         List<Order_Item> orderItems = orderItemService.repoFind(orderItemsFilter);
 
         return responseMapper.groupOrderItemsByOrderId(orderItems);
@@ -279,9 +286,9 @@ public class OrderSearchService {
             orderItemsResBean.add(bean);
         }
 
-        SEFilter filterI = new SEFilter(AggregationFilter.SEFilterType.AND);
-        filterI.addClause(AggregationFilter.WhereClause.eq(Invoice.Fields.orderCode, orderDetails.getCode()));
-        filterI.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        SEFilter filterI = new SEFilter(SEFilterType.AND);
+        filterI.addClause(WhereClause.eq(Invoice.Fields.orderCode, orderDetails.getCode()));
+        filterI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         Invoice invoice = invoiceService.repoFindOne(filterI);
 
@@ -311,6 +318,7 @@ public class OrderSearchService {
                 .deliveredAt(deliveredAt)
                 .addressId(orderDetails.getDelivery_address().getAddress_id())
                 .deliveryCharge(orderDetails.getEstimated_delivery_charges() == null ? BigDecimal.ZERO : CommonUtils.paiseToRupee(orderDetails.getEstimated_delivery_charges()))
+                .isSecureInitiated(secureReturnService.findByOrderId(orderDetails.getId()) != null)
                 .build();
     }
 }

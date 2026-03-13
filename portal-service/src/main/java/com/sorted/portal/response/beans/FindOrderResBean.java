@@ -27,7 +27,9 @@ public record FindOrderResBean(
         String creation_date_str,
         String dp_order_id,
         @JsonProperty("address_id")
-        String addressId
+        String addressId,
+        @JsonProperty("is_secure_initiated")
+        boolean isSecureInitiated
 ) {
 
 }
