@@ -14,6 +14,8 @@ public record SecureOrderDetailsBean(
         String secureReturnId,
         @JsonProperty("order_id")
         String orderId,
+        @JsonProperty("order_code")
+        String orderCode,
         String status,
         @JsonProperty("order_date")
         String orderDate,

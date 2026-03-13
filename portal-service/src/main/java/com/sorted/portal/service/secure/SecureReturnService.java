@@ -105,6 +105,7 @@ public class SecureReturnService {
         return SecureOrderDetailsBean.builder()
                 .secureReturnId(secureReturn.getId())
                 .orderId(secureReturn.getOrder_id())
+                .orderCode(orderMap.get(secureReturn.getOrder_id()).getCode())
                 .status(secureReturn.getStatus().name())
                 .orderDate(orderMap.get(secureReturn.getOrder_id()).getCreation_date_str())
                 .totalSellingPriceAfterDiscount(CommonUtils.paiseToRupee(orderMap.get(secureReturn.getOrder_id()).getTotal_amount()))
