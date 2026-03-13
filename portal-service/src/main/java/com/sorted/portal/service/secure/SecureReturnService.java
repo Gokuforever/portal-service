@@ -266,6 +266,10 @@ public class SecureReturnService {
 
         List<Order_Item> secureItems = orderItems.stream().filter(item -> item.getType().equals(PurchaseType.SECURE)).toList();
 
+        if (CollectionUtils.isEmpty(secureItems)) {
+            throw new CustomIllegalArgumentsException(ResponseCode.NOT_SECURED_ITEM);
+        }
+
         boolean invalidItemStatus = secureItems.stream()
                 .anyMatch(item -> item.getStatus() != OrderStatus.DELIVERED);
         Preconditions.check(!invalidItemStatus, ResponseCode.INVALID_ITEM_STATUS_FOR_SECURE_RETURN);
