@@ -138,7 +138,7 @@ public class SecureReturnService {
         LocalDate returnDate = parseReturnDate(secureBean.getReturnDate());
         Order_Details order = validateAndGetOrder(secureBean.getOrderId(), user.getId(), OrderStatus.DELIVERED);
         LocalDate orderDate = order.getCreation_date().toLocalDate();
-        Preconditions.check(orderDate.plusDays(maxReturnDays + 1).isBefore(returnDate), ResponseCode.RETURN_DATE_RANGE_EXCEEDED);
+        Preconditions.check(orderDate.plusDays(maxReturnDays + 1).isAfter(returnDate), ResponseCode.RETURN_DATE_RANGE_EXCEEDED);
         List<Order_Item> orderItems = validateOrderItems(secureBean, order);
         Seller seller = validateSellerBusinessHours(order.getSeller_id(), returnDate);
         Address pickUpAddress = validateAndGetCustomerAddressForSecureReturn(secureBean.getAddressId(), user.getId());
