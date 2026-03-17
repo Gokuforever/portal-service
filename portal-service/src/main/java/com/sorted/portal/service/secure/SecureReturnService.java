@@ -64,7 +64,7 @@ public class SecureReturnService {
     public List<SecureOrderDetailsBean> findSecureOrders(FindOrderReqBean req, HttpServletRequest httpServletRequest) {
         CommonUtils.extractHeaders(httpServletRequest, req);
         // Validate user permissions
-        UsersBean usersBean = usersService.validateUserForActivity(req.getReq_user_id(), Activity.SECURE_RETURN);
+        UsersBean usersBean = usersService.validateUserForActivity(req.getReq_user_id(), Activity.SECURE_RETURN, Activity.ORDER_MANAGEMENT);
         switch (usersBean.getRole().getUser_type()) {
             case CUSTOMER, SELLER:
                 break;
@@ -76,7 +76,7 @@ public class SecureReturnService {
         if (usersBean.getRole().getUser_type() == CUSTOMER) {
             filter.addClause(WhereClause.eq(Secure_Return.Fields.user_id, usersBean.getId()));
         } else {
-            filter.addClause(WhereClause.eq(Secure_Return.Fields.seller_id, usersBean.getId()));
+            filter.addClause(WhereClause.eq(Secure_Return.Fields.seller_id, usersBean.getSeller().getId()));
         }
         if (req.getOrder_status() != null) {
             filter.addClause(WhereClause.eq(Secure_Return.Fields.status, req.getOrder_status()));
