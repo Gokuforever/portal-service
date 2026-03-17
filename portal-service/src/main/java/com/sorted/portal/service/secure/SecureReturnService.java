@@ -78,10 +78,10 @@ public class SecureReturnService {
         } else {
             filter.addClause(WhereClause.eq(Secure_Return.Fields.seller_id, usersBean.getSeller().getId()));
         }
-        if (req.getOrder_status() != null) {
+        if (StringUtils.hasText(req.getOrder_status())) {
             filter.addClause(WhereClause.eq(Secure_Return.Fields.status, req.getOrder_status()));
         }
-        if (req.getCode() != null) {
+        if (StringUtils.hasText(req.getCode())) {
             filter.addClause(WhereClause.eq(Secure_Return.Fields.order_code, req.getCode()));
         }
         if (StringUtils.hasText(req.getFrom_date()) && StringUtils.hasText(req.getTo_date())) {
