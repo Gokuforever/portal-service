@@ -123,7 +123,7 @@ public class GenerateInvoiceService {
                         .build())
                 .buyer(BuyerInfo.builder()
                         .email(buyer.getEmail_id())
-                        .name(buyer.getFirst_name() + " " + buyer.getLast_name())
+                        .name(StringUtils.isNotNullOrEmpty(buyer.getFirst_name()) ? buyer.getFirst_name() + " " + buyer.getLast_name() : "")
                         .address(orderDetails.getDelivery_address().getFullAddress())
                         .build())
                 .items(invoiceItems)
