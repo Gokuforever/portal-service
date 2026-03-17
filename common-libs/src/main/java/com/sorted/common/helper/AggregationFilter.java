@@ -11,6 +11,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -151,7 +152,7 @@ public class AggregationFilter {
 				// converting value
 				if (pValClass == String.class) {
 					this.value = (String) value;
-				} else if (pValClass == java.time.LocalDateTime.class) {
+				} else if (pValClass == java.time.LocalDateTime.class || pValClass == java.time.LocalDate.class) {
 					this.value = String.valueOf(value);
 				} else if (pValClass == int.class || pValClass == Integer.class || pValClass == long.class
 						|| pValClass == Long.class || pValClass == double.class || pValClass == Double.class
@@ -230,7 +231,7 @@ public class AggregationFilter {
 		private static boolean isValuePrimitive(String invalueClassType) {
 			if (StringUtils.hasLength(invalueClassType)) {
 				List<String> arrPrimitives = Arrays.asList("String", "int", "Integer", "long", "Long", "double",
-						"Double", "boolean", "Boolean", "BigDecimal", "LocalDateTime");
+						"Double", "boolean", "Boolean", "BigDecimal", "LocalDateTime", "LocalDate");
 				return arrPrimitives.contains(invalueClassType);
 			}
 			return false;
@@ -266,6 +267,8 @@ public class AggregationFilter {
 
 					case "LocalDateTime":
 						return LocalDateTime.parse(this.value);
+					case "LocalDate":
+						return LocalDate.parse(this.value);
 					default:
 						return null;
 					}

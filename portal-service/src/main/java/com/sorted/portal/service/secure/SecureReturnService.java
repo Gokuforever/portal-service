@@ -521,6 +521,8 @@ public class SecureReturnService {
             return;
         }
 
+
+
         List<String> sellerIds = secureReturns.stream().map(Secure_Return::getSeller_id).toList();
         List<String> userIds = secureReturns.stream().map(Secure_Return::getUser_id).toList();
 
@@ -555,8 +557,18 @@ public class SecureReturnService {
             return;
         }
 
+        LocalDateTime scheduledDateTime = LocalDateTime.of(
+                secureReturn.getScheduled_pickup_date(),
+                secureReturn.getScheduled_time_slot().getStartTime()
+        );
+        if (scheduledDateTime.isAfter(LocalDateTime.now())) {
+            log.debug("Scheduled time not yet reached. Order: {}, Scheduled: {}", 
+                    secureReturn.getOrder_id(), scheduledDateTime);
+            return;
+        }
+
         CreateOrderBean createOrderRequest = buildCreateOrderRequest(secureReturn, seller, user);
-        CreateOrderResBean response = porterUtility.createOrderForPickup(createOrderRequest);
+        CreateOrderResBean response = porterUtility.createOrderForSecureReturnPickup(createOrderRequest);
 
         secureReturn.setDp_order_id(response.getOrder_id());
         secureReturn.setDp_tracking_url(response.getTracking_url());

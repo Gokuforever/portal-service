@@ -2,6 +2,7 @@ package com.sorted.common.entity.mongo;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.sorted.common.beans.AddressDTO;
+import com.sorted.common.beans.DeliveryRequestAttempts;
 import com.sorted.common.beans.Secure_Return_Item;
 import com.sorted.common.beans.Secure_Status_History;
 import com.sorted.common.enums.RefundStatus;
@@ -62,6 +63,7 @@ public class Secure_Return extends BaseMongoEntity<String> {
     private String dp_tracking_url;
     private Long estimated_delivery_charges;
     private Long actual_delivery_charges;
+    private List<DeliveryRequestAttempts> pickup_request_attempts;
 
     // Items
     private List<Secure_Return_Item> items;

@@ -10,6 +10,7 @@ import com.sorted.common.constants.Defaults;
 import com.sorted.common.entity.mongo.*;
 import com.sorted.common.entity.service.Order_Details_Service;
 import com.sorted.common.entity.service.Order_Item_Service;
+import com.sorted.common.entity.service.Secure_Return_Service;
 import com.sorted.common.entity.service.Users_Service;
 import com.sorted.common.enums.*;
 import com.sorted.common.exceptions.BadRequestException;
@@ -76,6 +77,7 @@ public class PorterUtility {
     private final ThirdPartAPITraceHelper traceHelper;
     private final SmsTraceHelper smsTraceHelper;
     private final SMSService smsService;
+    private final Secure_Return_Service secureReturnService;
     private final RestTemplate restTemplate = new RestTemplate();
 
 
@@ -114,14 +116,18 @@ public class PorterUtility {
     }
 
     public CreateOrderResBean createOrderForPickup(CreateOrderBean order) {
-        return traceHelper.runWithTrace(ThirdPartyAPIType.PORTER_CREATE_ORDER, order, () -> this.createOrder(order));
+        return traceHelper.runWithTrace(ThirdPartyAPIType.PORTER_CREATE_ORDER, order, () -> this.createOrder(order, false));
+    }
+
+    public CreateOrderResBean createOrderForSecureReturnPickup(CreateOrderBean order) {
+        return traceHelper.runWithTrace(ThirdPartyAPIType.PORTER_CREATE_ORDER, order, () -> this.createOrder(order, true));
     }
 
     public FetchOrderRes getOrderStatus(String porterOrderId) {
         return traceHelper.runWithTrace(ThirdPartyAPIType.PORTER_GET_ORDER_STATUS, porterOrderId, () -> this.getOrder(porterOrderId));
     }
 
-    private CreateOrderResBean createOrder(CreateOrderBean order) {
+    private CreateOrderResBean createOrder(CreateOrderBean order, boolean isSecureReturn) {
 
         CreateOrderBean.Address pickup_address = order.getPickup_details().getAddress();
         CreateOrderBean.Address drop_address = order.getDrop_details().getAddress();
@@ -131,16 +137,32 @@ public class PorterUtility {
 //            drop_address.setLat(BigDecimal.valueOf(mockDropLat));
 //            drop_address.setLng(BigDecimal.valueOf(mockDropLng));
 //        }
-        SEFilter filterOD = new SEFilter(SEFilterType.AND);
-        filterOD.addClause(WhereClause.eq(Order_Details.Fields.code, order.getRequest_id()));
-        filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
-        Order_Details order_Details = order_Details_Service.repoFindOne(filterOD);
-        if (order_Details == null) {
-            throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_ORDER_ID);
+        Order_Details order_Details = null;
+        Secure_Return secureReturn = null;
+        List<DeliveryRequestAttempts> delivery_request_attempts;
+
+        if (isSecureReturn) {
+            SEFilter filter = new SEFilter(SEFilterType.AND);
+            filter.addClause(WhereClause.eq(Secure_Return.Fields.secure_order_code, order.getRequest_id()));
+            filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+            secureReturn = secureReturnService.repoFindOne(filter);
+            if (secureReturn == null) {
+                throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_ORDER_ID);
+            }
+            delivery_request_attempts = CollectionUtils.isEmpty(secureReturn.getPickup_request_attempts()) ? new ArrayList<>() : secureReturn.getPickup_request_attempts();
+        } else {
+            SEFilter filterOD = new SEFilter(SEFilterType.AND);
+            filterOD.addClause(WhereClause.eq(Order_Details.Fields.code, order.getRequest_id()));
+            filterOD.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+            order_Details = order_Details_Service.repoFindOne(filterOD);
+            if (order_Details == null) {
+                throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_ORDER_ID);
+            }
+            delivery_request_attempts = CollectionUtils.isEmpty(order_Details.getDelivery_request_attempts()) ? new ArrayList<>() : order_Details.getDelivery_request_attempts();
         }
-
-        List<DeliveryRequestAttempts> delivery_request_attempts = CollectionUtils.isEmpty(order_Details.getDelivery_request_attempts()) ? new ArrayList<>() : order_Details.getDelivery_request_attempts();
 
         String url = porterBaseUrl + porterCreateOrderEndpoint;
 
@@ -172,14 +194,15 @@ public class PorterUtility {
             } catch (HttpServerErrorException.InternalServerError ex) {
                 log.error("Exception occurred with message: {}", ex.getMessage(), ex);
                 String responseBody = ex.getResponseBodyAsString();
-                extractError(order_Details, delivery_request_attempts, responseBody, HttpStatus.INTERNAL_SERVER_ERROR);
+                if (isSecureReturn) {
+                    extractSecureReturnError(secureReturn, delivery_request_attempts, responseBody, HttpStatus.INTERNAL_SERVER_ERROR);
+                } else {
+                    extractError(order_Details, delivery_request_attempts, responseBody, HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+                throw new CustomIllegalArgumentsException(porterErrorMessage);
             }
         }
 
-        if (response == null) {
-            extractError(order_Details, delivery_request_attempts, "No Response", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-        assert response != null;
         HttpStatus httpStatus = HttpStatus.resolve(response.getStatusCode().value());
 
         if (httpStatus == null) {
@@ -189,7 +212,12 @@ public class PorterUtility {
             case CREATED, OK:
                 break;
             default:
-                extractError(order_Details, delivery_request_attempts, response.getBody(), httpStatus);
+                if (isSecureReturn) {
+                    extractSecureReturnError(secureReturn, delivery_request_attempts, response.getBody(), httpStatus);
+                } else {
+                    extractError(order_Details, delivery_request_attempts, response.getBody(), httpStatus);
+                }
+                throw new CustomIllegalArgumentsException(porterErrorMessage);
         }
 
         JsonNode root;
@@ -230,7 +258,17 @@ public class PorterUtility {
         delivery_request_attempts.add(DeliveryRequestAttempts.builder().count(delivery_request_attempts.size() + 1).message(message).type(type).response_code(httpStatus.value()).build());
         order_Details.setDelivery_request_attempts(delivery_request_attempts);
         order_Details_Service.update(order_Details.getId(), order_Details, "porter");
-        throw new CustomIllegalArgumentsException(porterErrorMessage);
+    }
+
+    private void extractSecureReturnError(Secure_Return secureReturn, List<DeliveryRequestAttempts> pickup_request_attempts, String response, HttpStatus httpStatus) {
+        Gson gson = GsonUtils.getGson();
+        JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+        String type = jsonResponse.has("type") ? jsonResponse.get("type").getAsString() : null;
+        String message = jsonResponse.has("message") ? jsonResponse.get("message").getAsString() : null;
+
+        pickup_request_attempts.add(DeliveryRequestAttempts.builder().count(pickup_request_attempts.size() + 1).message(message).type(type).response_code(httpStatus.value()).build());
+        secureReturn.setPickup_request_attempts(pickup_request_attempts);
+        secureReturnService.update(secureReturn.getId(), secureReturn, "porter");
     }
 
     private FetchOrderRes getOrder(String porterOrderId) {

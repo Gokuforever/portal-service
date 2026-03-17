@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -54,13 +55,10 @@ public class Secure_Return_Service extends GenericEntityServiceImpl<String, Secu
 
     public List<Secure_Return> fetchScheduledSecureReturns() {
 
-        TimeSlot timeSlot = TimeSlot.getCurrentTimeSlot();
-        if (timeSlot == null) return null;
-
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(Secure_Return.Fields.status_id, SecureReturnStatus.SCHEDULED.getId()));
-        filter.addClause(WhereClause.eq(Secure_Return.Fields.scheduled_pickup_date, LocalDate.now()));
-        filter.addClause(WhereClause.eq(Secure_Return.Fields.scheduled_time_slot, timeSlot.name()));
+        filter.addClause(WhereClause.lte(Secure_Return.Fields.scheduled_pickup_date, LocalDateTime.now()));
+//        filter.addClause(WhereClause.eq(Secure_Return.Fields.scheduled_time_slot, timeSlot.name()));
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         return this.repoFind(filter);
     }

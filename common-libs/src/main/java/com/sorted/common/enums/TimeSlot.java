@@ -45,4 +45,9 @@ public enum TimeSlot {
 
         return null;
     }
+
+    public LocalTime getStartTime() {
+        String[] parts = this.timeRange.split("-");
+        return LocalTime.parse(parts[0], DateTimeFormatter.ofPattern("HH:mm"));
+    }
 }
