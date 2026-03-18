@@ -242,7 +242,9 @@ public class OrderSearchService {
 
         // Fetch order items
         SEFilter orderItemsFilter = filterBuilder.buildOrderItemsFilter(orderIds);
-        orderItemsFilter.addClause(WhereClause.eq(Order_Item.Fields.type, purchaseType.name()));
+        if (purchaseType != null) {
+            orderItemsFilter.addClause(WhereClause.eq(Order_Item.Fields.type, purchaseType.name()));
+        }
         List<Order_Item> orderItems = orderItemService.repoFind(orderItemsFilter);
 
         return responseMapper.groupOrderItemsByOrderId(orderItems);
