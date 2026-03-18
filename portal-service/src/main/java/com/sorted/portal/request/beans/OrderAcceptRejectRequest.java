@@ -14,7 +14,7 @@ import java.util.List;
 public class OrderAcceptRejectRequest extends ReqBaseBean {
     @JsonProperty("order_id")
     private String orderId;
-    @JsonProperty("accepted_item_ids")
+    @JsonProperty("accepted_items")
     private List<String> acceptedItemIds;
     @JsonProperty("rejection_reason")
     private String rejectionReason;
