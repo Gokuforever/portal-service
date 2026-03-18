@@ -31,6 +31,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDate;
 import java.time.Year;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -116,7 +117,10 @@ public class OrderProcessingService {
         Order_Details orderDetails = validationService.validateOrderForAcceptReject(
                 usersBean.getSeller().getId(), req.getOrderId());
 
-        if (req.isAccepted()) {
+        // Check for partial accept scenario
+        if (req.isPartialAccept()) {
+            return processPartialAccept(orderDetails, req, usersBean.getId());
+        } else if (req.isAccepted()) {
             return processOrderAccept(orderDetails, usersBean.getId());
         } else {
             return processOrderReject(orderDetails, req.getRemark(), usersBean.getId());
@@ -152,7 +156,7 @@ public class OrderProcessingService {
         log.info("Processing order rejection for order ID: {}", orderDetails.getId());
 
         orderDetails.setStatus(OrderStatus.ORDER_REJECTED, userId);
-        orderDetails.setRejection_remarks(remarks);
+        orderDetails.setRejection_reason(remarks);
         orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
 
         // TODO: mark products out of stock
@@ -252,4 +256,167 @@ public class OrderProcessingService {
         // Save order details
         orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
     }
-} 
+
+    /**
+     * Process partial order acceptance - accept some items, reject others and initiate refund
+     *
+     * @param orderDetails Order details
+     * @param req          Request with accepted item IDs (non-accepted items are rejected)
+     * @param userId       User ID
+     * @return SEResponse indicating success
+     */
+    private SEResponse processPartialAccept(Order_Details orderDetails, OrderAcceptRejectRequest req, String userId) {
+        log.info("Processing partial order acceptance for order ID: {}", orderDetails.getId());
+
+        // Get all order items
+        SEFilter filterOI = new SEFilter(SEFilterType.AND);
+        filterOI.addClause(WhereClause.eq(Order_Item.Fields.order_id, orderDetails.getId()));
+        filterOI.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        List<Order_Item> orderItems = orderItemService.repoFind(filterOI);
+
+        if (CollectionUtils.isEmpty(orderItems)) {
+            throw new CustomIllegalArgumentsException("No order items found");
+        }
+
+        // Validate that all accepted item IDs belong to this order
+        List<String> allOrderItemIds = orderItems.stream().map(Order_Item::getId).toList();
+        validateItemIds(req.getAcceptedItemIds(), allOrderItemIds);
+
+        // Process items - accepted items get ORDER_ACCEPTED, others get ITEM_REJECTED
+        long refundAmount = 0L;
+        List<Order_Item> rejectedItems = new ArrayList<>();
+        List<Order_Item> acceptedItems = new ArrayList<>();
+
+        for (Order_Item item : orderItems) {
+            if (req.getAcceptedItemIds().contains(item.getId())) {
+                item.setStatus(OrderStatus.ORDER_ACCEPTED, userId);
+                orderItemService.update(item.getId(), item, userId);
+                acceptedItems.add(item);
+            } else {
+                // Items not in accepted list are automatically rejected
+                item.setStatus(OrderStatus.ITEM_REJECTED, userId);
+                orderItemService.update(item.getId(), item, userId);
+                refundAmount += item.getTotal_cost() != null ? item.getTotal_cost() : 0L;
+                rejectedItems.add(item);
+            }
+        }
+
+        // Update order status to PARTIALLY_ACCEPTED
+        orderDetails.setStatus(OrderStatus.PARTIALLY_ACCEPTED, userId);
+        orderDetails.setRejection_reason(req.getRejectionReason());
+        orderDetails.setPartial_refund_amount(refundAmount);
+        orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
+
+        // Mark rejected products as out of stock
+        markRejectedProductsOutOfStock(rejectedItems, userId);
+
+        // Initiate refund for rejected items
+        if (refundAmount > 0) {
+            initiatePartialRefund(orderDetails, refundAmount, userId);
+        }
+
+        log.info("Partial order acceptance completed. Accepted: {}, Rejected: {}, Refund amount: {}",
+                acceptedItems.size(), rejectedItems.size(), refundAmount);
+
+        return SEResponse.getEmptySuccessResponse(ResponseCode.SUCCESSFUL);
+    }
+
+    /**
+     * Validate that all item IDs in the list belong to the order
+     */
+    private void validateItemIds(List<String> itemIds, List<String> allOrderItemIds) {
+        if (itemIds == null) return;
+        for (String itemId : itemIds) {
+            if (!allOrderItemIds.contains(itemId)) {
+                throw new CustomIllegalArgumentsException("Invalid item ID: " + itemId);
+            }
+        }
+    }
+
+    /**
+     * Mark products of rejected items as out of stock
+     */
+    private void markRejectedProductsOutOfStock(List<Order_Item> rejectedItems, String userId) {
+        if (CollectionUtils.isEmpty(rejectedItems)) return;
+
+        List<String> productIds = rejectedItems.stream()
+                .map(Order_Item::getProduct_id)
+                .distinct()
+                .toList();
+
+        SEFilter filterP = new SEFilter(SEFilterType.AND);
+        filterP.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productIds));
+        filterP.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        List<Products> products = productService.repoFind(filterP);
+
+        if (!CollectionUtils.isEmpty(products)) {
+            products.forEach(product -> product.setQuantity(0L));
+            for (Products product : products) {
+                productService.update(product.getId(), product, "On Partial Reject");
+            }
+        }
+    }
+
+    /**
+     * Initiate refund for partial rejection
+     */
+    private void initiatePartialRefund(Order_Details orderDetails, long refundAmount, String userId) {
+        log.info("Initiating partial refund of {} for order ID: {}", refundAmount, orderDetails.getId());
+
+        long nanoseconds = CommonUtils.getNanoseconds();
+        String refundTxnId = "PREF" +
+                LocalDate.now().getMonth() +
+                Year.now() +
+                nanoseconds;
+
+        orderDetails.setPartial_refund_transaction_id(refundTxnId);
+        orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
+
+        // Process refund via PhonePe
+        Optional<RefundResponse> refundResponse = phonePeUtility.refund(
+                refundTxnId, orderDetails.getId(), refundAmount);
+
+        if (refundResponse.isEmpty()) {
+            log.warn("Partial refund initiation returned empty response for order: {}", orderDetails.getId());
+            updateRejectedItemsRefundStatus(orderDetails.getId(), OrderStatus.ITEM_REFUND_INITIATED, userId);
+            return;
+        }
+
+        RefundResponse response = refundResponse.get();
+        String state = response.getState();
+
+        OrderStatus itemRefundStatus = switch (state) {
+            case "COMPLETED" -> OrderStatus.FULLY_REFUNDED;
+            case "FAILED" -> OrderStatus.REFUND_FAILED;
+            default -> OrderStatus.ITEM_REFUND_INITIATED;
+        };
+
+        // Update rejected items with refund status
+        updateRejectedItemsRefundStatus(orderDetails.getId(), itemRefundStatus, userId);
+
+        if (itemRefundStatus == OrderStatus.REFUND_FAILED) {
+            internalMailService.sendMailOnError(
+                    "Partial refund failed for order ID: " + orderDetails.getId(),
+                    "Partial refund of " + refundAmount + " failed for order ID: " + orderDetails.getId(),
+                    null);
+        }
+
+        log.info("Partial refund status: {} for order ID: {}", state, orderDetails.getId());
+    }
+
+    /**
+     * Update refund status for rejected items
+     */
+    private void updateRejectedItemsRefundStatus(String orderId, OrderStatus status, String userId) {
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(Order_Item.Fields.order_id, orderId));
+        filter.addClause(WhereClause.eq(Order_Item.Fields.status, OrderStatus.ITEM_REJECTED));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<Order_Item> rejectedItems = orderItemService.repoFind(filter);
+        for (Order_Item item : rejectedItems) {
+            item.setStatus(status, userId);
+            orderItemService.update(item.getId(), item, userId);
+        }
+    }
+}

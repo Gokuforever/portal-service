@@ -6,12 +6,22 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
 public class OrderAcceptRejectRequest extends ReqBaseBean {
     @JsonProperty("order_id")
     private String orderId;
+    @JsonProperty("accepted_item_ids")
+    private List<String> acceptedItemIds;
+    @JsonProperty("rejection_reason")
+    private String rejectionReason;
     private boolean accepted;
     private String remark;
+
+    public boolean isPartialAccept() {
+        return acceptedItemIds != null && !acceptedItemIds.isEmpty();
+    }
 }

@@ -30,6 +30,9 @@ public enum OrderStatus {
 	REFUND_REQUESTED(14, "Refund Requested", "Refund Requested"),
 	REFUND_FAILED(15, "Refund Failed", "Refund Failed"),
 	STORE_NOT_OPERATIONAL(16, "Payment Success", "Store not operational"),
+    PARTIALLY_ACCEPTED(17, "Order Partially Accepted", "Partial Accept - Some Items Rejected"),
+    ITEM_REJECTED(18, "Item Rejected", "Item Rejected by Seller"),
+    ITEM_REFUND_INITIATED(19, "Item Refund Initiated", "Refund Initiated for Rejected Item"),
     DELIVERY_FAILED(25, "Delivery Failed", "Delivery Failed - Reattempt Requested")
     ;
 	// @formatter:on

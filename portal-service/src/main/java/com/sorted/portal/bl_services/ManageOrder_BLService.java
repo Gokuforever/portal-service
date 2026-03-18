@@ -98,7 +98,6 @@ public class ManageOrder_BLService {
     public SEResponse internalFind(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("internalFind:: API started for order search");
         FindOrderReqBean req = request.getGenericRequestDataObject(FindOrderReqBean.class);
-        req.setPurchase_type(PurchaseType.BUY);
         return orderSearchService.findOrdersInternal(req, httpServletRequest);
     }
 

@@ -66,7 +66,7 @@ public class Order_Details extends BaseMongoEntity<String> {
     @Version
     private Long version;
     private SettlementDetails settlement_details;
-    private String rejection_remarks;
+    private String rejection_reason;
     private String refund_transaction_id;
     private TimeSlot secured_time_slot;
     private LocalDate secured_date;
@@ -81,6 +81,8 @@ public class Order_Details extends BaseMongoEntity<String> {
     private Integer refund_retry_count;
     private LocalDateTime last_refund_retry_date;
     private String refund_failure_reason;
+    private Long partial_refund_amount;
+    private String partial_refund_transaction_id;
 
 
 
