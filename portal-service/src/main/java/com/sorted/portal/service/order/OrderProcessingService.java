@@ -156,7 +156,7 @@ public class OrderProcessingService {
         log.info("Processing order rejection for order ID: {}", orderDetails.getId());
 
         orderDetails.setStatus(OrderStatus.ORDER_REJECTED, userId);
-        orderDetails.setRejection_reason(remarks);
+        orderDetails.setRejection_remarks(remarks);
         orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
 
         // TODO: mark products out of stock
@@ -303,7 +303,7 @@ public class OrderProcessingService {
 
         // Update order status to PARTIALLY_ACCEPTED
         orderDetails.setStatus(OrderStatus.PARTIALLY_ACCEPTED, userId);
-        orderDetails.setRejection_reason(req.getRejectionReason());
+        orderDetails.setRejection_remarks(req.getRejectionReason());
         orderDetails.setPartial_refund_amount(refundAmount);
         orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
 
