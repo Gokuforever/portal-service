@@ -1078,7 +1078,7 @@ public class ManageProduct_BLService {
             throw new CustomIllegalArgumentsException(ResponseCode.MANDATE_PRODUCT_MASTER_ID);
         }
         Optional<Product_Master> optionalProductMaster = productMasterService.findById(req.getProduct_master_id());
-        if (optionalProductMaster.isEmpty()) {
+        if (!isEdit && optionalProductMaster.isEmpty()) {
             throw new CustomIllegalArgumentsException(ResponseCode.PRODUCT_MASTER_NOT_FOUND);
         }
         if (!StringUtils.hasText(req.getCategory_id())) {
@@ -1124,7 +1124,7 @@ public class ManageProduct_BLService {
         filterDup.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
         long count = productService.countByFilter(filterDup);
-        if (count > 0) {
+        if (!isEdit && count > 0) {
             String name = req.getName();
             throw new CustomIllegalArgumentsException(name + " : Product already exist in your store");
         }
