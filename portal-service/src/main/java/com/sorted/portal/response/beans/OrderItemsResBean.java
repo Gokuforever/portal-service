@@ -1,6 +1,7 @@
 package com.sorted.portal.response.beans;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.sorted.common.enums.OrderStatus;
 import lombok.Builder;
 
 import java.math.BigDecimal;
@@ -21,6 +22,7 @@ public record OrderItemsResBean(
         BigDecimal totalCost,
         @JsonProperty("selling_price")
         BigDecimal sellingPrice,
-        boolean secure
+        boolean secure,
+        OrderStatus status
 ) {
 }

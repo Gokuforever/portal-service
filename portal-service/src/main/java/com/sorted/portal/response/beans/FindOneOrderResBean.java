@@ -35,7 +35,13 @@ public record FindOneOrderResBean(
         @JsonProperty("address_id")
         String addressId,
         @JsonProperty("is_secure_initiated")
-        boolean isSecureInitiated
+        boolean isSecureInitiated,
+        @JsonProperty("partial_refund_amount")
+        BigDecimal partialRefundAmount,
+        @JsonProperty("partial_refund_txn_id")
+        String partialRefundTxnId,
+        @JsonProperty("partial_refund_status")
+        String partialRefundStatus
 
 ) {
 }

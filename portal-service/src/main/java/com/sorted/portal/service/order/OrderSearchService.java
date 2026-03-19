@@ -284,6 +284,7 @@ public class OrderSearchService {
                     .sellingPrice(orderItem.getSelling_price() == null ? BigDecimal.ZERO : CommonUtils.paiseToRupee(orderItem.getSelling_price()))
                     .quantity(orderItem.getQuantity())
                     .secure(orderItem.getType().equals(PurchaseType.SECURE))
+                    .status(orderItem.getStatus())
                     .build();
             orderItemsResBean.add(bean);
         }
@@ -321,6 +322,9 @@ public class OrderSearchService {
                 .addressId(orderDetails.getDelivery_address().getAddress_id())
                 .deliveryCharge(orderDetails.getEstimated_delivery_charges() == null ? BigDecimal.ZERO : CommonUtils.paiseToRupee(orderDetails.getEstimated_delivery_charges()))
                 .isSecureInitiated(secureReturnService.findByOrderId(orderDetails.getId()) != null)
+                .partialRefundAmount(CommonUtils.paiseToRupee(orderDetails.getPartial_refund_amount()))
+                .partialRefundStatus(orderDetails.getStatus().getInternal_status())
+                .partialRefundTxnId(orderDetails.getPartial_refund_transaction_id())
                 .build();
     }
 }

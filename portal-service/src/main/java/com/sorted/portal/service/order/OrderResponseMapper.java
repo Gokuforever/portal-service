@@ -102,6 +102,9 @@ public class OrderResponseMapper {
                 .dp_order_id(orderDetails.getDp_order_id())
                 .addressId(orderDetails.getDelivery_address().getId())
                 .isSecureInitiated(mapSR.containsKey(orderDetails.getId()))
+                .partialRefundAmount(CommonUtils.paiseToRupee(orderDetails.getPartial_refund_amount()))
+                .partialRefundStatus(orderDetails.getStatus().getInternal_status())
+                .partialRefundTxnId(orderDetails.getPartial_refund_transaction_id())
                 .build();
     }
 
