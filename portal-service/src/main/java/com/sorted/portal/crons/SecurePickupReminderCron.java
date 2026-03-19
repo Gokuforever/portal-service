@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * within 180 days of purchase. This cron job identifies delivered orders with
  * secure items and sends reminder emails to customers who haven't initiated a return yet.
  */
-@Component
+//@Component
 @Slf4j
 @RequiredArgsConstructor
 public class SecurePickupReminderCron {

@@ -31,6 +31,7 @@ public class OrderFilterBuilder {
     private static final List<OrderStatus> SELLER_ALLOWED_STATUS = List.of(
             OrderStatus.TRANSACTION_PROCESSED,
             OrderStatus.STORE_NOT_OPERATIONAL,
+            OrderStatus.PARTIALLY_ACCEPTED,
             OrderStatus.ORDER_ACCEPTED,
             OrderStatus.READY_FOR_PICK_UP,
             OrderStatus.RIDER_ASSIGNED,
