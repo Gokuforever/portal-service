@@ -39,7 +39,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Component
+//@Component
 @Slf4j
 @RequiredArgsConstructor
 public class ManageCrons_BLService {
@@ -84,7 +84,7 @@ public class ManageCrons_BLService {
 
     }
 
-    @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
+    // @Scheduled(fixedRate = 60000) // Executes every 5000ms (5 seconds)
     public void porterStatusCheckForCancelledOrders() {
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
         filterOD.addClause(WhereClause.notEq(Order_Details.Fields.dp_order_id, null));
@@ -122,7 +122,7 @@ public class ManageCrons_BLService {
         porterUtility.updateOrderStatus(details, fetchOrderRes);
     }
 
-    @Scheduled(fixedRate = 60000) // Executes every 60000ms (1 minute)
+    // @Scheduled(fixedRate = 60000) // Executes every 60000ms (1 minute)
     public void phonePeStatusCheckForPendingTransactions() {
         log.info("PhonePe Status Check For Pending Transactions");
         SEFilter filterOD = new SEFilter(SEFilterType.AND);
@@ -141,7 +141,7 @@ public class ManageCrons_BLService {
     }
 
     /* <<<<<<<<<<<<<<  ✨ Windsurf Command 🌟 >>>>>>>>>>>>>>>> */
-//    @Scheduled(cron = "0 */15 * * * *")
+//    // @Scheduled(cron = "0 */15 * * * *")
     public void evaluateStoreOpenClose() {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -205,7 +205,7 @@ public class ManageCrons_BLService {
         return WeekDay.values()[day.getValue()];
     }
 
-    @Scheduled(cron = "0 0 10 * * ?")
+    // @Scheduled(cron = "0 0 10 * * ?")
     public void sendReminderToSellers() {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
@@ -258,7 +258,7 @@ public class ManageCrons_BLService {
     }
 
 
-    @Scheduled(fixedRate = 60000)
+    // @Scheduled(fixedRate = 60000)
     public void checkPhonePeRefundStatus() {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
