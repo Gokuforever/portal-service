@@ -246,7 +246,7 @@ public class InvoicePdfGenerator {
         supportCell.setBorderColor(BORDER_COLOR);
         supportCell.setBackgroundColor(new Color(249, 249, 249));
 
-        supportCell.addElement(new Paragraph("Customer Support: support@studeaze.in | +91 98672-92392", regularFont));
+        supportCell.addElement(new Paragraph("Customer Support: support@studeaze.in | +91 90041-80031", regularFont));
         supportCell.addElement(new Paragraph("Return/Exchange: Contact us for any product issues - we'll handle everything", regularFont));
         supportCell.addElement(new Paragraph("Return Policy: 7-day return for unused books in original condition", regularFont));
         supportCell.addElement(new Paragraph("Track Your Order: Visit www.studeaze.in and use Order ID above", regularFont));
