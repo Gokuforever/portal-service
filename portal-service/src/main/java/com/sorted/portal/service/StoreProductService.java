@@ -45,7 +45,6 @@ public class StoreProductService {
     public List<ProductDetailsBeanList> getProductDetailsBeanLists(FindProductBean req, UsersBean usersBean) {
 
 
-
         String zoneId = usersBean.getNearestZoneId();
         Seller seller = zoneHandlerService.getSellerByZone(zoneId, usersBean.getCurrentLat().doubleValue(), usersBean.getCurrentLng().doubleValue());
 
@@ -137,8 +136,11 @@ public class StoreProductService {
         filterRN.addClause(WhereClause.eq(NotifyRestockEntity.Fields.status, NotifyRestockStatus.PENDING.name()));
 
         List<NotifyRestockEntity> notifyRestockEntities = notifyRestockService.repoFind(filterRN);
+        List<String> restockNotificationsEnabledProducts = new ArrayList<>();
+        if (!CollectionUtils.isEmpty(notifyRestockEntities)) {
+            restockNotificationsEnabledProducts = notifyRestockEntities.stream().map(NotifyRestockEntity::getProductMasterId).toList();
+        }
 
-        List<String> restockNotificationsEnabledProducts = notifyRestockEntities.stream().map(NotifyRestockEntity::getProductMasterId).toList();
 
         List<ProductDetailsBeanList> list = new ArrayList<>();
         if (!CollectionUtils.isEmpty(listP)) {
@@ -153,7 +155,7 @@ public class StoreProductService {
             Map<String, Long> highestPrize = productUtility.getProductHighestSellingPrice(listMap.entrySet().toArray(String[]::new));
 
             for (Products p : listP) {
-                list.add(getResponseBean(p, highestPrize, restockNotificationsEnabledProducts));
+                list.add(getResponseBean(p, highestPrize, restockNotificationsEnabledProducts.contains(p.getProduct_master_id())));
             }
         }
 
@@ -169,7 +171,7 @@ public class StoreProductService {
         return list;
     }
 
-    public List<ProductDetailsBeanList> getRelatedProducts(Products product) {
+    public List<ProductDetailsBeanList> getRelatedProducts(Products product, boolean restockNotificationEnabled) {
 
         Category_Master category_Master = category_MasterService.findById(product.getCategory_id()).orElseThrow();
         List<String> list_filterable = category_Master.getGroups().stream()
@@ -216,7 +218,7 @@ public class StoreProductService {
 
         List<ProductDetailsBeanList> list = new ArrayList<>();
         for (Products p : listRI) {
-            list.add(getResponseBean(p, highestSellingPrice, restockNotificationsEnabledProducts));
+            list.add(getResponseBean(p, highestSellingPrice, restockNotificationEnabled));
         }
         return list;
 
@@ -236,7 +238,7 @@ public class StoreProductService {
                 .build();
     }
 
-    public ProductDetailsBeanList getResponseBean(Products p, Map<String, Long> highestPrize, List<String> restockNotificationsEnabledProducts) {
+    public ProductDetailsBeanList getResponseBean(Products p, Map<String, Long> highestPrize, boolean restockNotificationsEnabledProducts) {
         return ProductDetailsBeanList.builder()
                 .name(p.getName())
                 .id(p.getId())
@@ -249,7 +251,7 @@ public class StoreProductService {
                 .secure(p.getIs_secure())
                 .search_sub_title(p.getSelected_sub_catagories().get(0).getSelected_attributes().get(0))
                 .productMasterId(p.getProduct_master_id())
-                .enabledRestockNotification()
+                .enabledRestockNotification(restockNotificationsEnabledProducts)
                 .build();
     }
 

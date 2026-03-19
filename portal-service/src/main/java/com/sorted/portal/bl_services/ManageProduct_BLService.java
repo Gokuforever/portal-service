@@ -77,6 +77,7 @@ public class ManageProduct_BLService {
     private final ComboUtility comboUtility;
     private final ProductUtility productUtility;
     private final RestockNotificationService restockNotificationService;
+    private final NotifyRestockService notifyRestockService;
     @Value("${se.store.allowed.categories:660194cde437f74a756be5f7,6858628aa520924ecbaa7ad5,687b6f241e9e6eb839f72cd5,687c94224323c53b054eafea}")
     private String allowedCategories;
 
@@ -740,6 +741,12 @@ public class ManageProduct_BLService {
                 return SEResponse.getEmptySuccessResponse(ResponseCode.NO_RECORD);
             }
 
+            SEFilter filterRN = new SEFilter(SEFilterType.AND);
+            filterRN.addClause(WhereClause.eq(NotifyRestockEntity.Fields.productMasterId, product.getProduct_master_id()));
+            filterRN.addClause(WhereClause.eq(NotifyRestockEntity.Fields.status, NotifyRestockStatus.PENDING.name()));
+
+            long count = notifyRestockService.countByFilter(filterRN);
+
             ProductDetailsBean resBean = this.productToBean(product);
             if (usersBean.getRole().getUser_type() == UserType.CUSTOMER
                     || usersBean.getRole().getUser_type() == UserType.GUEST) {
@@ -771,7 +778,7 @@ public class ManageProduct_BLService {
                     }
                 }
                 resBean.setCart_info(cartDetailsBuilder.build());
-                resBean.setRelated_products(storeProductService.getRelatedProducts(product));
+                resBean.setRelated_products(storeProductService.getRelatedProducts(product, count > 1));
             }
             return SEResponse.getBasicSuccessResponseObject(resBean, ResponseCode.SUCCESSFUL);
         } catch (CustomIllegalArgumentsException ex) {
