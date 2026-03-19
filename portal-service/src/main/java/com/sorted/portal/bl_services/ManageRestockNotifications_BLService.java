@@ -153,6 +153,7 @@ public class ManageRestockNotifications_BLService {
                 .restockRequestOn(notifyRestockEntity.getCreation_date_str())
                 .productName(productMaster.getName())
                 .read(notifyRestockEntity.isRead())
+                .notificationId(notifyRestockEntity.getId())
                 .build();
     }
 }

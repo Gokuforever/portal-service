@@ -13,6 +13,8 @@ public record RestockResponseBean(
         String cdnUrl,
         @JsonProperty("product_name")
         String productName,
-        boolean read
+        boolean read,
+        @JsonProperty("notification_id")
+        String notificationId
 ) {
 }
