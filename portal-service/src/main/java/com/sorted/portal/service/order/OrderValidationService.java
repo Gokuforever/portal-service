@@ -89,7 +89,7 @@ public class OrderValidationService {
         }
 
         // Validate order status
-        if (orderDetails.getStatus() != OrderStatus.ORDER_ACCEPTED) {
+        if (orderDetails.getStatus() != OrderStatus.ORDER_ACCEPTED && orderDetails.getStatus() != OrderStatus.PARTIALLY_ACCEPTED) {
             log.warn("Invalid order status: {} for order ID: {}", orderDetails.getStatus(), orderId);
             throw new CustomIllegalArgumentsException(ResponseCode.INVALID_ORDER_STATUS);
         }

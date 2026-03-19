@@ -76,7 +76,7 @@ public class ManageSettlement_BLService {
         }
         filter.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         filter.addClause(AggregationFilter.WhereClause.in(Order_Details.Fields.status_id, List.of(DELIVERED.getId(), OUT_FOR_DELIVERY.getId(),
-                READY_FOR_PICK_UP.getId(), RIDER_ASSIGNED.getId(), ORDER_ACCEPTED.getId())));
+                READY_FOR_PICK_UP.getId(), RIDER_ASSIGNED.getId(), ORDER_ACCEPTED.getId(), PARTIALLY_ACCEPTED.getId())));
 
         List<Order_Details> orderDetails = orderDetailsService.repoFind(filter);
         if (CollectionUtils.isEmpty(orderDetails)) {
@@ -96,7 +96,8 @@ public class ManageSettlement_BLService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal unpaid = unpaidOrders.stream()
-                .map(order -> CommonUtils.calculateFees(order.getTotal_amount(), 10).cost())
+                .map(order -> CommonUtils.calculateFees(order.getPartial_refund_amount() != null ? order.getTotal_amount() - order.getPartial_refund_amount() :
+                        order.getTotal_amount(), fee_percentage).cost())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         SettlementAnalyticsResponse response = new SettlementAnalyticsResponse(paid, unpaid);
@@ -133,7 +134,7 @@ public class ManageSettlement_BLService {
 
         filter.addClause(AggregationFilter.WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         filter.addClause(AggregationFilter.WhereClause.in(Order_Details.Fields.status_id, List.of(DELIVERED.getId(), OUT_FOR_DELIVERY.getId(),
-                READY_FOR_PICK_UP.getId(), RIDER_ASSIGNED.getId(), ORDER_ACCEPTED.getId())));
+                READY_FOR_PICK_UP.getId(), RIDER_ASSIGNED.getId(), ORDER_ACCEPTED.getId(), PARTIALLY_ACCEPTED.getId())));
 
         List<Order_Details> orderDetails = orderDetailsService.repoFind(filter);
         if (CollectionUtils.isEmpty(orderDetails)) {
@@ -144,10 +145,12 @@ public class ManageSettlement_BLService {
                 FindSettlementResponse.builder()
                         .orderId(order.getId())
                         .orderCode(order.getCode())
-                        .amount(CommonUtils.paiseToRupee(order.getTotal_amount()))
-                        .feeAndCost(CommonUtils.calculateFees(order.getTotal_amount(), fee_percentage))
+                        .amount(order.getPartial_refund_amount() != null ? CommonUtils.paiseToRupee(order.getTotal_amount() - order.getPartial_refund_amount()) :
+                                CommonUtils.paiseToRupee(order.getTotal_amount()))
+                        .feeAndCost(CommonUtils.calculateFees(order.getPartial_refund_amount() != null ? order.getTotal_amount() - order.getPartial_refund_amount() :
+                                order.getTotal_amount(), fee_percentage))
                         .expectedPayoutDate(order.getOrder_status_history().stream()
-                                .filter(orderStatusHistory -> orderStatusHistory.getStatus().equals(ORDER_ACCEPTED))
+                                .filter(orderStatusHistory -> orderStatusHistory.getStatus().equals(ORDER_ACCEPTED) || orderStatusHistory.getStatus().equals(PARTIALLY_ACCEPTED))
                                 .findFirst().get().getModification_date().plusDays(7).toLocalDate().toString())
                         .actualPayoutDate(Boolean.TRUE.equals(order.getIs_payout_done()) ? order.getSettlement_details().getTxnDate() : null)
                         .status(Boolean.TRUE.equals(order.getIs_payout_done()))
@@ -230,7 +233,7 @@ public class ManageSettlement_BLService {
 
         // Validate order status
         switch (orderDetails.getStatus()) {
-            case DELIVERED, OUT_FOR_DELIVERY, READY_FOR_PICK_UP, RIDER_ASSIGNED, ORDER_ACCEPTED:
+            case DELIVERED, OUT_FOR_DELIVERY, READY_FOR_PICK_UP, RIDER_ASSIGNED, ORDER_ACCEPTED, PARTIALLY_ACCEPTED:
                 break;
             default:
                 throw new CustomIllegalArgumentsException(ResponseCode.SETTLEMENT_NOT_ALLOWED);
@@ -242,7 +245,8 @@ public class ManageSettlement_BLService {
         }
 
         // Validate settlement amount
-        Long costInPaise = CommonUtils.calculateFees(orderDetails.getTotal_amount(), fee_percentage).costInPaise();
+        Long costInPaise = CommonUtils.calculateFees(orderDetails.getPartial_refund_amount() != null ? orderDetails.getTotal_amount() - orderDetails.getPartial_refund_amount() :
+                orderDetails.getTotal_amount(), fee_percentage).costInPaise();
         Long settlementAmount = CommonUtils.rupeeToPaise(req.getSettlementDetails().getAmount());
         Preconditions.check(costInPaise.compareTo(settlementAmount) == 0, ResponseCode.AMOUNT_VALIDATION_FAILED);
 

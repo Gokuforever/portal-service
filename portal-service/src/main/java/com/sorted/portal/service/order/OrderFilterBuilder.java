@@ -269,7 +269,8 @@ public class OrderFilterBuilder {
         return switch (customerStatus.toUpperCase()) {
             case "PENDING" -> List.of(
                     OrderStatus.TRANSACTION_PROCESSED,
-                    OrderStatus.ORDER_ACCEPTED
+                    OrderStatus.ORDER_ACCEPTED,
+                    OrderStatus.PARTIALLY_ACCEPTED
             );
             case "PROCESSING" -> List.of(
                     OrderStatus.READY_FOR_PICK_UP,
