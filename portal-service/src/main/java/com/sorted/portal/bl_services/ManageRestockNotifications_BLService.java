@@ -18,6 +18,7 @@ import com.sorted.common.helper.AggregationFilter.SEFilter;
 import com.sorted.common.helper.AggregationFilter.SEFilterType;
 import com.sorted.common.helper.AggregationFilter.WhereClause;
 import com.sorted.common.utils.CommonUtils;
+import com.sorted.portal.request.beans.MarkNotificationsReadReq;
 import com.sorted.portal.request.beans.RestockNotificationReq;
 import com.sorted.portal.response.beans.RestockResponseBean;
 import jakarta.servlet.http.HttpServletRequest;
@@ -106,16 +107,39 @@ public class ManageRestockNotifications_BLService {
 
         Map<String, Product_Master> productMasterMap = productMasters.stream().collect(Collectors.toMap(BaseMongoEntity::getId, p -> p));
 
-        List<RestockResponseBean> response = notifyRestockEntities.stream().map(r -> mapToResDTO(r, productMasterMap)).toList();
-
-        notifyRestockEntities.stream().filter(r -> !r.isRead()).forEach(notifyRestockEntity -> {
-            notifyRestockEntity.setRead(true);
-            notifyRestockService.update(notifyRestockEntity.getId(), notifyRestockEntity, req_user_id);
-        });
-
-
-        return response;
+        return notifyRestockEntities.stream().map(r -> mapToResDTO(r, productMasterMap)).toList();
     }
+
+    @PutMapping("/mark-read")
+    public void markAsRead(@RequestBody MarkNotificationsReadReq request, HttpServletRequest httpServletRequest) {
+        CommonUtils.extractHeaders(httpServletRequest, request);
+        UsersBean usersBean = usersService.validateUserForActivity(request.getReq_user_id(), Activity.INVENTORY_MANAGEMENT);
+        if (usersBean.getRole().getUser_type() != UserType.SELLER) {
+            throw new AccessDeniedException();
+        }
+
+        if (CollectionUtils.isEmpty(request.getNotificationIds())) {
+            throw new CustomIllegalArgumentsException("Notification IDs are required");
+        }
+
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.in(BaseMongoEntity.Fields.id, request.getNotificationIds()));
+        filter.addClause(WhereClause.in(NotifyRestockEntity.Fields.zoneId, usersBean.getSeller().getDeliverableZones()));
+        filter.addClause(WhereClause.eq(NotifyRestockEntity.Fields.status, NotifyRestockStatus.PENDING.name()));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+
+        List<NotifyRestockEntity> notifications = notifyRestockService.repoFind(filter);
+
+        if (CollectionUtils.isEmpty(notifications)) {
+            return;
+        }
+
+        for (NotifyRestockEntity notification : notifications) {
+            notification.setRead(true);
+            notifyRestockService.update(notification.getId(), notification, request.getReq_user_id());
+        }
+    }
+    
 
     private static RestockResponseBean mapToResDTO(NotifyRestockEntity notifyRestockEntity, Map<String, Product_Master> productMasterMap) {
 
