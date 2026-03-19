@@ -8,6 +8,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 @Data
 public class RestockNotificationReq extends ReqBaseBean {
-    @JsonProperty("product_id")
-    private String productId;
+    @JsonProperty("product_master_id")
+    private String productMasterId;
 }
