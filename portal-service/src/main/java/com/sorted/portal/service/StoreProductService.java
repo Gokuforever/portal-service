@@ -168,6 +168,8 @@ public class StoreProductService {
                 list.add(getResponseBean(productMaster));
             }
         }
+
+        list.sort((a, b) -> Long.compare(b.quantity() != null ? b.quantity() : 0, a.quantity() != null ? a.quantity() : 0));
         return list;
     }
 
