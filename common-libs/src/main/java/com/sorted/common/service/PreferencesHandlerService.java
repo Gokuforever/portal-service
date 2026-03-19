@@ -291,6 +291,7 @@ public class PreferencesHandlerService {
                 .name(product.getName())
                 .quantity(product.getQuantity())
                 .secure(product.getIs_secure())
+                .productMasterId(product.getProduct_master_id())
                 .build();
     }
 
