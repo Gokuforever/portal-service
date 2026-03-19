@@ -247,12 +247,6 @@ public class OrderProcessingService {
                 .build());
         orderDetails.setEstimated_pickup_time(deliveryResponse.getEstimated_pickup_time());
 
-        // Update order items
-        for (Order_Item item : orderItems) {
-            item.setStatus(OrderStatus.READY_FOR_PICK_UP, userId);
-            orderItemService.update(item.getId(), item, userId);
-        }
-
         // Save order details
         orderDetailsService.update(orderDetails.getId(), orderDetails, userId);
     }
