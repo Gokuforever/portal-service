@@ -435,7 +435,6 @@ public class OrderUtility {
         addressDTO.setLng(address.getLng());
         addressDTO.setFirst_name(address.getFirstName());
         addressDTO.setLast_name(address.getLastName());
-        addressDTO.setId(address.getId());
         addressDTO.setAddress_id(address.getId());
 
         return addressDTO;

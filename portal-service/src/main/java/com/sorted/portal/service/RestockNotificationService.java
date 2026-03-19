@@ -32,7 +32,7 @@ public class RestockNotificationService {
     @Async
     public void sendNotification(Products product) {
         SEFilter filter = new SEFilter(SEFilterType.AND);
-        filter.addClause(WhereClause.eq(NotifyRestockEntity.Fields.productId, product.getId()));
+        filter.addClause(WhereClause.eq(NotifyRestockEntity.Fields.productMasterId, product.getProduct_master_id()));
         filter.addClause(WhereClause.eq(NotifyRestockEntity.Fields.status, NotifyRestockStatus.PENDING.name()));
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         List<NotifyRestockEntity> notifyRestockEntities = notifyRestockService.repoFind(filter);

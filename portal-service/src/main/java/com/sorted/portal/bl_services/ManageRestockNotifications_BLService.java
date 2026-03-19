@@ -1,11 +1,11 @@
 package com.sorted.portal.bl_services;
 
 import com.sorted.common.beans.UsersBean;
+import com.sorted.common.entity.mongo.BaseMongoEntity;
 import com.sorted.common.entity.mongo.NotifyRestockEntity;
 import com.sorted.common.entity.mongo.Product_Master;
 import com.sorted.common.entity.mongo.Role;
 import com.sorted.common.entity.service.NotifyRestockService;
-import com.sorted.common.entity.service.ProductService;
 import com.sorted.common.entity.service.Product_Master_Service;
 import com.sorted.common.entity.service.Users_Service;
 import com.sorted.common.enums.Activity;
@@ -19,12 +19,17 @@ import com.sorted.common.helper.AggregationFilter.SEFilterType;
 import com.sorted.common.helper.AggregationFilter.WhereClause;
 import com.sorted.common.utils.CommonUtils;
 import com.sorted.portal.request.beans.RestockNotificationReq;
+import com.sorted.portal.response.beans.RestockResponseBean;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @RestController
@@ -33,7 +38,6 @@ public class ManageRestockNotifications_BLService {
 
     private final Users_Service usersService;
     private final NotifyRestockService notifyRestockService;
-    private final ProductService productService;
     private final Product_Master_Service productMasterService;
 
     @PostMapping("/subscribe")
@@ -56,7 +60,7 @@ public class ManageRestockNotifications_BLService {
         }
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(NotifyRestockEntity.Fields.userId, request.getReq_user_id()));
-        filter.addClause(WhereClause.eq(NotifyRestockEntity.Fields.productId, request.getProductMasterId()));
+        filter.addClause(WhereClause.eq(NotifyRestockEntity.Fields.productMasterId, request.getProductMasterId()));
         filter.addClause(WhereClause.eq(NotifyRestockEntity.Fields.status, NotifyRestockStatus.PENDING.name()));
 
         long count = notifyRestockService.countByFilter(filter);
@@ -68,6 +72,7 @@ public class ManageRestockNotifications_BLService {
                 .productMasterId(request.getProductMasterId())
                 .userId(request.getReq_user_id())
                 .status(NotifyRestockStatus.PENDING)
+                .zoneId(usersBean.getNearestZoneId())
                 .read(false)
                 .build();
 
@@ -75,13 +80,55 @@ public class ManageRestockNotifications_BLService {
     }
 
     @GetMapping("/list")
-    public List<NotifyRestockEntity> list(HttpServletRequest httpServletRequest) {
+    public List<RestockResponseBean> list(HttpServletRequest httpServletRequest) {
         String req_user_id = httpServletRequest.getHeader("req_user_id");
         UsersBean usersBean = usersService.validateUserForActivity(req_user_id, Activity.INVENTORY_MANAGEMENT);
-        if (usersBean.getRole().getUser_type() != UserType.SELLER){
+        if (usersBean.getRole().getUser_type() != UserType.SELLER) {
             throw new AccessDeniedException();
         }
 
-        return null;
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.in(NotifyRestockEntity.Fields.zoneId, usersBean.getSeller().getDeliverableZones()));
+        filter.addClause(WhereClause.eq(NotifyRestockEntity.Fields.status, NotifyRestockStatus.PENDING.name()));
+
+        List<NotifyRestockEntity> notifyRestockEntities = notifyRestockService.repoFind(filter);
+
+        if (CollectionUtils.isEmpty(notifyRestockEntities)) {
+            return Collections.emptyList();
+        }
+
+        List<String> productMasterIds = notifyRestockEntities.stream().map(NotifyRestockEntity::getProductMasterId).toList();
+
+        SEFilter filterPM = new SEFilter(SEFilterType.AND);
+        filterPM.addClause(WhereClause.in(BaseMongoEntity.Fields.id, productMasterIds));
+        filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        List<Product_Master> productMasters = productMasterService.repoFind(filterPM);
+
+        Map<String, Product_Master> productMasterMap = productMasters.stream().collect(Collectors.toMap(BaseMongoEntity::getId, p -> p));
+
+        List<RestockResponseBean> response = notifyRestockEntities.stream().map(r -> mapToResDTO(r, productMasterMap)).toList();
+
+        notifyRestockEntities.stream().filter(r -> !r.isRead()).forEach(notifyRestockEntity -> {
+            notifyRestockEntity.setRead(true);
+            notifyRestockService.update(notifyRestockEntity.getId(), notifyRestockEntity, req_user_id);
+        });
+
+
+        return response;
+    }
+
+    private static RestockResponseBean mapToResDTO(NotifyRestockEntity notifyRestockEntity, Map<String, Product_Master> productMasterMap) {
+
+        Product_Master productMaster = productMasterMap.getOrDefault(notifyRestockEntity.getProductMasterId(), null);
+        if (productMaster == null) {
+            return null;
+        }
+        return RestockResponseBean.builder()
+                .cdnUrl(productMaster.getCdn_url())
+                .productMasterId(notifyRestockEntity.getProductMasterId())
+                .restockRequestOn(notifyRestockEntity.getCreation_date_str())
+                .productName(productMaster.getName())
+                .read(notifyRestockEntity.isRead())
+                .build();
     }
 }

@@ -14,10 +14,10 @@ import org.springframework.data.mongodb.core.mapping.Field;
 @Document(collection = "notify_restock")
 @Builder
 public class NotifyRestockEntity extends BaseMongoEntity<String> {
-    @Field("product_id")
-    private String productId;
     @Field("product_master_id")
     private String productMasterId;
+    @Field("zone_id")
+    private String zoneId;
     @Field("user_id")
     private String userId;
     private NotifyRestockStatus status;
