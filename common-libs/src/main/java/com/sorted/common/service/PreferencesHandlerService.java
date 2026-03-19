@@ -5,10 +5,9 @@ import com.sorted.common.constants.Defaults;
 import com.sorted.common.entity.mongo.*;
 import com.sorted.common.entity.service.*;
 import com.sorted.common.enums.AssetType;
+import com.sorted.common.enums.NotifyRestockStatus;
 import com.sorted.common.exceptions.DeliveryNotAvailableException;
-import com.sorted.common.helper.AggregationFilter.SEFilter;
-import com.sorted.common.helper.AggregationFilter.SEFilterType;
-import com.sorted.common.helper.AggregationFilter.WhereClause;
+import com.sorted.common.helper.AggregationFilter.*;
 import com.sorted.common.helper.Pagination;
 import com.sorted.common.repository.mongo.ProductRepository;
 import com.sorted.common.utils.ComboUtility;
@@ -38,6 +37,7 @@ public class PreferencesHandlerService {
     private final CategoryFilterServiceV2 categoryFilterService;
     private final Users_Service usersService;
     private final ProductUtility productUtility;
+    private final NotifyRestockService notifyRestockService;
 
     public Config fetchPreference(double lat, double lng, Users users) {
         Seller seller;
@@ -78,6 +78,17 @@ public class PreferencesHandlerService {
 
         List<HomeProductsBean> homeProductsBeans = new ArrayList<>();
 
+        SEFilter filterRN = new SEFilter(SEFilterType.AND);
+        filterRN.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        filterRN.addClause(WhereClause.eq(NotifyRestockEntity.Fields.userId, users.getId()));
+        filterRN.addClause(WhereClause.eq(NotifyRestockEntity.Fields.status, NotifyRestockStatus.PENDING.name()));
+
+        List<NotifyRestockEntity> notifyRestockEntities = notifyRestockService.repoFind(filterRN);
+        List<String> restockNotificationsEnabledProducts = new ArrayList<>();
+        if (!CollectionUtils.isEmpty(notifyRestockEntities)) {
+            restockNotificationsEnabledProducts = notifyRestockEntities.stream().map(NotifyRestockEntity::getProductMasterId).toList();
+        }
+
         if (!CollectionUtils.isEmpty(productIdsBySeller)) {
             Map<String, Long> highestPrize = productUtility.getProductHighestSellingPrice(productIdsBySeller.toArray(new String[0]));
             for (HomeConfig homeConfig : homeConfigs) {
@@ -94,12 +105,14 @@ public class PreferencesHandlerService {
                 filter3.addClause(WhereClause.isNotNull("media.cdn_url"));
                 filter3.addClause(WhereClause.eq(Products.Fields.seller_id, seller.getId()));
 
+                filter3.setOrderBy(new OrderBy(Products.Fields.quantity, SortOrder.DESC));
+
                 List<Products> randomProducts = productRepository.getRandomProducts(filter3, 7);
 
                 ProductCarousel productCarousel = homeConfig.getProductCarousel();
                 List<ProductBean> randomProductBeans = new ArrayList<>();
                 for (Products randomProduct : randomProducts) {
-                    randomProductBeans.add(getProductBean(randomProduct, highestPrize));
+                    randomProductBeans.add(getProductBean(randomProduct, highestPrize, restockNotificationsEnabledProducts.contains(randomProduct.getProduct_master_id())));
                 }
 
                 if (CollectionUtils.isEmpty(randomProducts) || randomProducts.size() < 7) {
@@ -120,7 +133,7 @@ public class PreferencesHandlerService {
 
                     List<Product_Master> productMasters = productMasterService.repoFind(filter);
                     for (Product_Master productMaster : productMasters) {
-                        randomProductBeans.add(getProductBean(productMaster));
+                        randomProductBeans.add(getProductBean(productMaster, restockNotificationsEnabledProducts.contains(productMaster.getId())));
                     }
                 }
 
@@ -154,12 +167,14 @@ public class PreferencesHandlerService {
                         }
                     }
 
+                    filterPM.setOrderBy(new OrderBy(Products.Fields.quantity, SortOrder.DESC));
+
                     List<Products> productsByGroup = productRepository.getRandomProducts(filterPM, 7);
 
                     List<ProductBean> productListByGroup = new ArrayList<>();
 
                     for (Products productByGroup : productsByGroup) {
-                        productListByGroup.add(getProductBean(productByGroup, highestPrize));
+                        productListByGroup.add(getProductBean(productByGroup, highestPrize, restockNotificationsEnabledProducts.contains(productByGroup.getProduct_master_id())));
                     }
 
                     if (CollectionUtils.isEmpty(productsByGroup) || productsByGroup.size() < 7) {
@@ -186,11 +201,10 @@ public class PreferencesHandlerService {
                             pagination = new Pagination(0, 7 - productsByGroup.size());
                         }
                         filterMaster.setPagination(pagination);
-
                         List<Product_Master> productMasters = productMasterService.repoFind(filterMaster);
                         if (!CollectionUtils.isEmpty(productMasters)) {
                             for (Product_Master productMaster : productMasters) {
-                                productListByGroup.add(getProductBean(productMaster));
+                                productListByGroup.add(getProductBean(productMaster, restockNotificationsEnabledProducts.contains(productMaster.getId())));
                             }
                         }
                     }
@@ -282,7 +296,7 @@ public class PreferencesHandlerService {
 
     }
 
-    private ProductBean getProductBean(Products product, Map<String, Long> highestPrize) {
+    private ProductBean getProductBean(Products product, Map<String, Long> highestPrize, boolean restockNotificationEnabled) {
         return ProductBean.builder()
                 .mrp(CommonUtils.paiseToRupee(product.getMrp()))
                 .sellingPrice(CommonUtils.paiseToRupee(highestPrize.get(product.getProduct_master_id())))
@@ -292,11 +306,11 @@ public class PreferencesHandlerService {
                 .quantity(product.getQuantity())
                 .secure(product.getIs_secure())
                 .productMasterId(product.getProduct_master_id())
-                .isRestockNotificationEnabled(false)
+                .isRestockNotificationEnabled(restockNotificationEnabled)
                 .build();
     }
 
-    private ProductBean getProductBean(Product_Master product) {
+    private ProductBean getProductBean(Product_Master product, boolean restockNotificationEnabled) {
         return ProductBean.builder()
                 .mrp(CommonUtils.paiseToRupee(product.getMrp()))
                 .sellingPrice(CommonUtils.paiseToRupee(product.getMrp()))
@@ -306,7 +320,7 @@ public class PreferencesHandlerService {
                 .name(product.getName())
                 .quantity(0L)
                 .secure(false)
-                .isRestockNotificationEnabled(false)
+                .isRestockNotificationEnabled(restockNotificationEnabled)
                 .build();
     }
 

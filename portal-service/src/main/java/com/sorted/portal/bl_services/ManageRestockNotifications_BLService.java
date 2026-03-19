@@ -81,6 +81,7 @@ public class ManageRestockNotifications_BLService {
         if (usersBean.getRole().getUser_type() != UserType.SELLER){
             throw new AccessDeniedException();
         }
+
         return null;
     }
 }

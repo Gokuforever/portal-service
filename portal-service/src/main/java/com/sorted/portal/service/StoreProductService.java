@@ -4,6 +4,7 @@ import com.sorted.common.beans.SelectedSubCategories;
 import com.sorted.common.beans.UsersBean;
 import com.sorted.common.entity.mongo.*;
 import com.sorted.common.entity.service.*;
+import com.sorted.common.enums.NotifyRestockStatus;
 import com.sorted.common.helper.AggregationFilter.*;
 import com.sorted.common.helper.Pagination;
 import com.sorted.common.helper.SearchHistoryAsyncHelper;
@@ -39,8 +40,11 @@ public class StoreProductService {
     private final ZoneHandlerService zoneHandlerService;
     private final Product_Master_Service productMasterService;
     private final ProductUtility productUtility;
+    private final NotifyRestockService notifyRestockService;
 
     public List<ProductDetailsBeanList> getProductDetailsBeanLists(FindProductBean req, UsersBean usersBean) {
+
+
 
         String zoneId = usersBean.getNearestZoneId();
         Seller seller = zoneHandlerService.getSellerByZone(zoneId, usersBean.getCurrentLat().doubleValue(), usersBean.getCurrentLng().doubleValue());
@@ -128,6 +132,14 @@ public class StoreProductService {
         filterSE.addClause(WhereClause.eq(Products.Fields.seller_id, seller.getId()));
         List<Products> listP = productService.repoFind(filterSE);
 
+        SEFilter filterRN = new SEFilter(SEFilterType.AND);
+        filterRN.addClause(WhereClause.eq(NotifyRestockEntity.Fields.userId, usersBean.getId()));
+        filterRN.addClause(WhereClause.eq(NotifyRestockEntity.Fields.status, NotifyRestockStatus.PENDING.name()));
+
+        List<NotifyRestockEntity> notifyRestockEntities = notifyRestockService.repoFind(filterRN);
+
+        List<String> restockNotificationsEnabledProducts = notifyRestockEntities.stream().map(NotifyRestockEntity::getProductMasterId).toList();
+
         List<ProductDetailsBeanList> list = new ArrayList<>();
         if (!CollectionUtils.isEmpty(listP)) {
             List<String> filteredMasterIds = listP.stream().map(Products::getProduct_master_id).toList();
@@ -141,7 +153,7 @@ public class StoreProductService {
             Map<String, Long> highestPrize = productUtility.getProductHighestSellingPrice(listMap.entrySet().toArray(String[]::new));
 
             for (Products p : listP) {
-                list.add(getResponseBean(p, highestPrize));
+                list.add(getResponseBean(p, highestPrize, restockNotificationsEnabledProducts));
             }
         }
 
@@ -204,7 +216,7 @@ public class StoreProductService {
 
         List<ProductDetailsBeanList> list = new ArrayList<>();
         for (Products p : listRI) {
-            list.add(getResponseBean(p, highestSellingPrice));
+            list.add(getResponseBean(p, highestSellingPrice, restockNotificationsEnabledProducts));
         }
         return list;
 
@@ -220,10 +232,11 @@ public class StoreProductService {
                 .categoryId(p.getCatagory_id())
                 .groupId(p.getGroup_id())
                 .secure(false)
+                .enabledRestockNotification(false)
                 .build();
     }
 
-    public ProductDetailsBeanList getResponseBean(Products p, Map<String, Long> highestPrize) {
+    public ProductDetailsBeanList getResponseBean(Products p, Map<String, Long> highestPrize, List<String> restockNotificationsEnabledProducts) {
         return ProductDetailsBeanList.builder()
                 .name(p.getName())
                 .id(p.getId())
@@ -236,6 +249,7 @@ public class StoreProductService {
                 .secure(p.getIs_secure())
                 .search_sub_title(p.getSelected_sub_catagories().get(0).getSelected_attributes().get(0))
                 .productMasterId(p.getProduct_master_id())
+                .enabledRestockNotification()
                 .build();
     }
 
