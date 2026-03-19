@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@Component
+//@Component
 @Slf4j
 @RequiredArgsConstructor
 public class WeeklyOrdersReportCron {
