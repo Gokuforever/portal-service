@@ -292,6 +292,7 @@ public class PreferencesHandlerService {
                 .quantity(product.getQuantity())
                 .secure(product.getIs_secure())
                 .productMasterId(product.getProduct_master_id())
+                .isRestockNotificationEnabled(false)
                 .build();
     }
 
@@ -305,6 +306,7 @@ public class PreferencesHandlerService {
                 .name(product.getName())
                 .quantity(0L)
                 .secure(false)
+                .isRestockNotificationEnabled(false)
                 .build();
     }
 

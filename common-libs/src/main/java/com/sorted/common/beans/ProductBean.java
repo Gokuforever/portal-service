@@ -13,7 +13,8 @@ public record ProductBean(
         BigDecimal sellingPrice,
         String image,
         Long quantity,
-        Boolean secure
+        Boolean secure,
+        Boolean isRestockNotificationEnabled
 ) {
 
 }
