@@ -152,7 +152,7 @@ public class StoreProductService {
             List<Products> allFilteredProducts = productService.repoFind(filterAllProducts);
 
             Map<String, List<Products>> listMap = allFilteredProducts.stream().collect(Collectors.groupingBy(Products::getProduct_master_id));
-            Map<String, Long> highestPrize = productUtility.getProductHighestSellingPrice(listMap.entrySet().toArray(String[]::new));
+            Map<String, Long> highestPrize = productUtility.getProductHighestSellingPrice(listMap.keySet().toArray(new String[0]));
 
             for (Products p : listP) {
                 list.add(getResponseBean(p, highestPrize, restockNotificationsEnabledProducts.contains(p.getProduct_master_id())));
