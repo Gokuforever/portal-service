@@ -5,6 +5,7 @@ import com.sorted.common.enums.OrderStatus;
 import com.sorted.common.enums.PurchaseType;
 import lombok.Builder;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Builder
