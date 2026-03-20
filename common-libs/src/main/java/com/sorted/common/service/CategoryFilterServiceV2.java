@@ -3,6 +3,7 @@ package com.sorted.common.service;
 import com.sorted.common.entity.mongo.BaseMongoEntity;
 import com.sorted.common.entity.mongo.Category_Master;
 import com.sorted.common.entity.mongo.Product_Master;
+import com.sorted.common.enums.InputType;
 import com.sorted.common.entity.service.Category_MasterService;
 import com.sorted.common.entity.service.Product_Master_Service;
 import com.sorted.common.helper.AggregationFilter;
@@ -157,11 +158,7 @@ public class CategoryFilterServiceV2 {
             // Only process subcategories that have associated products in THIS category
             if (subCategoriesForCategory != null && subCategoriesForCategory.contains(subCategory.getName())) {
                 Category_Master.SubCategory filteredSubCategory = buildFilteredSubCategory(subCategory, filterData, categoryId);
-
-                // Only add subcategory if it has attributes with products
-                if (!CollectionUtils.isEmpty(filteredSubCategory.getAttributes())) {
-                    filteredSubCategories.add(filteredSubCategory);
-                }
+                filteredSubCategories.add(filteredSubCategory);
             }
         }
 
@@ -183,15 +180,16 @@ public class CategoryFilterServiceV2 {
         filteredSubCategory.setRelated_filterable(originalSubCategory.isRelated_filterable());
         filteredSubCategory.setData_type(originalSubCategory.getData_type());
 
-        // Get attributes for this specific category and subcategory
-        Set<String> attributesForSubCategory = filterData.attributesByCategoryAndSubCategory()
-                .getOrDefault(categoryId, Map.of())
-                .getOrDefault(originalSubCategory.getName(), Set.of());
-
-        // Filter attributes to only include those with products in THIS category
-        List<String> filteredAttributes = originalSubCategory.getAttributes().stream()
-                .filter(attributesForSubCategory::contains)
-                .collect(Collectors.toList());
+        // Only populate attributes for SELECT input type, keep others empty
+        List<String> filteredAttributes;
+        if (originalSubCategory.getInput_type() == InputType.SELECT) {
+            Set<String> attributesFromProducts = filterData.attributesByCategoryAndSubCategory()
+                    .getOrDefault(categoryId, Map.of())
+                    .getOrDefault(originalSubCategory.getName(), Set.of());
+            filteredAttributes = new ArrayList<>(attributesFromProducts);
+        } else {
+            filteredAttributes = new ArrayList<>();
+        }
 
         filteredSubCategory.setAttributes(filteredAttributes);
         return filteredSubCategory;
