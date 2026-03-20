@@ -383,7 +383,7 @@ public class SecureReturnService {
 
     private UsersBean validateSeller(String userId) {
         log.debug("Validating seller user for secure return activity. User ID: {}", userId);
-        UsersBean user = usersService.validateUserForActivity(userId, Activity.APPRAISE_SECURE_RETURN);
+        UsersBean user = usersService.validateUserForActivity(userId, Activity.INVENTORY_MANAGEMENT);
         Preconditions.check(user.getRole().getUser_type() == SELLER, ResponseCode.ACCESS_DENIED);
         log.debug("Seller user validation successful. User role: {}", user.getRole().getUser_type());
         return user;
