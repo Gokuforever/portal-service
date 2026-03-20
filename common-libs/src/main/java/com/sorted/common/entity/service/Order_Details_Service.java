@@ -3,16 +3,15 @@ package com.sorted.common.entity.service;
 import com.sorted.common.entity.mongo.BaseMongoEntity;
 import com.sorted.common.entity.mongo.Order_Details;
 import com.sorted.common.entity.mongo.Order_Item;
+import com.sorted.common.enums.OrderStatus;
 import com.sorted.common.helper.AggregationFilter.SEFilter;
 import com.sorted.common.helper.AggregationFilter.SEFilterType;
 import com.sorted.common.helper.AggregationFilter.WhereClause;
-import com.sorted.common.enums.OrderStatus;
 import com.sorted.common.repository.mongo.Order_Details_Repository;
 import com.sorted.common.utils.SequenceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Arrays;
 import java.util.List;
 
 @Service
@@ -52,7 +51,7 @@ public class Order_Details_Service extends GenericEntityServiceImpl<String, Orde
         List<Order_Item> orderItems = orderItemService.repoFind(filter);
         orderItems.forEach(orderItem -> {
             // Skip items that have been individually rejected or refunded
-            if (isItemLevelStatus(orderItem.getStatus())) {
+            if (orderItem.isRejected()) {
                 return;
             }
             if (!inE.getStatus().equals(orderItem.getStatus())) {
@@ -67,16 +66,6 @@ public class Order_Details_Service extends GenericEntityServiceImpl<String, Orde
      */
     private boolean isPartialAcceptStatus(OrderStatus status) {
         return status == OrderStatus.PARTIALLY_ACCEPTED;
-    }
-
-    /**
-     * Check if the item has an item-level status that should not be overwritten
-     */
-    private boolean isItemLevelStatus(OrderStatus status) {
-        return Arrays.asList(
-                OrderStatus.ITEM_REJECTED,
-                OrderStatus.ITEM_REFUND_INITIATED
-        ).contains(status);
     }
 
     @Override

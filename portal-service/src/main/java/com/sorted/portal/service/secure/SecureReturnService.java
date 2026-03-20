@@ -275,15 +275,15 @@ public class SecureReturnService {
         List<Order_Item> orderItems = findOrderItems(order.getId());
         log.debug("Found {} order items for return processing", orderItems.size());
 
-        List<Order_Item> secureItems = orderItems.stream().filter(item -> item.getType().equals(PurchaseType.SECURE) && item.getStatus() != OrderStatus.DELIVERED).toList();
+        List<Order_Item> secureItems = orderItems.stream().filter(item -> item.getType().equals(PurchaseType.SECURE) && !item.isRejected()).toList();
 
         if (CollectionUtils.isEmpty(secureItems)) {
             throw new CustomIllegalArgumentsException(ResponseCode.NOT_SECURED_ITEM);
         }
-//
-//        boolean invalidItemStatus = secureItems.stream()
-//                .anyMatch(item -> item.getStatus() != OrderStatus.DELIVERED);
-//        Preconditions.check(!invalidItemStatus, ResponseCode.INVALID_ITEM_STATUS_FOR_SECURE_RETURN);
+
+        boolean invalidItemStatus = secureItems.stream()
+                .anyMatch(item -> item.getStatus() != OrderStatus.DELIVERED);
+        Preconditions.check(!invalidItemStatus, ResponseCode.INVALID_ITEM_STATUS_FOR_SECURE_RETURN);
         return secureItems;
     }
 
