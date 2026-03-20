@@ -156,7 +156,7 @@ public class CategoryFilterServiceV2 {
 
         for (Category_Master.SubCategory subCategory : originalGroup.getSub_categories()) {
             // Only process subcategories that have associated products in THIS category
-            if (subCategoriesForCategory != null && subCategoriesForCategory.contains(subCategory.getName())) {
+            if (subCategoriesForCategory != null && subCategoriesForCategory.contains(subCategory.getName()) && subCategory.isFilterable()) {
                 Category_Master.SubCategory filteredSubCategory = buildFilteredSubCategory(subCategory, filterData, categoryId);
                 filteredSubCategories.add(filteredSubCategory);
             }
