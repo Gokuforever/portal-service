@@ -15,7 +15,7 @@ public class SecureRefundStatusCron {
 
     private final SecureReturnService secureReturnService;
 
-    @Scheduled(fixedRate = 300000) // Every 5 minutes
+    @Scheduled(fixedRate = 60000) // Every 5 minutes
     public void checkRefundStatus() {
         log.info("checkRefundStatus started: {}", LocalDateTime.now());
         secureReturnService.checkPendingRefundStatus();

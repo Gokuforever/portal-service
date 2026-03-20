@@ -6,6 +6,7 @@ import lombok.Builder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Builder
@@ -44,7 +45,11 @@ public record SecureOrderDetailsBean(
         @JsonProperty("max_reschedule_count")
         int maxRescheduleCount,
         @JsonProperty("reschedule_count")
-        int rescheduleCount
+        int rescheduleCount,
+        @JsonProperty("refund_amount")
+        BigDecimal refundAmount,
+        @JsonProperty("refund_date")
+        LocalDateTime refundDate
 
 ) {
 }

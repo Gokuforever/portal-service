@@ -142,6 +142,8 @@ public class SecureReturnService {
                 .maxRescheduleCount(secureReturn.getMax_reschedule_allowed())
                 .eligibleForReschedule(secureReturn.canReschedule())
                 .rescheduleCount(secureReturn.getReschedule_count())
+                .refundAmount(CommonUtils.paiseToRupee(secureReturn.getTotal_actual_refund()))
+                .refundDate(secureReturn.getRefund_completed_at())
                 .build();
     }
 
@@ -259,12 +261,29 @@ public class SecureReturnService {
                 default -> RefundStatus.PROCESSING;
             };
             secureReturn.setRefund_status(refundStatus);
-            secureReturn.setStatus(
-                    refundStatus == RefundStatus.COMPLETED ? SecureReturnStatus.REFUND_COMPLETED : refundStatus == RefundStatus.PROCESSING
-                            ? SecureReturnStatus.REFUND_PENDING : SecureReturnStatus.REFUND_FAILED,
-                    Defaults.SYSTEM_ADMIN,
-                    "Refund initiated successfully"
-            );
+            if (refundStatus == RefundStatus.COMPLETED) {
+                secureReturn.setRefund_completed_at(LocalDateTime.now());
+                secureReturn.setStatus(
+                        SecureReturnStatus.REFUND_COMPLETED,
+                        Defaults.SYSTEM_ADMIN,
+                        "Refund completed successfully"
+                );
+                log.info("Refund completed for secure return: {}", secureReturn.getId());
+            } else if (refundStatus == RefundStatus.FAILED) {
+                secureReturn.setStatus(
+                        SecureReturnStatus.REFUND_FAILED,
+                        Defaults.SYSTEM_ADMIN,
+                        "Refund failed"
+                );
+                log.error("Refund failed for secure return: {}", secureReturn.getId());
+            }else {
+                secureReturn.setStatus(
+                        SecureReturnStatus.REFUND_PENDING,
+                        Defaults.SYSTEM_ADMIN,
+                        "Refund failed"
+                );
+                log.error("Refund pending for secure return: {}", secureReturn.getId());
+            }
             log.info("Refund initiated successfully for secure return: {}, TransactionId: {}",
                     secureReturn.getId(), refundResponse.get().getRefundId());
         } else {
