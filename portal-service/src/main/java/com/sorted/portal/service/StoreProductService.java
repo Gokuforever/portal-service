@@ -245,7 +245,7 @@ public class StoreProductService {
                 .name(p.getName())
                 .id(p.getId())
                 .mrp(CommonUtils.paiseToRupee(p.getMrp()))
-                .sellingPrice(CommonUtils.paiseToRupee(highestPrize.getOrDefault(p.getId(), 0L)))
+                .sellingPrice(CommonUtils.paiseToRupee(highestPrize.getOrDefault(p.getProduct_master_id(), 0L)))
                 .quantity(p.getQuantity())
                 .image(CollectionUtils.isEmpty(p.getMedia()) ? "" : p.getMedia().stream().filter(e -> e.getOrder() == 0).findFirst().get().getCdn_url())
                 .categoryId(p.getCategory_id())
