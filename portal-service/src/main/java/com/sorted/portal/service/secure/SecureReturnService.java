@@ -198,7 +198,7 @@ public class SecureReturnService {
         Preconditions.check(secureReturn.getStatus().equals(SecureReturnStatus.DELIVERED_TO_SELLER), ResponseCode.INVALID_SECURE_RETURN_STATUS);
         List<Secure_Return_Item> secureReturnItems = secureReturn.getItems();
         for (Secure_Return_Item item : secureReturnItems) {
-            SecureItemAppraisalDetails itemAppraisalDetails = appraisal.getItems().stream().filter(appraisalItem -> appraisalItem.orderItemId().equals(item.getOrder_item_id())).findFirst().get();
+            SecureItemAppraisalDetails itemAppraisalDetails = appraisal.getItems().stream().filter(appraisalItem -> appraisalItem.orderItemId().equals(item.getProduct_id())).findFirst().get();
             item.applyAppraisal(itemAppraisalDetails.grade(), itemAppraisalDetails.remarks(), appraisal.getReq_user_id(), itemAppraisalDetails.imageUrls());
         }
         secureReturn.setItems(secureReturnItems);
