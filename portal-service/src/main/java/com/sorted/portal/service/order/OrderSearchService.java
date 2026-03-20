@@ -75,7 +75,7 @@ public class OrderSearchService {
             log.debug("Found {} orders matching criteria", ordersList.size());
 
             // Fetch related data
-            Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList, req.getPurchase_type());
+            Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList);
 
             // Map to response beans
             List<FindOrderResBean> resList = ordersList.stream()
@@ -125,7 +125,7 @@ public class OrderSearchService {
             log.debug("Found {} orders for customer", ordersList.size());
 
             // Fetch related data
-            Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList, req.getPurchase_type());
+            Map<String, List<Order_Item>> mapOI = fetchRelatedData(ordersList);
 
             List<String> sellerIds = ordersList.stream().map(Order_Details::getSeller_id).toList();
             SEFilter filter = new SEFilter(SEFilterType.AND);
@@ -230,11 +230,10 @@ public class OrderSearchService {
     /**
      * Fetch related data for orders
      *
-     * @param ordersList   List of orders
-     * @param purchaseType The purchase type
+     * @param ordersList List of orders
      * @return Map containing related data
      */
-    private Map<String, List<Order_Item>> fetchRelatedData(List<Order_Details> ordersList, PurchaseType purchaseType) {
+    private Map<String, List<Order_Item>> fetchRelatedData(List<Order_Details> ordersList) {
         // Get order IDs
         List<String> orderIds = ordersList.stream()
                 .map(BaseMongoEntity::getId)
@@ -242,9 +241,6 @@ public class OrderSearchService {
 
         // Fetch order items
         SEFilter orderItemsFilter = filterBuilder.buildOrderItemsFilter(orderIds);
-        if (purchaseType != null) {
-            orderItemsFilter.addClause(WhereClause.eq(Order_Item.Fields.type, purchaseType.name()));
-        }
         List<Order_Item> orderItems = orderItemService.repoFind(orderItemsFilter);
 
         return responseMapper.groupOrderItemsByOrderId(orderItems);
