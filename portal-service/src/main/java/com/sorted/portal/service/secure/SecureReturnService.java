@@ -243,6 +243,7 @@ public class SecureReturnService {
 
         secureReturn.setRefund_status(RefundStatus.PENDING);
         secureReturn.setRefund_initiated_at(LocalDateTime.now());
+        secureReturn.setMerchant_refund_id(merchantRefundId);
         secureReturnService.update(secureReturn.getId(), secureReturn, Defaults.SYSTEM_ADMIN);
 
         Optional<RefundResponse> refundResponse =
@@ -292,7 +293,7 @@ public class SecureReturnService {
     }
 
     private void checkAndUpdateRefundStatus(Secure_Return secureReturn) {
-        String refundId = secureReturn.getRefund_transaction_id();
+        String refundId = secureReturn.getMerchant_refund_id();
         if (!StringUtils.hasText(refundId)) {
             log.warn("No refund transaction ID found for secure return: {}", secureReturn.getId());
             return;

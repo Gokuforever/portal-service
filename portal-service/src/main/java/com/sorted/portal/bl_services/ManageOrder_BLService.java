@@ -113,7 +113,6 @@ public class ManageOrder_BLService {
     public SEResponse find(@RequestBody SERequest request, HttpServletRequest httpServletRequest) {
         log.info("find:: API started for customer order search");
         FindOrderReqBean req = request.getGenericRequestDataObject(FindOrderReqBean.class);
-        req.setPurchase_type(PurchaseType.BUY);
         return orderSearchService.findOrdersForCustomer(req, httpServletRequest);
     }
 

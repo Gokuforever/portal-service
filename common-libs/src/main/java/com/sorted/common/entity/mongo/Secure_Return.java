@@ -71,6 +71,7 @@ public class Secure_Return extends BaseMongoEntity<String> {
     // Financial Summary
     private Long total_estimated_refund;     // Sum of all items (optimistic)
     private Long total_actual_refund;        // After appraisal
+    private String merchant_refund_id;
     private String refund_transaction_id;    // PhonePe/Razorpay transaction ID
     private RefundStatus refund_status;
     private LocalDateTime refund_initiated_at;
