@@ -42,7 +42,9 @@ public record SecureOrderDetailsBean(
         @JsonProperty("is_eligible_for_reschedule")
         boolean eligibleForReschedule,
         @JsonProperty("max_reschedule_count")
-        int maxRescheduleCount
+        int maxRescheduleCount,
+        @JsonProperty("reschedule_count")
+        int rescheduleCount
 
 ) {
 }

@@ -135,6 +135,7 @@ public class SecureReturnService {
                 .timeSlot(secureReturn.getScheduled_time_slot())
                 .maxRescheduleCount(secureReturn.getMax_reschedule_allowed())
                 .eligibleForReschedule(secureReturn.canReschedule())
+                .rescheduleCount(secureReturn.getReschedule_count())
                 .build();
     }
 
