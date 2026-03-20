@@ -132,6 +132,9 @@ public class SecureReturnService {
                 .scheduledReturnDate(secureReturn.getScheduled_pickup_date())
                 .refundStatus(secureReturn.getRefund_status().getDescription())
                 .refundTransactionId(secureReturn.getRefund_transaction_id())
+                .timeSlot(secureReturn.getScheduled_time_slot())
+                .maxRescheduleCount(secureReturn.getMax_reschedule_allowed())
+                .eligibleForReschedule(secureReturn.canReschedule())
                 .build();
     }
 

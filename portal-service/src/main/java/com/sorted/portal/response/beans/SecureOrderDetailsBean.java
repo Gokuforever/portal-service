@@ -38,6 +38,11 @@ public record SecureOrderDetailsBean(
         @JsonProperty("refund_status")
         String refundStatus,
         @JsonProperty("refund_transaction_id")
-        String refundTransactionId
+        String refundTransactionId,
+        @JsonProperty("is_eligible_for_reschedule")
+        boolean eligibleForReschedule,
+        @JsonProperty("max_reschedule_count")
+        int maxRescheduleCount
+
 ) {
 }

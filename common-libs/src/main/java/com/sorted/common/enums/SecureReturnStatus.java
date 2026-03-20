@@ -46,6 +46,6 @@ public enum SecureReturnStatus {
      * Check if the return can be rescheduled in this status
      */
     public boolean canReschedule() {
-        return this == SCHEDULED || this == PICKUP_PENDING || this == RESCHEDULED;
+        return this == SCHEDULED;
     }
 }
