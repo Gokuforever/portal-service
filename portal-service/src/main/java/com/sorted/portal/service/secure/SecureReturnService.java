@@ -427,7 +427,7 @@ public class SecureReturnService {
         Secure_Return secureReturn = validateScheduled(rescheduleRequest.getSecureReturnId());
         LocalDate returnDate = parseReturnDate(rescheduleRequest.getReturnDate());
         Order_Details orderDetails = orderDetailsService.findById(secureReturn.getOrder_id()).orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.ORDER_NOT_FOUND));
-        Preconditions.check(orderDetails.getCreation_date().toLocalDate().plusDays(maxReturnDays + 1).isBefore(returnDate), ResponseCode.RETURN_DATE_RANGE_EXCEEDED);
+        Preconditions.check(orderDetails.getCreation_date().toLocalDate().plusDays(maxReturnDays + 1).isAfter(returnDate), ResponseCode.RETURN_DATE_RANGE_EXCEEDED);
         validateSellerBusinessHours(secureReturn.getSeller_id(), returnDate);
         updateScheduledReturn(secureReturn, returnDate, rescheduleRequest.getTimeSlot(), user.getId());
         log.info("Successfully scheduled secure return for secure return ID: {}", secureReturn.getId());
