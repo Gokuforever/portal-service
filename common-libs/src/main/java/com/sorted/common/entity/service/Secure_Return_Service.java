@@ -3,15 +3,14 @@ package com.sorted.common.entity.service;
 import com.sorted.common.entity.mongo.BaseMongoEntity;
 import com.sorted.common.entity.mongo.Secure_Return;
 import com.sorted.common.enums.SecureReturnStatus;
-import com.sorted.common.enums.TimeSlot;
 import com.sorted.common.helper.AggregationFilter.SEFilter;
 import com.sorted.common.helper.AggregationFilter.SEFilterType;
 import com.sorted.common.helper.AggregationFilter.WhereClause;
 import com.sorted.common.repository.Secure_Return_Repository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -19,9 +18,13 @@ import java.util.List;
  * Service layer for Secure_Return entity.
  * Provides CRUD operations and business logic for secure returns.
  */
+
 @Slf4j
 @Service
 public class Secure_Return_Service extends GenericEntityServiceImpl<String, Secure_Return, Secure_Return_Repository> {
+
+    @Value("${se.common.secure_pickup.mock.enabled:false}")
+    private boolean mockEnabled;
 
     @Override
     protected Class<Secure_Return_Repository> getRepoClass() {
@@ -57,7 +60,9 @@ public class Secure_Return_Service extends GenericEntityServiceImpl<String, Secu
 
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(Secure_Return.Fields.status_id, SecureReturnStatus.SCHEDULED.getId()));
-        filter.addClause(WhereClause.lte(Secure_Return.Fields.scheduled_pickup_date, LocalDateTime.now()));
+        if (!mockEnabled) {
+            filter.addClause(WhereClause.lte(Secure_Return.Fields.scheduled_pickup_date, LocalDateTime.now()));
+        }
 //        filter.addClause(WhereClause.eq(Secure_Return.Fields.scheduled_time_slot, timeSlot.name()));
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         return this.repoFind(filter);

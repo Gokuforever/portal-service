@@ -32,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -60,6 +61,9 @@ public class SecureReturnService {
 
     @Value("${se.secure.max-return-days:180}")
     private Integer maxReturnDays;
+
+    @Value("${se.common.secure_pickup.mock.enabled:false}")
+    private boolean mockEnabled;
 
     public List<SecureOrderDetailsBean> findSecureOrders(FindOrderReqBean req, HttpServletRequest httpServletRequest) {
         CommonUtils.extractHeaders(httpServletRequest, req);
@@ -161,8 +165,14 @@ public class SecureReturnService {
         GetQuoteRequest getQuoteRequest = porterUtility.buildGetQuoteRequest(pickUpAddress, deliveryAddress, user.getMobile_no(), user.getFirst_name());
         GetQuoteResponse deliveryQuote = porterUtility.getDeliveryQuote(getQuoteRequest);
         Preconditions.check(Objects.nonNull(deliveryQuote), new DeliveryNotAvailableException());
-        registerSecureReturn(order, user, seller, orderItems, secureBean, returnDate, pickUpAddress, deliveryAddress, deliveryQuote);
+        Secure_Return secureReturn = registerSecureReturn(order, user, seller, orderItems, secureBean, returnDate, pickUpAddress, deliveryAddress, deliveryQuote);
+        sendMailForSecureReturnInitiated(order, secureReturn, user);
         log.info("Successfully scheduled secure return for order ID: {}", order.getId());
+    }
+
+    @Async
+    private void sendMailForSecureReturnInitiated(Order_Details order, Secure_Return secureReturn, UsersBean user) {
+
     }
 
     /**
@@ -446,7 +456,7 @@ public class SecureReturnService {
         Preconditions.check(rescheduleRequest.getTimeSlot() != null, ResponseCode.MISSING_TIME_SLOT);
     }
 
-    private void registerSecureReturn(
+    private Secure_Return registerSecureReturn(
             Order_Details order,
             UsersBean user,
             Seller seller,
@@ -510,7 +520,7 @@ public class SecureReturnService {
         // Set refund status
         secureReturn.setRefund_status(RefundStatus.NOT_INITIATED);
 
-        secureReturnService.create(secureReturn, user.getId());
+        return secureReturnService.create(secureReturn, user.getId());
     }
 
     private String generateSecureOrderCode() {
@@ -524,7 +534,6 @@ public class SecureReturnService {
             log.info("No secure returns to initiate");
             return;
         }
-
 
 
         List<String> sellerIds = secureReturns.stream().map(Secure_Return::getSeller_id).toList();
@@ -565,8 +574,8 @@ public class SecureReturnService {
                 secureReturn.getScheduled_pickup_date(),
                 secureReturn.getScheduled_time_slot().getStartTime()
         );
-        if (scheduledDateTime.isAfter(LocalDateTime.now())) {
-            log.debug("Scheduled time not yet reached. Order: {}, Scheduled: {}", 
+        if (!mockEnabled && scheduledDateTime.isAfter(LocalDateTime.now())) {
+            log.debug("Scheduled time not yet reached. Order: {}, Scheduled: {}",
                     secureReturn.getOrder_id(), scheduledDateTime);
             return;
         }

@@ -7,5 +7,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum PurchaseType {
 
-	BUY, SECURE;
+	BUY("Direct Purchase"), SECURE("SecuRe Buy");
+
+	private final String description;
 }

@@ -39,7 +39,9 @@ public class OrderTemplateService {
         }
 
         for (Order_Item orderItem : listOI) {
-            productDetails.append(orderItem.getProduct_name()).append("|").append(orderItem.getQuantity()).append("|");
+            productDetails.append(orderItem.getProduct_name()).append("|")
+                    .append(orderItem.getQuantity()).append("|")
+                    .append(orderItem.getType().getDescription()).append("|");
         }
 
         String productDetailsString = productDetails.toString();
@@ -52,6 +54,7 @@ public class OrderTemplateService {
                 .addColumn("Sr. No.", ColumnType.SERIAL_NUMBER)
                 .addColumn("Product Name", ColumnType.DATA)
                 .addColumn("Quantity", ColumnType.DATA)
+                .addColumn("Purchase Type", ColumnType.DATA)
                 .build();
 
         // Create config map

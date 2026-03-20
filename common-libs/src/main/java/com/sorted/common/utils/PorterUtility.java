@@ -111,6 +111,12 @@ public class PorterUtility {
     @Value("${porter.mock.enabled:false}")
     private boolean porterResponseMockEnabled;
 
+    @Value("${se.secure.max-return-days:180}")
+    private Integer maxReturnDays;
+
+    @Value("${se.front.end.base_url}")
+    private String baseUrl;
+
     public GetQuoteResponse getDeliveryQuote(GetQuoteRequest request) {
         return traceHelper.runWithTrace(ThirdPartyAPIType.PORTER_GET_QUOTE, request, () -> this.getQuote(request));
     }
@@ -623,8 +629,25 @@ public class PorterUtility {
             case live -> OrderStatus.OUT_FOR_DELIVERY;
         };
 
+        if (!currentOrderStatus.equals(details.getStatus())) {
+            switch (currentOrderStatus) {
+                case DELIVERED -> mailTemplate = MailTemplate.ORDER_ARRIVED;
+                case OUT_FOR_DELIVERY -> mailTemplate = MailTemplate.ORDER_DISPATCHED;
+            }
+        }
+        details.setFare_details(fetchOrderRes.getFare_details());
+        details.setStatus(currentOrderStatus, Defaults.PORTER_STCHK_CRON);
 
+
+        order_Details_Service.update(details.getId(), details, Defaults.PORTER_STCHK_CRON);
         String invoiceUrl = null;
+        if (currentOrderStatus == OrderStatus.DELIVERED) {
+            try {
+                invoiceUrl = generateInvoiceService.generateInvoice(details);
+            } catch (Exception e) {
+                internalMailService.sendMailOnError("Error in generating invoice for order id : " + details.getCode(), "Error in generating invoice for order id : " + details.getCode(), e);
+            }
+        }
         if (!details.getStatus().equals(currentOrderStatus)) {
             if (currentOrderStatus.equals(OrderStatus.OUT_FOR_DELIVERY) && enableSms) {
                 String code = details.getCode();
@@ -649,26 +672,14 @@ public class PorterUtility {
                         () -> smsService.sendSMS(List.of(details.getDelivery_address().getPhone_no()), content, SmsTemplate.DELIVERED)
                 );
             }
-//            if (currentOrderStatus.equals(OrderStatus.DELIVERY_FAILED) && enableSms) {
-            String firstName = StringUtils.hasText(details.getDelivery_address().getFirst_name()) ? details.getDelivery_address().getFirst_name() : "Student";
-//                smsTraceHelper.runWithTrace(List.of(details.getDelivery_address().getPhone_no()),
-//                        firstName,
-//                        SmsTemplate.DELIVERED,
-//                        Defaults.AUTO,
-//                        () -> smsService.sendSMS(List.of(details.getDelivery_address().getPhone_no()), firstName, SmsTemplate.DELIVERED)
-//                );
-            // TODO: Delivery Failed
-//            }
-            details.setFare_details(fetchOrderRes.getFare_details());
-            details.setStatus(currentOrderStatus, Defaults.PORTER_STCHK_CRON);
+            if (currentOrderStatus.equals(OrderStatus.DELIVERED)) {
+                SEFilter filterOI = new SEFilter(SEFilterType.AND);
+                filterOI.addClause(WhereClause.eq(Order_Item.Fields.order_id, details.getDp_order_id()));
+                filterOI.addClause(WhereClause.eq(Order_Item.Fields.type, PurchaseType.SECURE.name()));
 
-
-            order_Details_Service.update(details.getId(), details, Defaults.PORTER_STCHK_CRON);
-            if (currentOrderStatus == OrderStatus.DELIVERED) {
-                try {
-                    invoiceUrl = generateInvoiceService.generateInvoice(details);
-                } catch (Exception e) {
-                    internalMailService.sendMailOnError("Error in generating invoice for order id : " + details.getCode(), "Error in generating invoice for order id : " + details.getCode(), e);
+                long count = order_Item_Service.countByFilter(filterOI);
+                if (count > 0) {
+                    ifSecureSendMail(details);
                 }
             }
 
@@ -678,6 +689,22 @@ public class PorterUtility {
         }
 
 
+    }
+
+    @Async
+    private void ifSecureSendMail(Order_Details details) {
+        String firstName = details.getDelivery_address().getFirst_name();
+        LocalDateTime maxReturnDate = details.getCreation_date().plusDays(maxReturnDays + 1);
+        String secureOrdersUrl = baseUrl + details.getCode();
+
+        String mailContent = firstName + "|" + maxReturnDate + "|" + secureOrdersUrl;
+
+        MailBuilder builder = new MailBuilder();
+        builder.setTo(usersService.findById(details.getUser_id()).get().getEmail_id());
+        builder.setContent(mailContent);
+        builder.setTemplate(MailTemplate.SECURE_ORDERS_DELIVERED);
+
+        emailSenderImpl.sendEmailHtmlTemplate(builder);
     }
 
     @Async
