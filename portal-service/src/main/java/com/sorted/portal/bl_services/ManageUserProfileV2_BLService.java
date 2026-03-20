@@ -131,4 +131,25 @@ public class ManageUserProfileV2_BLService {
         }
         return usersService.validateAndGetUserInfo(req_user_id);
     }
+
+    @PostMapping("/update-education")
+    public CompleteProfileRes updateEducationDetails(@RequestBody CompleteUserProfile request, HttpServletRequest httpServletRequest) {
+        CommonUtils.extractHeaders(httpServletRequest, request);
+        UsersBean usersBean = usersService.validateAndGetUserInfo(request.getReq_user_id());
+
+        if (usersBean.getRole().getUser_type() == com.sorted.common.enums.UserType.GUEST) {
+            throw new AccessDeniedException();
+        }
+
+        EducationCategoryBean educationDetails = request.getEducationDetails();
+        Preconditions.check(educationDetails != null, ResponseCode.MANDATE_EDUCATION_LEVEL_DETAILS);
+        validationService.validate(educationDetails);
+
+        Users users = usersService.findById(usersBean.getId()).get();
+        users.setEducationDetails(request.getEducationDetails());
+
+        usersService.update(users.getId(), users, users.getId());
+        UsersBean userInfo = usersService.validateAndGetUserInfo(users.getId());
+        return CompleteProfileRes.builder().userInfo(userInfo).build();
+    }
 }
