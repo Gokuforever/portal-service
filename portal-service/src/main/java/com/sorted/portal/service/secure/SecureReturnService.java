@@ -184,7 +184,7 @@ public class SecureReturnService {
         Preconditions.check(optionalSecureReturn.isPresent(), ResponseCode.INVALID_SECURE_RETURN_ID);
 
         Secure_Return secureReturn = optionalSecureReturn.get();
-        Preconditions.check(secureReturn.getSeller_id().equals(seller.getId()), ResponseCode.INVALID_SECURE_RETURN_ID);
+        Preconditions.check(secureReturn.getSeller_id().equals(seller.getSeller().getId()), ResponseCode.INVALID_SECURE_RETURN_ID);
         Preconditions.check(secureReturn.getStatus().equals(SecureReturnStatus.DELIVERED_TO_SELLER), ResponseCode.INVALID_SECURE_RETURN_STATUS);
         List<Secure_Return_Item> secureReturnItems = secureReturn.getItems();
         for (Secure_Return_Item item : secureReturnItems) {
