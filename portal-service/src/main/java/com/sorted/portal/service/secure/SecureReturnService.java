@@ -234,7 +234,7 @@ public class SecureReturnService {
                 .orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.ORDER_NOT_FOUND));
 
         String merchantRefundId = "SEC-REF-" + secureReturn.getSecure_order_code();
-        String originalOrderId = orderDetails.getPg_order_id();
+        String originalOrderId = orderDetails.getId();
         Long refundAmountInPaise = secureReturn.getTotal_actual_refund();
 
         log.info("Initiating refund for secure return: {}, Amount: ₹{}, OrderId: {}",
