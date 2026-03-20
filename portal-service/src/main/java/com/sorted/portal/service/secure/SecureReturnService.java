@@ -1,5 +1,6 @@
 package com.sorted.portal.service.secure;
 
+import com.phonepe.sdk.pg.common.models.response.RefundResponse;
 import com.sorted.common.beans.*;
 import com.sorted.common.constants.Defaults;
 import com.sorted.common.entity.mongo.*;
@@ -224,10 +225,55 @@ public class SecureReturnService {
             secureReturnService.update(secureReturn.getId(), secureReturn, Defaults.SYSTEM_ADMIN);
             log.info("No refund needed for secure return: {}", secureReturn.getId());
         } else {
-            // Refund will be processed by a separate cron/service
-            log.info("Refund of ₹{} needs to be processed for secure return: {}",
-                    secureReturn.getTotal_actual_refund(), secureReturn.getId());
+            initiateRefund(secureReturn);
         }
+    }
+
+    private void initiateRefund(Secure_Return secureReturn) {
+        Order_Details orderDetails = orderDetailsService.findById(secureReturn.getOrder_id())
+                .orElseThrow(() -> new CustomIllegalArgumentsException(ResponseCode.ORDER_NOT_FOUND));
+
+        String merchantRefundId = "SEC-REF-" + secureReturn.getSecure_order_code();
+        String originalOrderId = orderDetails.getPg_order_id();
+        Long refundAmountInPaise = secureReturn.getTotal_actual_refund();
+
+        log.info("Initiating refund for secure return: {}, Amount: ₹{}, OrderId: {}",
+                secureReturn.getId(), secureReturn.getTotal_actual_refund(), originalOrderId);
+
+        secureReturn.setRefund_status(RefundStatus.PENDING);
+        secureReturn.setRefund_initiated_at(LocalDateTime.now());
+        secureReturnService.update(secureReturn.getId(), secureReturn, Defaults.SYSTEM_ADMIN);
+
+        Optional<RefundResponse> refundResponse =
+                phonePeUtility.partialRefund(merchantRefundId, originalOrderId, refundAmountInPaise);
+
+        if (refundResponse.isPresent()) {
+            secureReturn.setRefund_transaction_id(refundResponse.get().getRefundId());
+            RefundResponse response = refundResponse.get();
+            String state = response.getState();
+            RefundStatus refundStatus = switch (state) {
+                case "COMPLETED" -> RefundStatus.COMPLETED;
+                case "FAILED" -> RefundStatus.FAILED;
+                default -> RefundStatus.PROCESSING;
+            };
+            secureReturn.setRefund_status(refundStatus);
+            secureReturn.setStatus(
+                    SecureReturnStatus.REFUND_COMPLETED,
+                    Defaults.SYSTEM_ADMIN,
+                    "Refund initiated successfully"
+            );
+            log.info("Refund initiated successfully for secure return: {}, TransactionId: {}",
+                    secureReturn.getId(), refundResponse.get().getRefundId());
+        } else {
+            secureReturn.setRefund_status(RefundStatus.FAILED);
+            secureReturn.setStatus(
+                    SecureReturnStatus.REFUND_FAILED,
+                    Defaults.SYSTEM_ADMIN,
+                    "Refund initiation failed"
+            );
+            log.error("Refund initiation failed for secure return: {}", secureReturn.getId());
+        }
+        secureReturnService.update(secureReturn.getId(), secureReturn, Defaults.SYSTEM_ADMIN);
     }
 
     private UsersBean validateCustomer(String userId) {

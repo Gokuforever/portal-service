@@ -23,7 +23,7 @@ public enum SecureReturnStatus {
     REFUND_NOT_APPLICABLE(11, "Refund Not Applicable"),
     FAILED(12, "Process Failed"),
     CANCELLED(13, "Cancelled by User/System"),
-    RESCHEDULED(14, "Pickup Rescheduled");
+    REFUND_FAILED(14, "Refund Failed");
 
     private final Integer id;
     private final String description;
