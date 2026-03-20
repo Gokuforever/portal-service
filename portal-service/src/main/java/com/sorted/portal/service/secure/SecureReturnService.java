@@ -1,6 +1,7 @@
 package com.sorted.portal.service.secure;
 
 import com.phonepe.sdk.pg.common.models.response.RefundResponse;
+import com.phonepe.sdk.pg.common.models.response.RefundStatusResponse;
 import com.sorted.common.beans.*;
 import com.sorted.common.constants.Defaults;
 import com.sorted.common.entity.mongo.*;
@@ -258,7 +259,8 @@ public class SecureReturnService {
             };
             secureReturn.setRefund_status(refundStatus);
             secureReturn.setStatus(
-                    SecureReturnStatus.REFUND_COMPLETED,
+                    refundStatus == RefundStatus.COMPLETED ? SecureReturnStatus.REFUND_COMPLETED : refundStatus == RefundStatus.PROCESSING
+                            ? SecureReturnStatus.REFUND_PENDING : SecureReturnStatus.REFUND_FAILED,
                     Defaults.SYSTEM_ADMIN,
                     "Refund initiated successfully"
             );
@@ -272,6 +274,67 @@ public class SecureReturnService {
                     "Refund initiation failed"
             );
             log.error("Refund initiation failed for secure return: {}", secureReturn.getId());
+        }
+        secureReturnService.update(secureReturn.getId(), secureReturn, Defaults.SYSTEM_ADMIN);
+    }
+
+    public void checkPendingRefundStatus() {
+        List<Secure_Return> pendingRefunds = secureReturnService.findByRefundStatus(RefundStatus.PROCESSING);
+        log.info("Found {} secure returns with pending refund status", pendingRefunds.size());
+
+        for (Secure_Return secureReturn : pendingRefunds) {
+            try {
+                checkAndUpdateRefundStatus(secureReturn);
+            } catch (Exception e) {
+                log.error("Error checking refund status for secure return: {}", secureReturn.getId(), e);
+            }
+        }
+    }
+
+    private void checkAndUpdateRefundStatus(Secure_Return secureReturn) {
+        String refundId = secureReturn.getRefund_transaction_id();
+        if (!StringUtils.hasText(refundId)) {
+            log.warn("No refund transaction ID found for secure return: {}", secureReturn.getId());
+            return;
+        }
+
+        Optional<RefundStatusResponse> refundStatusResponse =
+                phonePeUtility.refundStatus(refundId);
+
+        if (refundStatusResponse.isEmpty()) {
+            log.warn("Unable to fetch refund status for secure return: {}, refundId: {}", secureReturn.getId(), refundId);
+            return;
+        }
+
+        String state = refundStatusResponse.get().getState();
+        log.info("Refund status for secure return: {}, state: {}", secureReturn.getId(), state);
+
+        RefundStatus refundStatus = switch (state) {
+            case "COMPLETED" -> RefundStatus.COMPLETED;
+            case "FAILED" -> RefundStatus.FAILED;
+            default -> RefundStatus.PROCESSING;
+        };
+
+        if (refundStatus == RefundStatus.PROCESSING) {
+            return;
+        }
+
+        secureReturn.setRefund_status(refundStatus);
+        if (refundStatus == RefundStatus.COMPLETED) {
+            secureReturn.setRefund_completed_at(LocalDateTime.now());
+            secureReturn.setStatus(
+                    SecureReturnStatus.REFUND_COMPLETED,
+                    Defaults.SYSTEM_ADMIN,
+                    "Refund completed successfully"
+            );
+            log.info("Refund completed for secure return: {}", secureReturn.getId());
+        } else {
+            secureReturn.setStatus(
+                    SecureReturnStatus.REFUND_FAILED,
+                    Defaults.SYSTEM_ADMIN,
+                    "Refund failed"
+            );
+            log.error("Refund failed for secure return: {}", secureReturn.getId());
         }
         secureReturnService.update(secureReturn.getId(), secureReturn, Defaults.SYSTEM_ADMIN);
     }

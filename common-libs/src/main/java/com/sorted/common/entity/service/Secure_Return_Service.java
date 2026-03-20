@@ -2,6 +2,7 @@ package com.sorted.common.entity.service;
 
 import com.sorted.common.entity.mongo.BaseMongoEntity;
 import com.sorted.common.entity.mongo.Secure_Return;
+import com.sorted.common.enums.RefundStatus;
 import com.sorted.common.enums.SecureReturnStatus;
 import com.sorted.common.helper.AggregationFilter.SEFilter;
 import com.sorted.common.helper.AggregationFilter.SEFilterType;
@@ -75,6 +76,13 @@ public class Secure_Return_Service extends GenericEntityServiceImpl<String, Secu
                 SecureReturnStatus.IN_TRANSIT.getId())));
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
 
+        return this.repoFind(filter);
+    }
+
+    public List<Secure_Return> findByRefundStatus(RefundStatus refundStatus) {
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(Secure_Return.Fields.refund_status, refundStatus.name()));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         return this.repoFind(filter);
     }
 
