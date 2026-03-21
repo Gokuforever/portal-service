@@ -2,6 +2,7 @@ package com.sorted.portal.bl_services;
 
 import com.sorted.common.beans.GroupComponent;
 import com.sorted.common.beans.ProductCarousel;
+import com.sorted.common.beans.ProductMasterBean;
 import com.sorted.common.beans.SelectedSubCategories;
 import com.sorted.common.beans.UsersBean;
 import com.sorted.common.entity.mongo.*;
@@ -290,7 +291,28 @@ public class ManageMetaData_BLService {
 
         List<Product_Master> listPM = this.getProductMasters();
         if (!CollectionUtils.isEmpty(listPM)) {
-            data.setProducts(listPM);
+            List<ProductMasterBean> productBeans = listPM.stream()
+                    .map(pm -> ProductMasterBean.builder()
+                            .id(pm.getId())
+                            .catagory_id(pm.getCatagory_id())
+                            .name(pm.getName())
+                            .img_src(pm.getImg_src())
+                            .group_id(pm.getGroup_id())
+                            .group_name(pm.getGroup_name())
+                            .sub_categories(pm.getSub_categories())
+                            .cdn_url(pm.getCdn_url())
+                            .mrp(CommonUtils.paiseToRupee(pm.getMrp()))
+                            .desc(pm.getDesc())
+                            .created_by(pm.getCreated_by())
+                            .modified_by(pm.getModified_by())
+                            .creation_date(pm.getCreation_date())
+                            .modification_date(pm.getModification_date())
+                            .creation_date_str(pm.getCreation_date_str())
+                            .modification_date_str(pm.getModification_date_str())
+                            .deleted(pm.isDeleted())
+                            .build())
+                    .toList();
+            data.setProducts(productBeans);
         }
         data.setUpdated_at(LocalDateTime.now());
 
