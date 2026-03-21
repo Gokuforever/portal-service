@@ -137,6 +137,9 @@ public class PreferencesHandlerService {
                     }
                 }
 
+                // Sort by quantity descending before returning
+                randomProductBeans.sort((a, b) -> Long.compare(b.quantity(), a.quantity()));
+
                 ProductCarouselBean productCarouselBean = ProductCarouselBean.builder()
                         .title(productCarousel.getTitle())
                         .subtitle(productCarousel.getSubtitle())
@@ -208,6 +211,7 @@ public class PreferencesHandlerService {
                             }
                         }
                     }
+                    productListByGroup.sort((a, b) -> Long.compare(b.quantity(), a.quantity()));
 
                     GroupComponentBean groupComponentBean = GroupComponentBean.builder()
                             .groupId(group.getId())
