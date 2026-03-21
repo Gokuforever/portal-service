@@ -5,12 +5,15 @@ import com.sorted.portal.request.beans.AppraiseSecureReturn;
 import com.sorted.portal.request.beans.FindOrderReqBean;
 import com.sorted.portal.request.beans.InitiateSecureBean;
 import com.sorted.portal.response.beans.SecureOrderDetailsBean;
+import com.sorted.portal.response.beans.SecurePickupDetailsBean;
 import com.sorted.portal.service.secure.SecureReturnService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -90,6 +93,32 @@ public class ManageSecure_BLService {
         secureReturnService.rescheduleSecureReturn(request);
 
         log.info("Completed secure return reschedule for order ID: {}", request.getOrderId());
+    }
+
+    /**
+     * Gets secure pickup details by confirmation token.
+     * Frontend uses this to display pickup details page with confirm button.
+     *
+     * @param token The confirmation token from the email link
+     * @return SecurePickupDetailsBean with pickup details
+     */
+    @GetMapping("/secure/pickup-details")
+    public SecurePickupDetailsBean getPickupDetails(@RequestParam String token) {
+        log.info("Received pickup details request");
+        return secureReturnService.getPickupDetailsByToken(token);
+    }
+
+    /**
+     * Confirms pickup availability for a secure return.
+     * Called when user clicks the confirm button on the pickup details page.
+     *
+     * @param token The confirmation token from the email link
+     */
+    @PostMapping("/secure/confirm-pickup")
+    public void confirmPickup(@RequestParam String token) {
+        log.info("Received pickup confirmation request");
+        secureReturnService.confirmPickup(token);
+        log.info("Pickup confirmed successfully");
     }
 
 }

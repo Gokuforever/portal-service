@@ -13,6 +13,8 @@ import com.sorted.common.exceptions.DeliveryNotAvailableException;
 import com.sorted.common.helper.AggregationFilter.SEFilter;
 import com.sorted.common.helper.AggregationFilter.SEFilterType;
 import com.sorted.common.helper.AggregationFilter.WhereClause;
+import com.sorted.common.helper.MailBuilder;
+import com.sorted.common.notifications.EmailSenderImpl;
 import com.sorted.common.porter.req.beans.CreateOrderBean;
 import com.sorted.common.porter.req.beans.GetQuoteRequest;
 import com.sorted.common.porter.res.beans.CreateOrderResBean;
@@ -28,6 +30,7 @@ import com.sorted.portal.request.beans.InitiateSecureBean;
 import com.sorted.portal.request.beans.SecureItemAppraisalDetails;
 import com.sorted.portal.response.beans.SecureOrderDetailsBean;
 import com.sorted.portal.response.beans.SecureOrderItemDetail;
+import com.sorted.portal.response.beans.SecurePickupDetailsBean;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,12 +63,19 @@ public class SecureReturnService {
     private final StoreActivityService storeActivityService;
     private final PhonePeUtility phonePeUtility;
     private final Secure_Return_Service secureReturnService;
+    private final EmailSenderImpl emailSender;
 
     @Value("${se.secure.max-return-days:180}")
     private Integer maxReturnDays;
 
     @Value("${se.common.secure_pickup.mock.enabled:false}")
     private boolean mockEnabled;
+
+    @Value("${se.secure-return.details_url}")
+    private String secureReturnDetailsUrl;
+
+    @Value("${se.secure-return.list_url}")
+    private String secureReturnListUrl;
 
     public List<SecureOrderDetailsBean> findSecureOrders(FindOrderReqBean req, HttpServletRequest httpServletRequest) {
         CommonUtils.extractHeaders(httpServletRequest, req);
@@ -276,7 +286,7 @@ public class SecureReturnService {
                         "Refund failed"
                 );
                 log.error("Refund failed for secure return: {}", secureReturn.getId());
-            }else {
+            } else {
                 secureReturn.setStatus(
                         SecureReturnStatus.REFUND_PENDING,
                         Defaults.SYSTEM_ADMIN,
@@ -649,6 +659,9 @@ public class SecureReturnService {
         // Set refund status
         secureReturn.setRefund_status(RefundStatus.NOT_INITIATED);
 
+        // Initialize confirmation tracking
+        secureReturn.setConfirmation_email_sent(false);
+
         return secureReturnService.create(secureReturn, user.getId());
     }
 
@@ -782,6 +795,206 @@ public class SecureReturnService {
             case ended, completed -> SecureReturnStatus.DELIVERED_TO_SELLER;
             case cancelled -> SecureReturnStatus.CANCELLED;
         };
+    }
+
+    /**
+     * Send pickup confirmation emails to users with pickups scheduled for the next day.
+     * Called by SecurePickupConfirmationCron daily.
+     */
+    public void sendPickupConfirmationEmails() {
+        LocalDate nextDay = LocalDate.now().plusDays(1);
+        List<Secure_Return> returnsNeedingConfirmation = secureReturnService.findReturnsNeedingConfirmationEmail(nextDay);
+
+        if (CollectionUtils.isEmpty(returnsNeedingConfirmation)) {
+            log.info("No secure returns needing confirmation email for {}", nextDay);
+            return;
+        }
+
+        log.info("Found {} secure returns needing confirmation email for {}", returnsNeedingConfirmation.size(), nextDay);
+
+        List<String> userIds = returnsNeedingConfirmation.stream().map(Secure_Return::getUser_id).distinct().toList();
+        SEFilter userFilter = new SEFilter(SEFilterType.AND);
+        userFilter.addClause(WhereClause.in(BaseMongoEntity.Fields.id, userIds));
+        userFilter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        List<Users> users = usersService.repoFind(userFilter);
+        Map<String, Users> userMap = users.stream().collect(Collectors.toMap(Users::getId, Function.identity()));
+
+        for (Secure_Return secureReturn : returnsNeedingConfirmation) {
+            try {
+                Users user = userMap.get(secureReturn.getUser_id());
+                if (user == null || !StringUtils.hasText(user.getEmail_id())) {
+                    log.warn("User not found or no email for secure return: {}", secureReturn.getId());
+                    continue;
+                }
+
+                // Generate token first before sending email
+                String confirmationToken = UUID.randomUUID().toString();
+                secureReturn.setConfirmation_email_sent(true);
+                secureReturn.setConfirmation_email_sent_at(LocalDateTime.now());
+                secureReturn.setConfirmation_token(confirmationToken);
+                secureReturnService.update(secureReturn.getId(), secureReturn, Defaults.SYSTEM_ADMIN);
+
+                // Send email with the token
+                sendPickupConfirmationEmail(secureReturn, user);
+
+                log.info("Sent pickup confirmation email for secure return: {}", secureReturn.getId());
+            } catch (Exception e) {
+                log.error("Error sending pickup confirmation email for secure return: {}", secureReturn.getId(), e);
+            }
+        }
+    }
+
+    @Async
+    private void sendPickupConfirmationEmail(Secure_Return secureReturn, Users user) {
+        // Email content will be: userName|orderCode|pickupDate|timeSlot|confirmationLink
+        String userName = user.getFirst_name() + " " + user.getLast_name();
+        String confirmationLink = buildConfirmationLink(secureReturn.getConfirmation_token());
+        String mailContent = userName + "|" + confirmationLink + "|" + secureReturnListUrl;
+
+        MailBuilder mailBuilder = new MailBuilder();
+        mailBuilder.setTo(user.getEmail_id());
+        mailBuilder.setContent(mailContent);
+        mailBuilder.setTemplate(MailTemplate.SECURE_PICKUP_CONFIRMATION);
+
+        emailSender.sendEmailHtmlTemplate(mailBuilder);
+    }
+
+    private String buildConfirmationLink(String token) {
+        return secureReturnDetailsUrl + "/secure/pickup-details?token=" + token;
+    }
+
+    /**
+     * Mark returns scheduled for today that were not confirmed as PICKUP_NOT_CONFIRMED.
+     * Called by SecurePickupConfirmationCron daily before pickup initiation.
+     */
+    public void markUnconfirmedReturns() {
+        LocalDate today = LocalDate.now();
+        List<Secure_Return> unconfirmedReturns = secureReturnService.findUnconfirmedReturnsForToday(today);
+
+        if (CollectionUtils.isEmpty(unconfirmedReturns)) {
+            log.info("No unconfirmed secure returns for today: {}", today);
+            return;
+        }
+
+        log.info("Found {} unconfirmed secure returns for today: {}", unconfirmedReturns.size(), today);
+
+        LocalTime now = LocalTime.now();
+
+        for (Secure_Return secureReturn : unconfirmedReturns) {
+            try {
+                // Only mark as not confirmed if the pickup time slot has passed
+                TimeSlot scheduledSlot = secureReturn.getScheduled_time_slot();
+                if (scheduledSlot != null) {
+                    LocalTime slotStartTime = scheduledSlot.getStartTime();
+                    if (now.isBefore(slotStartTime)) {
+                        // Pickup time slot hasn't started yet, skip this return
+                        log.debug("Skipping secure return {}: pickup slot {} hasn't started yet", 
+                                secureReturn.getId(), scheduledSlot.getDisplayName());
+                        continue;
+                    }
+                }
+
+                secureReturn.setStatus(
+                        SecureReturnStatus.PICKUP_NOT_CONFIRMED,
+                        Defaults.SYSTEM_ADMIN,
+                        "Pickup not confirmed by user before scheduled date"
+                );
+                secureReturnService.update(secureReturn.getId(), secureReturn, Defaults.SYSTEM_ADMIN);
+                log.info("Marked secure return as PICKUP_NOT_CONFIRMED: {}", secureReturn.getId());
+
+                // TODO: Send notification to user about missed confirmation
+            } catch (Exception e) {
+                log.error("Error marking secure return as unconfirmed: {}", secureReturn.getId(), e);
+            }
+        }
+    }
+
+    /**
+     * Confirm pickup availability for a secure return using the confirmation token.
+     * Called from the confirmation endpoint.
+     */
+    public void confirmPickup(String token) {
+        Preconditions.check(StringUtils.hasText(token), ResponseCode.INVALID_TOKEN);
+
+        Secure_Return secureReturn = secureReturnService.findByConfirmationToken(token);
+        Preconditions.check(secureReturn != null, ResponseCode.INVALID_TOKEN);
+        Preconditions.check(secureReturn.getStatus() == SecureReturnStatus.SCHEDULED, ResponseCode.INVALID_SECURE_RETURN_STATUS);
+
+        // Verify the pickup date is still in the future or today
+        LocalDate today = LocalDate.now();
+        Preconditions.check(!secureReturn.getScheduled_pickup_date().isBefore(today), ResponseCode.PICKUP_DATE_PASSED);
+
+        secureReturn.setStatus(
+                SecureReturnStatus.PICKUP_CONFIRMED,
+                Defaults.SYSTEM_ADMIN,
+                "Pickup confirmed by user"
+        );
+        secureReturnService.update(secureReturn.getId(), secureReturn, Defaults.SYSTEM_ADMIN);
+        log.info("Pickup confirmed for secure return: {}", secureReturn.getId());
+    }
+
+    /**
+     * Get secure pickup details by confirmation token.
+     * Used by frontend to display pickup details page with confirm button.
+     */
+    public SecurePickupDetailsBean getPickupDetailsByToken(String token) {
+        Preconditions.check(StringUtils.hasText(token), ResponseCode.INVALID_TOKEN);
+
+        Secure_Return secureReturn = secureReturnService.findByConfirmationToken(token);
+        Preconditions.check(secureReturn != null, ResponseCode.INVALID_TOKEN);
+
+        // Get user details
+        Users user = usersService.findById(secureReturn.getUser_id()).orElse(null);
+        String customerName = user != null ? user.getFirst_name() + " " + user.getLast_name() : "Customer";
+
+        // Build pickup address string
+        AddressDTO addr = secureReturn.getPickup_address();
+        String pickupAddress = buildAddressString(addr);
+
+        // Check if confirmation is still allowed
+        LocalDate today = LocalDate.now();
+        boolean canConfirm = secureReturn.getStatus() == SecureReturnStatus.SCHEDULED
+                && !secureReturn.getScheduled_pickup_date().isBefore(today);
+
+        // Build item details
+        List<SecurePickupDetailsBean.PickupItemDetail> itemDetails = secureReturn.getItems().stream()
+                .map(item -> SecurePickupDetailsBean.PickupItemDetail.builder()
+                        .productName(item.getProduct_name())
+                        .productImageUrl(item.getProduct_image_url())
+                        .quantity(item.getQuantity().intValue())
+                        .sellingPrice(CommonUtils.paiseToRupee(item.getSelling_price_after_discount()))
+                        .estimatedRefund(CommonUtils.paiseToRupee(item.getEstimated_refund_amount()))
+                        .build())
+                .collect(Collectors.toList());
+
+        return SecurePickupDetailsBean.builder()
+                .secureReturnId(secureReturn.getId())
+                .orderCode(secureReturn.getOrder_code())
+                .secureOrderCode(secureReturn.getSecure_order_code())
+                .scheduledPickupDate(secureReturn.getScheduled_pickup_date())
+                .timeSlot(secureReturn.getScheduled_time_slot())
+                .timeSlotDisplay(secureReturn.getScheduled_time_slot().getDisplayName())
+                .status(secureReturn.getStatus())
+                .statusDescription(secureReturn.getStatus().getDescription())
+                .canConfirm(canConfirm)
+                .customerName(customerName)
+                .pickupAddress(pickupAddress)
+                .items(itemDetails)
+                .totalItems(itemDetails.size())
+                .estimatedRefund(CommonUtils.paiseToRupee(secureReturn.getTotal_estimated_refund()))
+                .build();
+    }
+
+    private String buildAddressString(AddressDTO addr) {
+        if (addr == null) return "";
+        StringBuilder sb = new StringBuilder();
+        if (StringUtils.hasText(addr.getStreet_1())) sb.append(addr.getStreet_1());
+        if (StringUtils.hasText(addr.getStreet_2())) sb.append(", ").append(addr.getStreet_2());
+        if (StringUtils.hasText(addr.getLandmark())) sb.append(", ").append(addr.getLandmark());
+        if (StringUtils.hasText(addr.getCity())) sb.append(", ").append(addr.getCity());
+        if (StringUtils.hasText(addr.getState())) sb.append(", ").append(addr.getState());
+        if (StringUtils.hasText(addr.getPincode())) sb.append(" - ").append(addr.getPincode());
+        return sb.toString();
     }
 }
 

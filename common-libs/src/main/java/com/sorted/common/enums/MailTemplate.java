@@ -21,6 +21,7 @@ public enum MailTemplate {
 	ERROR("error.html", "Error occurred on website."),
 	SECURE_ORDERS_DELIVERED("secure_orders_delivered.html", "SecuRe Buy Delivery Completed!"),
 	SECURE_RETURN_SCHEDULED("secure_return_scheduled.html", "SecuRe Return is Scheduled!"),
+	SECURE_PICKUP_CONFIRMATION("return_confirmation.html", "Action Required: Confirm Your SecuRe Pickup for Tomorrow!"),
 	;
 
 	private final String file_name;

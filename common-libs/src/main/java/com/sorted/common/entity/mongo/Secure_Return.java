@@ -77,6 +77,11 @@ public class Secure_Return extends BaseMongoEntity<String> {
     private LocalDateTime refund_initiated_at;
     private LocalDateTime refund_completed_at;
 
+    // Pickup Confirmation
+    private Boolean confirmation_email_sent;
+    private LocalDateTime confirmation_email_sent_at;
+    private String confirmation_token;
+
     // Failure Handling
     private String failure_reason;
     private String rejection_remarks;

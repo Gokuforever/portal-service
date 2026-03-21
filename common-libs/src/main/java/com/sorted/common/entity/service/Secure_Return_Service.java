@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -60,11 +61,11 @@ public class Secure_Return_Service extends GenericEntityServiceImpl<String, Secu
     public List<Secure_Return> fetchScheduledSecureReturns() {
 
         SEFilter filter = new SEFilter(SEFilterType.AND);
-        filter.addClause(WhereClause.eq(Secure_Return.Fields.status_id, SecureReturnStatus.SCHEDULED.getId()));
+        // Only fetch PICKUP_CONFIRMED returns (user has confirmed availability)
+        filter.addClause(WhereClause.eq(Secure_Return.Fields.status_id, SecureReturnStatus.PICKUP_CONFIRMED.getId()));
         if (!mockEnabled) {
             filter.addClause(WhereClause.lte(Secure_Return.Fields.scheduled_pickup_date, LocalDateTime.now()));
         }
-//        filter.addClause(WhereClause.eq(Secure_Return.Fields.scheduled_time_slot, timeSlot.name()));
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         return this.repoFind(filter);
     }
@@ -82,6 +83,55 @@ public class Secure_Return_Service extends GenericEntityServiceImpl<String, Secu
     public List<Secure_Return> findByRefundStatus(RefundStatus refundStatus) {
         SEFilter filter = new SEFilter(SEFilterType.AND);
         filter.addClause(WhereClause.eq(Secure_Return.Fields.refund_status, refundStatus.name()));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        return this.repoFind(filter);
+    }
+
+    /**
+     * Find scheduled returns for next day that haven't received confirmation email
+     */
+    public List<Secure_Return> findReturnsNeedingConfirmationEmail(LocalDate nextDay) {
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(Secure_Return.Fields.status_id, SecureReturnStatus.SCHEDULED.getId()));
+        if (!mockEnabled) {
+            filter.addClause(WhereClause.eq(Secure_Return.Fields.scheduled_pickup_date, nextDay));
+        }
+        filter.addClause(WhereClause.eq(Secure_Return.Fields.confirmation_email_sent, false));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        return this.repoFind(filter);
+    }
+
+    /**
+     * Find returns scheduled for today that were not confirmed
+     */
+    public List<Secure_Return> findUnconfirmedReturnsForToday(LocalDate today) {
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(Secure_Return.Fields.status_id, SecureReturnStatus.SCHEDULED.getId()));
+        filter.addClause(WhereClause.eq(Secure_Return.Fields.scheduled_pickup_date, today));
+        filter.addClause(WhereClause.eq(Secure_Return.Fields.confirmation_email_sent, true));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        return this.repoFind(filter);
+    }
+
+    /**
+     * Find secure return by confirmation token
+     */
+    public Secure_Return findByConfirmationToken(String token) {
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(Secure_Return.Fields.confirmation_token, token));
+        filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+        return this.repoFind(filter).stream().findFirst().orElse(null);
+    }
+
+    /**
+     * Fetch confirmed secure returns ready for pickup
+     */
+    public List<Secure_Return> fetchConfirmedSecureReturns() {
+        SEFilter filter = new SEFilter(SEFilterType.AND);
+        filter.addClause(WhereClause.eq(Secure_Return.Fields.status_id, SecureReturnStatus.PICKUP_CONFIRMED.getId()));
+        if (!mockEnabled) {
+            filter.addClause(WhereClause.lte(Secure_Return.Fields.scheduled_pickup_date, LocalDateTime.now()));
+        }
         filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
         return this.repoFind(filter);
     }

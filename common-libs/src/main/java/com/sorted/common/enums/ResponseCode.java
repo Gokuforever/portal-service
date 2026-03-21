@@ -304,6 +304,8 @@ public enum ResponseCode {
 	INVALID_SECURE_RETURN_STATUS("SE_0288", "Invalid secure return status.", "Invalid secure return status."),
 	SECURE_RETURN_RESCHEDULE_LIMIT_EXCEEDED("SE_0289", "Secure return reschedule limit exceeded.", "Secure return reschedule limit exceeded."),
 	RETURN_DATE_RANGE_EXCEEDED("SE_0290", "Return date range exceeded.", "Return date range exceeded."),
+	INVALID_TOKEN("SE_0291", "Invalid or expired token.", "Invalid or expired confirmation link."),
+	PICKUP_DATE_PASSED("SE_0292", "Pickup date has passed.", "The scheduled pickup date has already passed."),
 	;
 	// @formatter:on
 

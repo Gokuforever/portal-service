@@ -12,18 +12,20 @@ import lombok.Getter;
 public enum SecureReturnStatus {
 
     SCHEDULED(1, "Return Scheduled"),
-    PICKUP_PENDING(2, "Awaiting Pickup"),
-    PICKUP_ASSIGNED(3, "Delivery Partner Assigned"),
-    IN_TRANSIT(5, "In Transit to Seller"),
-    DELIVERED_TO_SELLER(6, "Delivered to Seller"),
-    UNDER_APPRAISAL(7, "Seller Reviewing Items"),
-    APPRAISAL_COMPLETED(8, "Appraisal Done"),
-    REFUND_PENDING(9, "Refund Processing"),
-    REFUND_COMPLETED(10, "Refund Completed"),
-    REFUND_NOT_APPLICABLE(11, "Refund Not Applicable"),
-    FAILED(12, "Process Failed"),
-    CANCELLED(13, "Cancelled by User/System"),
-    REFUND_FAILED(14, "Refund Failed");
+    PICKUP_CONFIRMED(2, "Pickup Confirmed"),
+    PICKUP_NOT_CONFIRMED(3, "Pickup Not Confirmed"),
+    PICKUP_PENDING(4, "Awaiting Pickup"),
+    PICKUP_ASSIGNED(5, "Delivery Partner Assigned"),
+    IN_TRANSIT(6, "In Transit to Seller"),
+    DELIVERED_TO_SELLER(7, "Delivered to Seller"),
+    UNDER_APPRAISAL(8, "Seller Reviewing Items"),
+    APPRAISAL_COMPLETED(9, "Appraisal Done"),
+    REFUND_PENDING(10, "Refund Processing"),
+    REFUND_COMPLETED(11, "Refund Completed"),
+    REFUND_NOT_APPLICABLE(12, "Refund Not Applicable"),
+    FAILED(13, "Process Failed"),
+    CANCELLED(14, "Cancelled by User/System"),
+    REFUND_FAILED(15, "Refund Failed");
 
     private final Integer id;
     private final String description;
@@ -46,6 +48,20 @@ public enum SecureReturnStatus {
      * Check if the return can be rescheduled in this status
      */
     public boolean canReschedule() {
+        return this == SCHEDULED || this == PICKUP_CONFIRMED;
+    }
+
+    /**
+     * Check if pickup confirmation is pending
+     */
+    public boolean isAwaitingConfirmation() {
         return this == SCHEDULED;
+    }
+
+    /**
+     * Check if pickup can be initiated (confirmed status)
+     */
+    public boolean canInitiatePickup() {
+        return this == PICKUP_CONFIRMED;
     }
 }
