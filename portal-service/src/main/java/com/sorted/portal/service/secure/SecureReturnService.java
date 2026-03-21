@@ -952,9 +952,9 @@ public class SecureReturnService {
         String pickupAddress = buildAddressString(addr);
 
         // Check if confirmation is still allowed
-        LocalDate today = LocalDate.now();
+        LocalTime startTime = secureReturn.getScheduled_time_slot().getStartTime();
         boolean canConfirm = secureReturn.getStatus() == SecureReturnStatus.SCHEDULED
-                && !secureReturn.getScheduled_pickup_date().isBefore(today);
+                && !LocalDate.now().isAfter(secureReturn.getScheduled_pickup_date()) && LocalTime.now().isBefore(startTime);
 
         // Build item details
         List<SecurePickupDetailsBean.PickupItemDetail> itemDetails = secureReturn.getItems().stream()
