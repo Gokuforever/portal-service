@@ -921,8 +921,8 @@ public class SecureReturnService {
         Preconditions.check(secureReturn.getStatus() == SecureReturnStatus.SCHEDULED, ResponseCode.INVALID_SECURE_RETURN_STATUS);
 
         // Verify the pickup date is still in the future or today
-        LocalDate today = LocalDate.now();
-        Preconditions.check(!secureReturn.getScheduled_pickup_date().isBefore(today), ResponseCode.PICKUP_DATE_PASSED);
+        boolean isBefore = LocalDateTime.now().isBefore(LocalDateTime.of(secureReturn.getScheduled_pickup_date(), secureReturn.getScheduled_time_slot().getStartTime()));
+        Preconditions.check(isBefore, ResponseCode.PICKUP_DATE_PASSED);
 
         secureReturn.setStatus(
                 SecureReturnStatus.PICKUP_CONFIRMED,
