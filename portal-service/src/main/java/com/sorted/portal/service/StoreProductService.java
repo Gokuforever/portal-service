@@ -34,7 +34,7 @@ public class StoreProductService {
     private final SearchHistoryAsyncHelper searchHistoryAsyncHelper;
     private final Category_MasterService category_MasterService;
     private final ComboUtility comboUtility;
-    @Value("${se.store.allowed.categories:660194cde437f74a756be5f7,693701e9c6f45220cc784671,69370ac8c6f45220cc784675,69370e15c6f45220cc784678,69370f58c6f45220cc78467a,69371231c6f45220cc78467c,68df9761ffe872a16b247617,68dd47b6f88953e8a00deea5,693edb76e48e2b76f1cb918c}")
+    @Value("${se.store.allowed.categories:660194cde437f74a756be5f7,693701e9c6f45220cc784671,69370ac8c6f45220cc784675,69370e15c6f45220cc784678,69370f58c6f45220cc78467a,69371231c6f45220cc78467c,68df9761ffe872a16b247617,68dd47b6f88953e8a00deea5,693edb76e48e2b76f1cb918c,6858628aa520924ecbaa7ad5}")
     private String allowedCategories;
     private final RecommendationsService recommendationsService;
     private final ZoneHandlerService zoneHandlerService;
