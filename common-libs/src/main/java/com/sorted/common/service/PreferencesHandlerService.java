@@ -88,145 +88,146 @@ public class PreferencesHandlerService {
         if (!CollectionUtils.isEmpty(notifyRestockEntities)) {
             restockNotificationsEnabledProducts = notifyRestockEntities.stream().map(NotifyRestockEntity::getProductMasterId).toList();
         }
-
+        Map<String, Long> highestPrize = new HashMap<>();
         if (!CollectionUtils.isEmpty(productIdsBySeller)) {
-            Map<String, Long> highestPrize = productUtility.getProductHighestSellingPrice(productIdsBySeller.toArray(new String[0]));
-            for (HomeConfig homeConfig : homeConfigs) {
+            highestPrize = productUtility.getProductHighestSellingPrice(productIdsBySeller.toArray(new String[0]));
+        }
+        for (HomeConfig homeConfig : homeConfigs) {
 
-                String categoryId = homeConfig.getCategoryId();
-                homeProductsBeanBuilder.mainBadge(homeConfig.getMainBadge())
-                        .mainTitle(homeConfig.getMainTitle())
-                        .mainSubtitle(homeConfig.getMainSubtitle())
-                        .categoryId(categoryId);
+            String categoryId = homeConfig.getCategoryId();
+            homeProductsBeanBuilder.mainBadge(homeConfig.getMainBadge())
+                    .mainTitle(homeConfig.getMainTitle())
+                    .mainSubtitle(homeConfig.getMainSubtitle())
+                    .categoryId(categoryId);
 
-                SEFilter filter3 = new SEFilter(SEFilterType.AND);
-                filter3.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-                filter3.addClause(WhereClause.eq(Products.Fields.category_id, categoryId));
-                filter3.addClause(WhereClause.isNotNull("media.cdn_url"));
-                filter3.addClause(WhereClause.eq(Products.Fields.seller_id, seller.getId()));
+            SEFilter filter3 = new SEFilter(SEFilterType.AND);
+            filter3.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+            filter3.addClause(WhereClause.eq(Products.Fields.category_id, categoryId));
+            filter3.addClause(WhereClause.isNotNull("media.cdn_url"));
+            filter3.addClause(WhereClause.eq(Products.Fields.seller_id, seller.getId()));
 
-                filter3.setOrderBy(new OrderBy(Products.Fields.quantity, SortOrder.DESC));
+            filter3.setOrderBy(new OrderBy(Products.Fields.quantity, SortOrder.DESC));
 
-                List<Products> randomProducts = productRepository.getRandomProducts(filter3, 7);
+            List<Products> randomProducts = productRepository.getRandomProducts(filter3, 7);
 
-                ProductCarousel productCarousel = homeConfig.getProductCarousel();
-                List<ProductBean> randomProductBeans = new ArrayList<>();
-                for (Products randomProduct : randomProducts) {
-                    randomProductBeans.add(getProductBean(randomProduct, highestPrize, restockNotificationsEnabledProducts.contains(randomProduct.getProduct_master_id())));
+            ProductCarousel productCarousel = homeConfig.getProductCarousel();
+            List<ProductBean> randomProductBeans = new ArrayList<>();
+            for (Products randomProduct : randomProducts) {
+                randomProductBeans.add(getProductBean(randomProduct, highestPrize, restockNotificationsEnabledProducts.contains(randomProduct.getProduct_master_id())));
+            }
+
+            if (CollectionUtils.isEmpty(randomProducts) || randomProducts.size() < 7) {
+                SEFilter filter = new SEFilter(SEFilterType.AND);
+                filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+                filter.addClause(WhereClause.eq(Product_Master.Fields.catagory_id, categoryId));
+                filter.addClause(WhereClause.isNotNull(Product_Master.Fields.cdn_url));
+                if (!CollectionUtils.isEmpty(randomProducts)) {
+                    filter.addClause(WhereClause.nin(BaseMongoEntity.Fields.id, randomProducts.stream().map(Products::getProduct_master_id).toList()));
+                }
+                Pagination pagination;
+                if (CollectionUtils.isEmpty(randomProducts)) {
+                    pagination = new Pagination(0, 7);
+                } else {
+                    pagination = new Pagination(0, 7 - randomProducts.size());
+                }
+                filter.setPagination(pagination);
+
+                List<Product_Master> productMasters = productMasterService.repoFind(filter);
+                for (Product_Master productMaster : productMasters) {
+                    randomProductBeans.add(getProductBean(productMaster, restockNotificationsEnabledProducts.contains(productMaster.getId())));
+                }
+            }
+
+            // Sort by quantity descending before returning
+            randomProductBeans.sort((a, b) -> Long.compare(b.quantity(), a.quantity()));
+
+            ProductCarouselBean productCarouselBean = ProductCarouselBean.builder()
+                    .title(productCarousel.getTitle())
+                    .subtitle(productCarousel.getSubtitle())
+                    .products(randomProductBeans)
+                    .build();
+
+            homeProductsBeanBuilder.productCarousel(productCarouselBean);
+
+            List<GroupComponent> groupComponent = homeConfig.getGroupComponent();
+
+            List<GroupComponentBean> groupComponentBeans = new ArrayList<>();
+
+            for (GroupComponent group : groupComponent) {
+                SEFilter filterPM = new SEFilter(SEFilterType.AND);
+                filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+                filterPM.addClause(WhereClause.eq(Products.Fields.category_id, categoryId));
+                filterPM.addClause(WhereClause.eq(Products.Fields.group_id, group.getId()));
+                filterPM.addClause(WhereClause.isNotEmpty("media.cdn_url"));
+                filterPM.addClause(WhereClause.eq(Products.Fields.seller_id, seller.getId()));
+                if (group.getFilters() != null && !group.getFilters().isEmpty()) {
+                    for (Map.Entry<String, List<String>> entry : group.getFilters().entrySet()) {
+                        if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
+                            Map<String, Object> map = new HashMap<>();
+                            map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
+                            map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
+                            filterPM.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+                        }
+                    }
                 }
 
-                if (CollectionUtils.isEmpty(randomProducts) || randomProducts.size() < 7) {
-                    SEFilter filter = new SEFilter(SEFilterType.AND);
-                    filter.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-                    filter.addClause(WhereClause.eq(Product_Master.Fields.catagory_id, categoryId));
-                    filter.addClause(WhereClause.isNotNull(Product_Master.Fields.cdn_url));
-                    if (!CollectionUtils.isEmpty(randomProducts)) {
-                        filter.addClause(WhereClause.nin(BaseMongoEntity.Fields.id, randomProducts.stream().map(Products::getProduct_master_id).toList()));
-                    }
-                    Pagination pagination;
-                    if (CollectionUtils.isEmpty(randomProducts)) {
-                        pagination = new Pagination(0, 7);
-                    } else {
-                        pagination = new Pagination(0, 7 - randomProducts.size());
-                    }
-                    filter.setPagination(pagination);
+                filterPM.setOrderBy(new OrderBy(Products.Fields.quantity, SortOrder.DESC));
 
-                    List<Product_Master> productMasters = productMasterService.repoFind(filter);
-                    for (Product_Master productMaster : productMasters) {
-                        randomProductBeans.add(getProductBean(productMaster, restockNotificationsEnabledProducts.contains(productMaster.getId())));
-                    }
+                List<Products> productsByGroup = productRepository.getRandomProducts(filterPM, 7);
+
+                List<ProductBean> productListByGroup = new ArrayList<>();
+
+                for (Products productByGroup : productsByGroup) {
+                    productListByGroup.add(getProductBean(productByGroup, highestPrize, restockNotificationsEnabledProducts.contains(productByGroup.getProduct_master_id())));
                 }
 
-                // Sort by quantity descending before returning
-                randomProductBeans.sort((a, b) -> Long.compare(b.quantity(), a.quantity()));
-
-                ProductCarouselBean productCarouselBean = ProductCarouselBean.builder()
-                        .title(productCarousel.getTitle())
-                        .subtitle(productCarousel.getSubtitle())
-                        .products(randomProductBeans)
-                        .build();
-
-                homeProductsBeanBuilder.productCarousel(productCarouselBean);
-
-                List<GroupComponent> groupComponent = homeConfig.getGroupComponent();
-
-                List<GroupComponentBean> groupComponentBeans = new ArrayList<>();
-
-                for (GroupComponent group : groupComponent) {
-                    SEFilter filterPM = new SEFilter(SEFilterType.AND);
-                    filterPM.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-                    filterPM.addClause(WhereClause.eq(Products.Fields.category_id, categoryId));
-                    filterPM.addClause(WhereClause.eq(Products.Fields.group_id, group.getId()));
-                    filterPM.addClause(WhereClause.isNotEmpty("media.cdn_url"));
-                    filterPM.addClause(WhereClause.eq(Products.Fields.seller_id, seller.getId()));
+                if (CollectionUtils.isEmpty(productsByGroup) || productsByGroup.size() < 7) {
+                    SEFilter filterMaster = new SEFilter(SEFilterType.AND);
+                    filterMaster.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
+                    filterMaster.addClause(WhereClause.eq(Product_Master.Fields.catagory_id, categoryId));
+                    filterMaster.addClause(WhereClause.eq(Product_Master.Fields.group_id, group.getId()));
+                    filterMaster.addClause(WhereClause.isNotNull(Product_Master.Fields.cdn_url));
+                    if (!CollectionUtils.isEmpty(productsByGroup)) {
+                        filterMaster.addClause(WhereClause.nin(BaseMongoEntity.Fields.id, productsByGroup.stream().map(Products::getProduct_master_id).toList()));
+                    }
                     if (group.getFilters() != null && !group.getFilters().isEmpty()) {
                         for (Map.Entry<String, List<String>> entry : group.getFilters().entrySet()) {
                             if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
-                                Map<String, Object> map = new HashMap<>();
-                                map.put(SelectedSubCategories.Fields.sub_category, entry.getKey());
-                                map.put(SelectedSubCategories.Fields.selected_attributes, entry.getValue());
-                                filterPM.addClause(WhereClause.elem_match(Products.Fields.selected_sub_catagories, map));
+                                filterMaster.addClause(WhereClause.in("sub_categories." + entry.getKey(), entry.getValue()));
                             }
                         }
                     }
 
-                    filterPM.setOrderBy(new OrderBy(Products.Fields.quantity, SortOrder.DESC));
-
-                    List<Products> productsByGroup = productRepository.getRandomProducts(filterPM, 7);
-
-                    List<ProductBean> productListByGroup = new ArrayList<>();
-
-                    for (Products productByGroup : productsByGroup) {
-                        productListByGroup.add(getProductBean(productByGroup, highestPrize, restockNotificationsEnabledProducts.contains(productByGroup.getProduct_master_id())));
+                    Pagination pagination;
+                    if (CollectionUtils.isEmpty(productsByGroup)) {
+                        pagination = new Pagination(0, 7);
+                    } else {
+                        pagination = new Pagination(0, 7 - productsByGroup.size());
                     }
-
-                    if (CollectionUtils.isEmpty(productsByGroup) || productsByGroup.size() < 7) {
-                        SEFilter filterMaster = new SEFilter(SEFilterType.AND);
-                        filterMaster.addClause(WhereClause.eq(BaseMongoEntity.Fields.deleted, false));
-                        filterMaster.addClause(WhereClause.eq(Product_Master.Fields.catagory_id, categoryId));
-                        filterMaster.addClause(WhereClause.eq(Product_Master.Fields.group_id, group.getId()));
-                        filterMaster.addClause(WhereClause.isNotNull(Product_Master.Fields.cdn_url));
-                        if (!CollectionUtils.isEmpty(productsByGroup)) {
-                            filterMaster.addClause(WhereClause.nin(BaseMongoEntity.Fields.id, productsByGroup.stream().map(Products::getProduct_master_id).toList()));
-                        }
-                        if (group.getFilters() != null && !group.getFilters().isEmpty()) {
-                            for (Map.Entry<String, List<String>> entry : group.getFilters().entrySet()) {
-                                if (StringUtils.hasText(entry.getKey()) && !CollectionUtils.isEmpty(entry.getValue())) {
-                                    filterMaster.addClause(WhereClause.in("sub_categories." + entry.getKey(), entry.getValue()));
-                                }
-                            }
-                        }
-
-                        Pagination pagination;
-                        if (CollectionUtils.isEmpty(productsByGroup)) {
-                            pagination = new Pagination(0, 7);
-                        } else {
-                            pagination = new Pagination(0, 7 - productsByGroup.size());
-                        }
-                        filterMaster.setPagination(pagination);
-                        List<Product_Master> productMasters = productMasterService.repoFind(filterMaster);
-                        if (!CollectionUtils.isEmpty(productMasters)) {
-                            for (Product_Master productMaster : productMasters) {
-                                productListByGroup.add(getProductBean(productMaster, restockNotificationsEnabledProducts.contains(productMaster.getId())));
-                            }
+                    filterMaster.setPagination(pagination);
+                    List<Product_Master> productMasters = productMasterService.repoFind(filterMaster);
+                    if (!CollectionUtils.isEmpty(productMasters)) {
+                        for (Product_Master productMaster : productMasters) {
+                            productListByGroup.add(getProductBean(productMaster, restockNotificationsEnabledProducts.contains(productMaster.getId())));
                         }
                     }
-                    productListByGroup.sort((a, b) -> Long.compare(b.quantity(), a.quantity()));
-
-                    GroupComponentBean groupComponentBean = GroupComponentBean.builder()
-                            .groupId(group.getId())
-                            .title(group.getTitle())
-                            .filters(group.getFilters())
-                            .products(productListByGroup)
-                            .build();
-                    groupComponentBeans.add(groupComponentBean);
                 }
-                HomeProductsBean homeProductsBean = homeProductsBeanBuilder.groupComponent(groupComponentBeans)
-                        .combo(false)
+                productListByGroup.sort((a, b) -> Long.compare(b.quantity(), a.quantity()));
+
+                GroupComponentBean groupComponentBean = GroupComponentBean.builder()
+                        .groupId(group.getId())
+                        .title(group.getTitle())
+                        .filters(group.getFilters())
+                        .products(productListByGroup)
                         .build();
-                homeProductsBeans.add(homeProductsBean);
+                groupComponentBeans.add(groupComponentBean);
             }
+            HomeProductsBean homeProductsBean = homeProductsBeanBuilder.groupComponent(groupComponentBeans)
+                    .combo(false)
+                    .build();
+            homeProductsBeans.add(homeProductsBean);
         }
+
 
         List<PromoBanners> promoBanners = new ArrayList<>();
 
