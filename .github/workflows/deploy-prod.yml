@@ -3,7 +3,7 @@ name: Deploy to Production
 on:
   workflow_dispatch:
   push:
-    branches: [ master ]
+    branches: [ prod ]
   release:
     types: [ published ]
 
@@ -13,7 +13,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -71,7 +71,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: production-runner  # ✅ This targets only your prod EC2
+    runs-on: [self-hosted, gcp-prod]
     environment: production
     permissions:
       contents: read
@@ -88,9 +88,6 @@ jobs:
       - name: Deploy to Production Server
         run: |
           echo "======== DEPLOYMENT STARTED ========"
-
-          mkdir -p /home/ubuntu/studeaze/config
-          mkdir -p /home/ubuntu/studeaze/logs
           
           echo "*** Gracefully stopping application ***"
           if docker ps -q -f name=portal-service | grep -q .; then
@@ -114,13 +111,13 @@ jobs:
             --restart always \
             -p 443:443 \
             -e SE_ENV=/app/config \
-            -e SPRING_PROFILES_ACTIVE=prod \
+            -e SPRING_PROFILES_ACTIVE=dev \
             -e LOG_DIR=/app/logs \
             -e TZ=Asia/Kolkata \
             -e JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Kolkata" \
-            --mount type=bind,source=/home/ubuntu/studeaze/config,target=/app/config \
-            --mount type=bind,source=/home/ubuntu/studeaze/logs,target=/app/logs \
-            --mount type=bind,source=/home/ubuntu/prod.api.studeaze.in.keystore.p12,target=/app/ssl/prod.api.studeaze.in.keystore.p12 \
+            --mount type=bind,source=/home/yogesh-gcp/studeaze/config,target=/app/config \
+            --mount type=bind,source=/home/yogesh-gcp/studeaze/logs,target=/app/logs \
+            --mount type=bind,source=/app/ssl/keystore.p12,target=/app/ssl/keystore.p12 \
             ghcr.io/gokuforever/portal-service:latest
           
           echo "*** Verifying deployment ***"
