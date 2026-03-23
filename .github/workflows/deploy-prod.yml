@@ -115,8 +115,8 @@ jobs:
             -e LOG_DIR=/app/logs \
             -e TZ=Asia/Kolkata \
             -e JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Kolkata" \
-            --mount type=bind,source=/home/yogesh-gcp/studeaze/config,target=/app/config \
-            --mount type=bind,source=/home/yogesh-gcp/studeaze/logs,target=/app/logs \
+            --mount type=bind,source=/home/yogesh-prod/studeaze/config,target=/app/config \
+            --mount type=bind,source=/home/yogesh-prod/studeaze/logs,target=/app/logs \
             --mount type=bind,source=/app/ssl/keystore.p12,target=/app/ssl/keystore.p12 \
             ghcr.io/gokuforever/portal-service:latest
           
