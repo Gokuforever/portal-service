@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
  * 1. Sends confirmation emails to users with pickups scheduled for the next day
  * 2. Marks unconfirmed returns as PICKUP_NOT_CONFIRMED on the day of pickup
  */
-@Component
+//@Component
 @Slf4j
 @RequiredArgsConstructor
 public class SecurePickupConfirmationCron {

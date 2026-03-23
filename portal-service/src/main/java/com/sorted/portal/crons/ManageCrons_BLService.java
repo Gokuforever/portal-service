@@ -42,7 +42,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-@Component
+//@Component
 @Slf4j
 @RequiredArgsConstructor
 public class ManageCrons_BLService {
