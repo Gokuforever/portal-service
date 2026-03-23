@@ -111,7 +111,7 @@ jobs:
             --restart always \
             -p 443:443 \
             -e SE_ENV=/app/config \
-            -e SPRING_PROFILES_ACTIVE=dev \
+            -e SPRING_PROFILES_ACTIVE=prod \
             -e LOG_DIR=/app/logs \
             -e TZ=Asia/Kolkata \
             -e JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Kolkata" \
